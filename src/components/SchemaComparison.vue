@@ -5,6 +5,17 @@
       <p>Compare table structures between two SQLCipher databases</p>
     </div>
 
+      <!-- Error message -->
+      <div v-if="error" class="error-message">
+        {{ error }}
+      </div>
+
+      <!-- Success message -->
+      <div v-if="successMessage" class="success-message">
+        <pre>{{ successMessage }}</pre>
+      </div>
+
+
     <div class="database-selection">
       <div class="db-selector">
         <label>Database 1 (Source):</label>
@@ -44,6 +55,14 @@
         class="export-btn"
       >
         Export Report
+      </button>
+      
+      <button 
+        v-if="comparisonResult"
+        @click="generatePatch"
+        class="patch-btn"
+        >
+        Generate SQL Patch
       </button>
     </div>
 
@@ -171,7 +190,7 @@
         </div>
       </div>
 
-      <!-- Modified Tables Section -->
+      <!-- Modified Tables Section
       <div v-if="modifiedTables.source.length > 0" class="status-section">
         <div class="status-section-header modified">
           <span class="status-icon">🔄</span>
@@ -262,7 +281,113 @@
             </div>
           </div>
         </div>
+      </div> -->
+
+  <!-- Replace the Modified Tables section -->
+  <div v-if="modifiedTables.source.length > 0" class="status-section">
+    <div class="status-section-header modified">
+      <span class="status-icon">🔄</span>
+      <h4>Modified Tables ({{ modifiedTables.source.length }})</h4>
+      <p>Tables that have structural differences between databases</p>
+    </div>
+  
+  <!-- SINGLE header row at the top -->
+  <div class="side-by-side-container header-only">
+    <div class="column-header">
+      <h4>{{ getDatabaseName(database1) }} (Source)</h4>
+    </div>
+    <div class="column-header">
+      <h4>{{ getDatabaseName(database2) }} (Target)</h4>
+    </div>
+  </div>
+  
+  <!-- Table pairs WITHOUT headers -->
+  <div v-for="(sourceTable, index) in modifiedTables.source" :key="'modified_pair_' + sourceTable.name" class="table-pair-container">
+    <div class="side-by-side-container">
+      
+      <!-- Source Side - NO HEADER -->
+      <div class="database-column-no-header">
+        <div class="column-content">
+          <div class="table-card">
+            <div 
+              class="table-header-card modified"
+              @click="toggleTableDetails(sourceTable.name)"
+            >
+              <div class="table-info">
+                <span class="table-name">{{ sourceTable.name }}</span>
+                <span class="table-status-badge modified">Modified</span>
+              </div>
+              <span class="toggle-icon">
+                {{ expandedTables.has(sourceTable.name) ? '▼' : '▶' }}
+              </span>
+            </div>
+            <div v-if="expandedTables.has(sourceTable.name)" class="table-details">
+              <div v-if="sourceTable.columns.length > 0" class="columns-list">
+                <h6>Columns (Before):</h6>
+                <div 
+                  v-for="column in sourceTable.columns" 
+                  :key="'source_mod_col_' + column.name"
+                  class="column-item"
+                  :class="column.status"
+                >
+                  <span class="column-name">{{ column.name }}</span>
+                  <span class="column-type">{{ column.data_type }}</span>
+                  <span v-if="column.changes" class="column-changes">
+                    {{ column.changes.join(', ') }}
+                  </span>
+                </div>
+              </div>
+              <div v-else class="empty-columns-message">
+                No column changes detected in source
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
+      
+      <!-- Target Side - NO HEADER -->
+      <div class="database-column-no-header">
+        <div class="column-content">
+          <div class="table-card">
+            <div 
+              class="table-header-card modified"
+              @click="toggleTableDetails(modifiedTables.target[index].name)"
+            >
+              <div class="table-info">
+                <span class="table-name">{{ modifiedTables.target[index].name }}</span>
+                <span class="table-status-badge modified">Modified</span>
+              </div>
+              <span class="toggle-icon">
+                {{ expandedTables.has(modifiedTables.target[index].name) ? '▼' : '▶' }}
+              </span>
+            </div>
+            <div v-if="expandedTables.has(modifiedTables.target[index].name)" class="table-details">
+              <div v-if="modifiedTables.target[index].columns.length > 0" class="columns-list">
+                <h6>Columns (After):</h6>
+                <div 
+                  v-for="column in modifiedTables.target[index].columns" 
+                  :key="'target_mod_col_' + column.name"
+                  class="column-item"
+                  :class="column.status"
+                >
+                  <span class="column-name">{{ column.name }}</span>
+                  <span class="column-type">{{ column.data_type }}</span>
+                  <span v-if="column.changes" class="column-changes">
+                    {{ column.changes.join(', ') }}
+                  </span>
+                </div>
+              </div>
+              <div v-else class="empty-columns-message">
+                No column changes detected in target
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+    </div>
+  </div>
+</div>
 
       <!-- Unchanged Tables Section -->
       <div v-if="unchangedTables.length > 0" class="status-section">
@@ -332,6 +457,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount } from "vue"
+import { invoke } from '@tauri-apps/api/core'; 
 import { DatabaseService, type DatabaseInfo, type SchemaComparison } from '../services/databaseService';
 
 // Props
@@ -368,6 +494,7 @@ interface ColumnDisplay {
   status: 'added' | 'removed' | 'modified' | 'unchanged';
   changes?: string[];
 }
+
 
 // Computed properties for grouped display by status
 const addedTables = computed((): TableDisplay[] => {
@@ -508,13 +635,29 @@ const getDatabaseName = (path: string): string => {
 
 
 
+// const exportComparison = () => {
+//   if (!comparisonResult.value) return;
+
+//   const report = generateComparisonReport(comparisonResult.value);
+//   downloadReport(report);
+// };
+
 const exportComparison = () => {
   if (!comparisonResult.value) return;
 
+  error.value = '';
+  successMessage.value = '';
+  
   const report = generateComparisonReport(comparisonResult.value);
-  downloadReport(report);
+  const filename = `schema-comparison-${new Date().toISOString().slice(0, 10)}.txt`;
+  downloadReport(report, filename);
+  
+  successMessage.value = `✅ Comparison report exported successfully!\nFile: ${filename}\nLocation: Your browser's download folder`;
+  
+  setTimeout(() => {
+    successMessage.value = '';
+  }, 5000);
 };
-
 const generateComparisonReport = (comparison: SchemaComparison): string => {
   let report = `Database Schema Comparison Report\n`;
   report += `=====================================\n\n`;
@@ -587,18 +730,29 @@ const generateComparisonReport = (comparison: SchemaComparison): string => {
   return report;
 };
 
-const downloadReport = (content: string) => {
+// const downloadReport = (content: string) => {
+//   const blob = new Blob([content], { type: 'text/plain' });
+//   const url = URL.createObjectURL(blob);
+//   const a = document.createElement('a');
+//   a.href = url;
+//   a.download = `schema-comparison-${new Date().toISOString().slice(0, 10)}.txt`;
+//   document.body.appendChild(a);
+//   a.click();
+//   document.body.removeChild(a);
+//   URL.revokeObjectURL(url);
+// };
+
+const downloadReport = (content: string, filename: string) => {
   const blob = new Blob([content], { type: 'text/plain' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `schema-comparison-${new Date().toISOString().slice(0, 10)}.txt`;
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 };
-
 
 // State persistence
 const saveState = () => {
@@ -635,8 +789,110 @@ const loadState = () => {
     console.warn('Failed to load schema comparison state:', e);
   }
 };
+const successMessage = ref('');
+const generatePatch = async () => {
+  if (!database1.value || !database2.value) return;
+  
+   error.value = ''; // Clear previous errors
+  successMessage.value = ''; // Clear previous success
+
+  try {
+    const patchSql = await invoke<string>('generate_schema_patch', {
+      db1Path: database1.value,
+      db2Path: database2.value,
+      // db2Password: db2Password,
+    });
+    
+   // const filename = `schema-patch-${new Date().toISOString().slice(0, 10)}.sql`;
+    // const now = new Date();
+    // const timestamp = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}-${String(now.getMinutes()).padStart(2,'0')}-${String(now.getSeconds()).padStart(2,'0')}`;
+    // const filename = `schema-patch-${timestamp}.sql`;
+
+    const db1Name = getDatabaseName(database1.value).replace(/[^a-z0-9]/gi, '_');
+    const db2Name = getDatabaseName(database2.value).replace(/[^a-z0-9]/gi, '_');
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
+    const filename = `patch_${db1Name}_to_${db2Name}_${timestamp}.sql`;
+
+    downloadPatch(patchSql, filename);
+    
+    //downloadPatch(patchSql);
+     // Show success message
+    successMessage.value = `✅ SQL patch generated successfully!\nFile: ${filename}\nLocation:Downloads folder`;
+    
+    // Auto-clear after 5 seconds
+    setTimeout(() => {
+      successMessage.value = '';
+    }, 5000);
+  } catch (err) {
+    error.value = `Failed to generate patch: ${err}`;
+  }
+};
 
 
+// const generatePatch = async () => {
+//   if (!database1.value || !database2.value) return;
+  
+//   // Find the database info to get the password
+//   const db2Info = props.databases.find(db => db.path === database2.value);
+  
+//   if (!db2Info) {
+//     error.value = 'Target database information not found. Please reconnect the database.';
+//     return;
+//   }
+
+//   // Get the password - use the stored password or prompt user if not available
+//   let db2Password = db2Info.password || '';
+  
+//   // If password is not stored, you might want to prompt the user
+//   if (!db2Password) {
+//     // Option 1: Use a prompt (simple but not secure)
+//     db2Password = prompt(`Please enter the password for database: ${db2Info.name}`) || '';
+    
+//     // Option 2: Or show an error and return
+//     // error.value = `Password not available for ${db2Info.name}. Please reconnect the database with the password.`;
+//     // return;
+//   }
+
+//   if (!db2Password) {
+//     error.value = 'Password is required to generate the patch.';
+//     return;
+//   }
+
+//   try {
+//     const patchSql = await invoke<string>('generate_schema_patch', {
+//       db1Path: database1.value,
+//       db2Path: database2.value,
+//       db2Password: db2Password, // Pass the password from frontend
+//     });
+    
+//     downloadPatch(patchSql);
+//     error.value = ''; // Clear any previous errors
+//   } catch (err) {
+//     error.value = `Failed to generate patch: ${err}`;
+//   }
+// };
+// const downloadPatch = (sql: string) => {
+//   const blob = new Blob([sql], { type: 'text/plain' });
+//   const url = URL.createObjectURL(blob);
+//   const a = document.createElement('a');
+//   a.href = url;
+//   a.download = `schema-patch-${new Date().toISOString().slice(0, 10)}.sql`;
+//   document.body.appendChild(a);
+//   a.click();
+//   document.body.removeChild(a);
+//   URL.revokeObjectURL(url);
+// };
+const downloadPatch = (sql: string, filename: string) => {
+  const blob = new Blob([sql], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
 
 // Watchers to save state on changes
 watch([database1, database2], saveState);
@@ -653,6 +909,21 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.patch-btn {
+  padding: 12px 30px;
+  background: #6610f2;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 1em;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.patch-btn:hover {
+  background: #520dc2;
+}
+
 .schema-comparison {
   max-width: 100%;
   height: 100%;
@@ -767,6 +1038,24 @@ onBeforeUnmount(() => {
   border-radius: 4px;
   margin-bottom: 20px;
   text-align: center;
+}
+
+.success-message {
+  padding: 15px;
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+  border-radius: 4px;
+  margin-bottom: 20px;
+  text-align: center;
+  animation: slideIn 0.3s ease-out;
+}
+
+.success-message pre {
+  margin: 0;
+  font-family: inherit;
+  white-space: pre-line;
+  font-size: 0.95em;
 }
 
 .comparison-results {
@@ -889,18 +1178,26 @@ onBeforeUnmount(() => {
   text-align: center;
 }
 
-/* Side by Side Layout */
+/* Table Pair Container - For Modified Tables */
+.table-pair-container {
+  /* margin-bottom: 1px; */
+  background: #dee2e6;
+}
+
+/* Side by Side Layout - Equal Heights */
 .side-by-side-container {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1px;
   background: #dee2e6;
+  align-items: stretch;
 }
 
 .database-column {
   background: white;
   display: flex;
   flex-direction: column;
+  /* min-height: 100%; */
 }
 
 .column-header {
@@ -916,9 +1213,10 @@ onBeforeUnmount(() => {
 }
 
 .column-content {
-  flex: 1;
+  /* flex: 1; */
   padding: 20px;
-  min-height: 200px;
+  display: flex;
+  flex-direction: column;
 }
 
 .column-content.empty-state {
@@ -945,7 +1243,7 @@ onBeforeUnmount(() => {
 }
 
 .table-card {
-  margin-bottom: 15px;
+  /* flex: 1; */
   border: 1px solid #dee2e6;
   border-radius: 6px;
   overflow: hidden;
@@ -1034,6 +1332,7 @@ onBeforeUnmount(() => {
   padding: 15px;
   background: #f8f9fa;
   border-top: 1px solid #dee2e6;
+  /* min-height: 100px; */
 }
 
 .columns-list h6 {
@@ -1090,6 +1389,17 @@ onBeforeUnmount(() => {
   font-style: italic;
 }
 
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @media (max-width: 768px) {
   .database-selection {
     grid-template-columns: 1fr;
@@ -1120,9 +1430,24 @@ onBeforeUnmount(() => {
   .status-section-header h4 {
     font-size: 1.1em;
   }
+}
 
-  .column-content {
-    min-height: 150px;
-  }
+
+side-by-side-container.header-only {
+  margin-bottom: 0;
+}
+
+.side-by-side-container.header-only .column-header {
+  padding: 15px 20px;
+  background: #343a40;
+  color: white;
+  text-align: center;
+}
+
+/* Column without header */
+.database-column-no-header {
+  background: white;
+  display: flex;
+  flex-direction: column;
 }
 </style>

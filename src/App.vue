@@ -388,7 +388,7 @@ const handleTableSelected = (tableName: string) => {
 /* Tailwind-inspired utility classes */
 
 /* Color Variables */
-:root {
+/*:root {
   --primary-500: #6366f1;
   --primary-600: #4f46e5;
   --primary-700: #3730a3;
@@ -404,7 +404,29 @@ const handleTableSelected = (tableName: string) => {
   --blue-500: #3b82f6;
   --blue-600: #2563eb;
   --blue-700: #1d4ed8;
+} 
+
+:root {
+  --primary-500: #6366f1;
+  --primary-600: #4f46e5;
+  --gray-50: #f8fafc;
+  --gray-100: #f1f5f9;
+  --gray-800: #1e293b;
+  --gray-900: #0f172a;
+  --white: #ffffff;
+} 
+
+
+:root.dark {
+  --primary-500: #818cf8;
+  --primary-600: #6366f1;
+  --gray-50: #0f172a;     
+  --gray-100: #1e293b;    
+  --gray-800: #f1f5f9;    
+  --gray-900: #f8fafc;     
+  --white: #0f172a;      
 }
+*/
 
 /* Reset and Base */
 * {
@@ -418,6 +440,7 @@ const handleTableSelected = (tableName: string) => {
   font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
   height: 100vh;
   background-color: var(--gray-50);
+  color: var(--gray-900);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -427,6 +450,7 @@ const handleTableSelected = (tableName: string) => {
 /* Header */
 .app-header {
   background: linear-gradient(135deg, var(--primary-500) 0%, var(--primary-600) 100%);
+  
   color: var(--white);
   padding: 1rem 1.5rem;
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
@@ -860,4 +884,38 @@ const handleTableSelected = (tableName: string) => {
     box-shadow: none;
   }
 }
+
+/*html.dark {
+  color-scheme: dark;
+}
+
+html.dark #app {
+  background-color: #0f172a;
+  color: #f8fafc;
+}
+
+html.dark .app-header {
+  background: linear-gradient(135deg, #4338ca 0%, #3730a3 100%);
+}
+
+html.dark .sidebar,
+html.dark .main-content {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+html.dark .nav-sidebar {
+  background: #0f172a;
+}
+
+html.dark .welcome-content {
+  background: #1e293b;
+  border-color: #334155;
+  color: #f8fafc;
+}
+
+html.dark .tab-panel {
+  background: #1e293b;
+}*/
+
 </style>

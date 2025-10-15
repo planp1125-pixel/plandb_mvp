@@ -106,7 +106,26 @@
       >
         Export Report
       </button>
+
+      <button 
+      v-if="hasResults"
+      @click="generateDataPatch"
+      class="patch-btn"
+      :disabled="isGeneratingPatch"
+    >
+      {{ isGeneratingPatch ? 'Generating...' : 'Generate Data Patch' }}
+    </button>
     </div>
+
+    <!-- Toast Notification -->
+  <div v-if="toast.show" class="toast" :class="toast.type">
+    <div class="toast-icon">{{ toast.type === 'success' ? '✅' : '❌' }}</div>
+    <div class="toast-content">
+      <div class="toast-title">{{ toast.title }}</div>
+      <div class="toast-message">{{ toast.message }}</div>
+    </div>
+    <button @click="toast.show = false" class="toast-close">×</button>
+  </div>
 
     <div v-if="error" class="error-message">
       {{ error }}
@@ -117,23 +136,7 @@
       <div class="results-header">
         <h4>Data Comparison Results</h4>
         <div class="results-controls">
-          <!-- View Toggle -->
-          <div class="view-toggle">
-            <button 
-              @click="viewMode = 'sideBySide'"
-              :class="{ active: viewMode === 'sideBySide' }"
-              class="view-btn"
-            >
-              Side by Side
-            </button>
-            <button 
-              @click="viewMode = 'single'"
-              :class="{ active: viewMode === 'single' }"
-              class="view-btn"
-            >
-              Single View
-            </button>
-          </div>
+         
           
           <!-- Filter Controls -->
           <div class="filter-controls">
@@ -283,6 +286,16 @@
                   Single
                 </button>
               </div>
+
+              <!-- NEW: Per-table patch button -->
+              <button 
+                @click.stop="generateSingleTablePatch(result.tableName)"
+                class="mini-patch-btn"
+                title="Generate patch for this table only"
+              >
+                📄
+              </button>
+
               <span class="toggle-icon">
                 {{ expandedCards.has(`different_${result.tableName}`) ? '▼' : '▶' }}
               </span>
@@ -365,7 +378,7 @@
                     <div class="section-title source-title">
                       <h6>{{ getDatabaseName(database1) }} (Source)</h6>
                     </div>
-                    <div class="scrollable-table-container single-view-table">
+                    <div class="scrollable-table-container">
                       <table class="data-table">
                         <thead>
                           <tr>
@@ -391,7 +404,7 @@
                     <div class="section-title target-title">
                       <h6>{{ getDatabaseName(database2) }} (Target)</h6>
                     </div>
-                    <div class="scrollable-table-container single-view-table">
+                    <div class="scrollable-table-container">
                       <table class="data-table">
                         <thead>
                           <tr>
@@ -1125,6 +1138,139 @@ watch(selectedTables, async (newTables, oldTables) => {
     delete tableColumns.value[table];
   }
 });
+
+
+
+
+const isGeneratingPatch = ref(false);
+const toast = ref({
+  show: false,
+  type: 'success' as 'success' | 'error',
+  title: '',
+  message: ''
+});
+
+// Add toast helper
+const showToast = (type: 'success' | 'error', title: string, message: string) => {
+  toast.value = { show: true, type, title, message };
+  setTimeout(() => {
+    toast.value.show = false;
+  }, 5000);
+};
+
+// Add data patch generation method
+const generateDataPatch = async () => {
+  if (!hasResults.value || !database1.value || !database2.value) return;
+  
+  isGeneratingPatch.value = true;
+  
+  try {
+    // Prepare comparison data for backend
+    const comparisonData = tableComparisons.value.map(result => ({
+      tableName: result.tableName,
+      keyColumn: result.keyColumn,
+      comparison: {
+        missingInTarget: result.comparison.missingInTarget,
+        differentRows: result.comparison.differentRows.map(diff => ({
+          sourceRow: diff.sourceRow,
+          targetRow: diff.targetRow,
+          differentColumns: diff.differentColumns
+        })),
+        extraInTarget: result.comparison.extraInTarget,
+        commonColumns: result.comparison.commonColumns
+      }
+    }));
+
+    const patchSql = await invoke<string>('generate_data_patch', {
+      db1Path: database1.value,
+      db2Path: database2.value,
+      tableComparisons: comparisonData
+    });
+    
+    // Generate filename with database names and timestamp
+    const db1Name = getDatabaseName(database1.value)
+      .replace(/\.[^/.]+$/, '')
+      .replace(/[^a-z0-9]/gi, '_');
+    
+    const db2Name = getDatabaseName(database2.value)
+      .replace(/\.[^/.]+$/, '')
+      .replace(/[^a-z0-9]/gi, '_');
+    
+    const timestamp = new Date().toISOString()
+      .slice(0, 19)
+      .replace('T', '_')
+      .replace(/:/g, '-');
+    
+    const filename = `data_patch_${db1Name}_to_${db2Name}_${timestamp}.sql`;
+    
+    downloadPatch(patchSql, filename);
+    
+    showToast('success', 'Data Patch Generated', 
+      `File: ${filename}\nSaved to Downloads folder\n\nIMPORTANT: Review before executing!`);
+    
+  } catch (err) {
+    showToast('error', 'Patch Generation Failed', String(err));
+  } finally {
+    isGeneratingPatch.value = false;
+  }
+};
+
+const downloadPatch = (sql: string, filename: string) => {
+  const blob = new Blob([sql], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
+
+
+const generateSingleTablePatch = async (tableName: string) => {
+  const tableResult = tableComparisons.value.find(t => t.tableName === tableName);
+  if (!tableResult) return;
+  
+  try {
+    // Reuse the same backend command with single table
+    const comparisonData = [{
+      tableName: tableResult.tableName,
+      keyColumn: tableResult.keyColumn,
+      comparison: {
+        missingInTarget: tableResult.comparison.missingInTarget,
+        differentRows: tableResult.comparison.differentRows.map(diff => ({
+          sourceRow: diff.sourceRow,
+          targetRow: diff.targetRow,
+          differentColumns: diff.differentColumns
+        })),
+        extraInTarget: tableResult.comparison.extraInTarget,
+        commonColumns: tableResult.comparison.commonColumns
+      }
+    }];
+
+    const patchSql = await invoke<string>('generate_data_patch', {
+      db1Path: database1.value,
+      db2Path: database2.value,
+      tableComparisons: comparisonData
+    });
+    
+    const timestamp = new Date().toISOString()
+      .slice(0, 19)
+      .replace('T', '_')
+      .replace(/:/g, '-');
+    
+    const filename = `data_patch_${tableName}_${timestamp}.sql`;
+    downloadPatch(patchSql, filename);
+    
+    showToast('success', 'Table Patch Generated', 
+      `Table: ${tableName}\nFile: ${filename}`);
+    
+  } catch (err) {
+    showToast('error', 'Failed', String(err));
+  }
+};
+
 </script>
 
 
@@ -1189,16 +1335,13 @@ watch(selectedTables, async (newTables, oldTables) => {
 
 /* Fixed single view table scrolling */
 .single-view-table {
-  max-height: 200px !important;
+  max-height: 300px !important;
   overflow-x: auto !important;
   overflow-y: auto !important;
+  width: 100%;
 }
 
 /* Enhanced scrollbar for single view tables */
-.single-view-table::-webkit-scrollbar {
-  width: 18px !important;
-  height: 18px !important;
-}
 
 .single-view-table::-webkit-scrollbar-track {
   background: #f1f1f1;
@@ -1221,39 +1364,6 @@ watch(selectedTables, async (newTables, oldTables) => {
 .single-view-table::-webkit-scrollbar-corner {
   background: #f1f1f1;
 }
-
-
-/* 
-.scrollable-table-container::-webkit-scrollbar {
-  width: 18px;
-  height: 18px;
-}
-
-.scrollable-table-container::-webkit-scrollbar-track {
-  background: #f1f1f1;
-  border-radius: 10px;
-  border: 2px solid #e0e0e0;
-}
-
-.scrollable-table-container::-webkit-scrollbar-thumb {
-  background: #666;
-  border-radius: 10px;
-  border: 3px solid #f1f1f1;
-  min-height: 40px;
-  min-width: 40px;
-}
-
-.scrollable-table-container::-webkit-scrollbar-thumb:hover {
-  background: #444;
-}
-
-.scrollable-table-container::-webkit-scrollbar-thumb:active {
-  background: #222;
-}
-
-.scrollable-table-container::-webkit-scrollbar-corner {
-  background: #f1f1f1;
-} */
 
 
 .database-selection {
@@ -1428,10 +1538,6 @@ watch(selectedTables, async (newTables, oldTables) => {
   background: #e9ecef;
 }
 
-/* .table-name {
-  font-family: 'Courier New', monospace;
-  font-weight: 500;
-} */
 
 .per-table-key-select {
   padding: 6px;
@@ -1800,26 +1906,46 @@ watch(selectedTables, async (newTables, oldTables) => {
   padding: 20px;
 }
 
-/* CRITICAL: Universal Scrollbar Styles - Applied to ALL scrollable containers */
-/* .scrollable-table-container {
-  max-height: 400px;
-  overflow: auto;
-  border: 2px solid #dee2e6;
-  border-radius: 6px;
-  background: white;
-  scroll-behavior: smooth;
-} */
 
 .scrollable-table-container {
   max-height: 400px;
-  overflow-x: auto !important;
-  overflow-y: auto !important;
+  overflow-x: auto;
+  overflow-y: auto;
   border: 2px solid #dee2e6;
   border-radius: 6px;
   background: white;
   scroll-behavior: smooth;
+  scrollbar-gutter: stable;
+  padding-top: 10px;
 }
 
+
+.scrollable-table-container::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+}
+
+.scrollable-table-container::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 8px;
+  border: 2px solid #f1f1f1;
+  min-height: 30px;
+  min-width: 30px;
+}
+
+.scrollable-table-container::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+.scrollable-table-container::-webkit-scrollbar-corner {
+  background: #f1f1f1;
+}
+
+.scrollable-table-container {
+  scrollbar-width: thin;
+  scrollbar-color: #888 #f1f1f1;
+}
 
 
 /* /* Firefox Support */
@@ -2000,10 +2126,6 @@ watch(selectedTables, async (newTables, oldTables) => {
 }
 
 /* Add scrollbar styles specifically for side-by-side view */
-.side-by-side-different-view .scrollable-table-container::-webkit-scrollbar {
-  width: 18px;
-  height: 18px;
-}
 
 .side-by-side-different-view .scrollable-table-container::-webkit-scrollbar-track {
   background: #f1f1f1;
@@ -2265,5 +2387,134 @@ watch(selectedTables, async (newTables, oldTables) => {
   .target-section .scrollable-table-container {
     max-height: 200px;
   }
+
+  /* Single diff container height fix */
+.single-diff-container .scrollable-table-container {
+  max-height: 300px;
+}
+
+.source-section .scrollable-table-container,
+.target-section .scrollable-table-container {
+  max-height: 300px !important;
+}
+}
+
+
+
+.patch-btn {
+  padding: 12px 24px;
+  background: #6610f2;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 1em;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.patch-btn:hover:not(:disabled) {
+  background: #520dc2;
+  transform: translateY(-1px);
+}
+
+.patch-btn:disabled {
+  background: #6c757d;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Toast notification styles */
+.toast {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  min-width: 350px;
+  max-width: 500px;
+  padding: 16px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: start;
+  gap: 12px;
+  z-index: 9999;
+  animation: slideInRight 0.3s ease-out;
+}
+
+.toast.success {
+  background: #d4edda;
+  border-left: 4px solid #28a745;
+  color: #155724;
+}
+
+.toast.error {
+  background: #f8d7da;
+  border-left: 4px solid #dc3545;
+  color: #721c24;
+}
+
+.toast-icon {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.toast-content {
+  flex: 1;
+}
+
+.toast-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.toast-message {
+  font-size: 0.9em;
+  white-space: pre-line;
+}
+
+.toast-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  opacity: 0.5;
+}
+
+.toast-close:hover {
+  opacity: 1;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(400px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.mini-patch-btn {
+  padding: 4px 8px;
+  border: none;
+  background: #6610f2;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85em;
+  transition: background 0.2s;
+}
+
+.mini-patch-btn:hover {
+  background: #520dc2;
+}
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 </style>

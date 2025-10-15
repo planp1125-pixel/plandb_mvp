@@ -1,7 +1,7 @@
 {
-  "name": "cipher-differ",
-  "version": "0.1.0",
-  "description": "SQLCipher Database Schema Comparison Tool",
+  "name": "plandbdiff",
+  "version": "0.3.0",
+  "description": "SQLCipher Database Comparison Tool",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -15,6 +15,7 @@
     "@tauri-apps/api": "^2.8.0",
     "@tauri-apps/plugin-dialog": "^2.3.3",
     "@tauri-apps/plugin-opener": "^2.5.0",
+    "@tauri-apps/plugin-shell": "^2.3.1",
     "lucide-vue-next": "^0.542.0",
     "vue": "^3.4.0"
   },

@@ -8,6 +8,7 @@ pub struct DatabaseInfo {
     pub is_connected: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub alias: Option<String>,
+    pub password: Option<String>, 
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

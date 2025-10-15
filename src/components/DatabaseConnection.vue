@@ -56,12 +56,12 @@
           {{ isConnecting ? 'Connecting...' : 'Add Database' }}
         </button>
 
-        <button 
+        <!-- <button 
           @click="testBackend" 
           class="test-btn"
         >
           Test Backend
-        </button>
+        </button> -->
       </div>
 
       <div v-if="error" class="error-message">
@@ -142,6 +142,7 @@ interface DatabaseInfo {
   table_count: number;
   is_connected: boolean;
   alias?: string;
+  password?: string; 
 }
 
 const emit = defineEmits<{
@@ -221,6 +222,7 @@ const handleConnect = async () => {
       password: password.value || '' // Send empty string if no password
     }) as DatabaseInfo;
     
+    dbInfo.password = password.value || '';
     // Add alias if provided
     if (dbAlias.value.trim()) {
       dbInfo.alias = dbAlias.value.trim();
@@ -259,16 +261,16 @@ const handleConnect = async () => {
   }
 };
 
-const testBackend = async () => {
-  try {
-    const result = await invoke('test_connection') as string;
-    successMessage.value = `Backend test: ${result}`;
-    error.value = '';
-  } catch (err) {
-    error.value = `Backend test failed: ${err}`;
-    successMessage.value = '';
-  }
-};
+// const testBackend = async () => {
+//   try {
+//     const result = await invoke('test_connection') as string;
+//     successMessage.value = `Backend test: ${result}`;
+//     error.value = '';
+//   } catch (err) {
+//     error.value = `Backend test failed: ${err}`;
+//     successMessage.value = '';
+//   }
+// };
 
 const selectDatabase = (database: DatabaseInfo) => {
   emit('select-database', database);

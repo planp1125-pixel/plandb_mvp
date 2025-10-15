@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "cipher-Differ",
-  "version": "0.1.0",
-  "identifier": "com.planp.sqlcipher-tool",
+  "productName": "PlanDBDiff",
+  "version": "0.3.0",
+  "identifier": "com.planp.PlanDBDiff",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "SQLCipher Schema Comparison Tool",
+        "title": "SQLCipher/SQLite Comparison Tool",
         "width": 1200,
         "height": 800,
         "minWidth": 800,
