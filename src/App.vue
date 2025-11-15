@@ -14,7 +14,7 @@
           @click="toggleTheme"
           :title="isDark ? 'Switch to Light' : 'Switch to Dark'"
         >
-          {{ isDark ? '🌙 Dark' : '☀️ Light' }}
+          {{ isDark ? '🌙' : '☀️' }}
         </button>
       </div>
     </header>
@@ -23,7 +23,7 @@
     <main class="flex-1 flex overflow-hidden">
       <div class="flex w-full h-full relative">
         <!-- Left Navigation Sidebar -->
-        <nav class="w-16 bg-gray-800 dark:bg-gray-900 flex flex-col items-center py-4 shadow-lg z-40 flex-shrink-0">
+        <nav class="w-30 bg-gray-800 dark:bg-gray-900 flex flex-col items-center py-4 shadow-lg z-40 flex-shrink-0">
           <div class="flex flex-col gap-2 w-full">
             <button 
               class="nav-icon"

@@ -281,6 +281,29 @@ watch(currentDbPath, () => {
 </script>
 
 <style scoped>
+
+:root {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8f9fa;
+  --bg-tertiary: #e9ecef;
+  --text-primary: #343a40;
+  --text-secondary: #6c757d;
+  --border-color: #dee2e6;
+  --border-light: #f1f3f4;
+}
+
+/* Dark mode CSS variables */
+:global(html.dark) .database-explorer {
+  --bg-primary: #1a1d21;
+  --bg-secondary: #24292e;
+  --bg-tertiary: #2d333b;
+  --text-primary: #f0f6fc;
+  --text-secondary: #c9d1d9;
+  --border-color: #30363d;
+  --border-light: #3c444d;
+}
+
+
 .database-explorer {
   height: 100%;
   display: flex;
@@ -290,12 +313,14 @@ watch(currentDbPath, () => {
 .explorer-header {
   padding: 20px;
   border-bottom: 1px solid #dee2e6;
-  background: #f8f9fa;
+   background: var(--bg-secondary);
+  /* background: #f8f9fa; */
 }
 
 .explorer-header h3 {
   margin: 0 0 15px 0;
-  color: #343a40;
+  color: var(--text-primary);
+  /* color: #343a40; */
   display: flex;
   align-items: center;
   gap: 10px;
@@ -318,7 +343,8 @@ watch(currentDbPath, () => {
 .db-path {
   font-family: monospace;
   font-size: 0.8em;
-  color: #6c757d;
+  color: var(--text-secondary);
+  /* color: #6c757d; */
   background: #e9ecef;
   padding: 2px 6px;
   border-radius: 3px;
@@ -328,7 +354,8 @@ watch(currentDbPath, () => {
   padding: 8px 12px;
   border: 1px solid #ced4da;
   border-radius: 6px;
-  background: white;
+  background: var(--bg-primary);
+  /* background: white; */
   min-width: 250px;
 }
 
@@ -337,7 +364,8 @@ watch(currentDbPath, () => {
   justify-content: space-between;
   align-items: center;
   padding: 15px 20px;
-  background: white;
+  background: var(--bg-primary);
+  /* background: white; */
   border-bottom: 1px solid #dee2e6;
 }
 
@@ -356,8 +384,10 @@ watch(currentDbPath, () => {
   align-items: center;
   gap: 6px;
   padding: 8px 12px;
-  background: #f8f9fa;
-  border: 1px solid #dee2e6;
+  background: var(--bg-secondary);
+  /* background: #f8f9fa; */
+  border: 1px solid var(--border-color);
+  /* border: 1px solid #dee2e6; */
   border-radius: 4px;
   cursor: pointer;
   font-size: 0.85em;
@@ -379,7 +409,8 @@ watch(currentDbPath, () => {
   flex-direction: column;
   align-items: center;
   padding: 60px 20px;
-  color: #6c757d;
+  color: var(--text-secondary);
+  /* color: #6c757d; */
 }
 
 .loading-spinner {
@@ -430,7 +461,8 @@ watch(currentDbPath, () => {
   position: sticky;        /* Add this */
   top: 0;                  /* Add this */
   z-index: 10;            /* Add this */
-  background: white;       /* Ensure background covers content below */
+  background: var(--bg-primary);
+  /* background: white;       */
 }
 
 .table-row:hover {
@@ -448,7 +480,8 @@ watch(currentDbPath, () => {
   width: 20px;
   display: flex;
   justify-content: center;
-  color: #6c757d;
+  color: var(--text-secondary);
+  /* color: #6c757d; */
   font-size: 0.9em;
 }
 
@@ -467,13 +500,15 @@ watch(currentDbPath, () => {
 .table-name {
   font-weight: 600;
   font-family: monospace;
-  color: #343a40;
+  color: var(--text-primary);
+  /* color: #343a40; */
   font-size: 1em;
 }
 
 .table-meta {
   font-size: 0.85em;
-  color: #6c757d;
+  color: var(--text-secondary);
+  /* color: #6c757d; */
 }
 
 .table-actions {
@@ -541,7 +576,8 @@ watch(currentDbPath, () => {
   display: flex;
   align-items: center;
   padding: 8px 12px;
-  background: white;
+  background: var(--bg-primary);
+  /* background: white; */
   border-radius: 4px;
   transition: all 0.2s;
 }
@@ -575,12 +611,14 @@ watch(currentDbPath, () => {
 .column-name {
   font-weight: 600;
   font-family: monospace;
-  color: #343a40;
+  color: var(--text-primary);
+  /* color: #343a40; */
 }
 
 .column-details {
   font-size: 0.8em;
-  color: #6c757d;
+  color: var(--text-secondary);
+  /* color: #6c757d; */
   font-family: monospace;
 }
 
@@ -653,12 +691,14 @@ watch(currentDbPath, () => {
 }
 
 .empty-state h4 {
-  color: #6c757d;
+  color: var(--text-secondary);
+  /* color: #6c757d; */
   margin-bottom: 10px;
 }
 
 .empty-state p {
-  color: #6c757d;
+  color: var(--text-secondary);
+  /* color: #6c757d; */
   margin: 0;
 }
 

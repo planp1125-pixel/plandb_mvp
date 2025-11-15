@@ -596,7 +596,8 @@ const handleRekeySuccess = async (dbPath: string) => {
 <style scoped>
 .database-connection {
   padding: 24px;
-  max-width: 1400px;
+   max-width: 100%;
+  width: 100%;
   margin: 0 auto;
 }
 
