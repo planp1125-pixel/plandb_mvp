@@ -229,6 +229,8 @@
       </div>
     </div>
 
+    <!-- <button @click="forceReset" class="btn btn-outline">Force Reset Trial</button> -->
+
     <!-- Deactivation Modal -->
     <div v-if="showDeactivate" class="modal-overlay" @click="showDeactivate = false">
       <div class="modal-content" @click.stop>
@@ -255,6 +257,11 @@ interface LicenseStatus {
   license_type: 'Trial' | 'Monthly' | 'Yearly' | 'Lifetime';
   days_remaining?: number;
   message: string;
+}
+declare global {
+  interface Window {
+    Paddle: any;
+  }
 }
 
 const licenseStatus = ref<LicenseStatus | null>(null);
@@ -316,6 +323,12 @@ const faqs = [
 onMounted(async () => {
   await checkLicense();
 });
+
+// const forceReset = async () => {
+//   await invoke('force_reset_license');
+//   await checkLicense();
+// };
+
 
 const checkLicense = async () => {
   try {
@@ -396,17 +409,40 @@ const startTrial = () => {
   alert('Trial is already active! Enjoy all features for 14 days.');
 };
 
+//------------elmonsqueezy purchase links (old)------------//
+// const openPurchase = (plan: string) => {
+//   const urls: Record<string, string> = {
+//     monthly: 'https://planplabs.lemonsqueezy.com/buy/91cb4129-6a90-4ef7-9d2d-4dbc7499d239',//'https://yourstore.lemonsqueezy.com/checkout/buy/MONTHLY_ID',
+//     yearly: 'https://planplabs.lemonsqueezy.com/buy/39100320-dce1-4487-af6f-bf8ff51b6d67', //'https://yourstore.lemonsqueezy.com/checkout/buy/YEARLY_ID',
+//     lifetime: 'https://planplabs.lemonsqueezy.com/buy/401e3fbf-b3c5-4151-8e3c-f629a0f9a753' //'https://yourstore.lemonsqueezy.com/checkout/buy/LIFETIME_ID'
+//   };
+//   open(urls[plan]);
+// };
+
 const openPurchase = (plan: string) => {
-  const urls: Record<string, string> = {
-    monthly: 'https://planplabs.lemonsqueezy.com/buy/91cb4129-6a90-4ef7-9d2d-4dbc7499d239',//'https://yourstore.lemonsqueezy.com/checkout/buy/MONTHLY_ID',
-    yearly: 'https://planplabs.lemonsqueezy.com/buy/39100320-dce1-4487-af6f-bf8ff51b6d67', //'https://yourstore.lemonsqueezy.com/checkout/buy/YEARLY_ID',
-    lifetime: 'https://planplabs.lemonsqueezy.com/buy/401e3fbf-b3c5-4151-8e3c-f629a0f9a753' //'https://yourstore.lemonsqueezy.com/checkout/buy/LIFETIME_ID'
+  const paddleProductIds: Record<string, string> = {
+    monthly: 'pri_01k807azrz8asavdg42z0fqv34', 
+    yearly: 'pri_01k807dj8bv6h3gp9c1tvp6dfc',  
+    lifetime: 'pri_01k807ewanhdkvhb06wr24ffy9'
   };
-  open(urls[plan]);
+  
+  // Open Paddle checkout
+  if (window.Paddle) {
+    window.Paddle.Checkout.open({
+      product: paddleProductIds[plan],
+      successCallback: (data:any) => {
+        console.log('Purchase successful:', data);
+        // You can trigger license activation here
+      }
+    });
+  } else {
+    // Fallback to direct Paddle URL
+    open(`https://buy.paddle.com/checkout?product=${paddleProductIds[plan]}`);
+  }
 };
 
 const openSupport = () => {
-  open('mailto:support@yourdomain.com?subject=SQLCipher Tool - License Support');
+  open('mailto:support@planp.com?subject=SQLCipher Tool - License Support');
 };
 
 const toggleFaq = (id: number) => {

@@ -17,13 +17,11 @@
             placeholder="e.g., /home/user/database.db or ~/Downloads/data.db"
             class="file-path-input"
           />
-          <!-- <button @click="selectFile" class="select-file-btn" disabled>Browse</button> -->
-           <button @click="selectFile" class="select-file-btn">Browse</button>
+          <button @click="selectFile" class="select-file-btn">Browse</button>
         </div>
-        
       </div>
 
-      <div class="form-group">
+      <!-- <div class="form-group">
         <label for="password">Password (Optional for regular SQLite):</label>
         <input 
           id="password"
@@ -32,8 +30,7 @@
           placeholder="Leave empty for unencrypted SQLite, or enter SQLCipher password"
           class="password-input"
         />
-        
-      </div>
+      </div> -->
 
       <div class="form-group">
         <label for="db-alias">Database Alias (Optional):</label>
@@ -55,13 +52,6 @@
         >
           {{ isConnecting ? 'Connecting...' : 'Add Database' }}
         </button>
-
-        <!-- <button 
-          @click="testBackend" 
-          class="test-btn"
-        >
-          Test Backend
-        </button> -->
       </div>
 
       <div v-if="error" class="error-message">
@@ -73,20 +63,134 @@
       </div>
     </div>
 
+    <!-- NEW: Migration Tools Section
+    <div v-if="connectedDatabases.length > 0" class="migration-tools-section">
+      <h4>🔐 Migration & Encryption Tools</h4>
+      <p class="section-subtitle">Convert SQLite databases to encrypted SQLCipher or change encryption keys</p>
+      
+      <div class="migration-tools-table">
+        <div class="migration-table-header">
+          <div class="col-database">Database</div>
+          <div class="col-type">Type</div>
+          <div class="col-action">Action</div>
+        </div>
+        
+        <div 
+          v-for="db in connectedDatabases" 
+          :key="db.path" 
+          class="migration-table-row"
+        >
+          <div class="col-database">
+            <div class="db-name-compact">
+              <strong>{{ db.alias || db.name }}</strong>
+              <span class="db-path-compact">{{ db.path }}</span>
+            </div>
+          </div>
+          
+          <div class="col-type">
+            <span 
+              class="type-badge" 
+              :class="getDatabaseType(db.path) === 'sqlite' ? 'badge-sqlite' : 'badge-sqlcipher'"
+            >
+              {{ getDatabaseType(db.path) === 'sqlite' ? '📄 SQLite' : '🔒 SQLCipher' }}
+            </span>
+          </div>
+          
+          <div class="col-action">
+            <button 
+              v-if="getDatabaseType(db.path) === 'sqlite'" 
+              @click="openMigrationModal(db)" 
+              class="action-btn migrate-btn-new"
+              title="Convert to encrypted SQLCipher"
+            >
+              <span class="btn-icon">🔒</span>
+              <span class="btn-text">Migrate to SQLCipher</span>
+            </button>
+            
+            <button 
+              v-if="getDatabaseType(db.path) === 'sqlcipher'" 
+              @click="openRekeyModal(db)" 
+              class="action-btn rekey-btn-new"
+              title="Change encryption password"
+            >
+              <span class="btn-icon">🔐</span>
+              <span class="btn-text">Change Password</span>
+            </button>
+
+            <span 
+              v-if="getDatabaseType(db.path) === 'unknown'" 
+              class="no-action"
+            >
+              Unknown type
+            </span>
+          </div>
+        </div>
+      </div>
+    </div> -->
+
+    <!-- REPLACE THE ENTIRE MIGRATION TOOLS SECTION WITH THIS -->
+
+    <!-- NEW: Compact Migration Tools Section -->
+    <div v-if="connectedDatabases.length > 0" class="migration-tools-section">
+      <h4>🔐 Migration & Encryption Tools</h4>
+      <p class="section-subtitle">Convert SQLite to encrypted SQLCipher or change passwords</p>
+      
+      <div class="migration-list-compact">
+        <div 
+          v-for="db in connectedDatabases" 
+          :key="db.path" 
+          class="migration-row-compact"
+        >
+          <!-- Left: Database Info -->
+          <div class="db-info-compact">
+            <div class="db-name-row">
+              <strong>{{ db.alias || db.name }}</strong>
+              <span 
+                class="type-badge-inline" 
+                :class="getDatabaseType(db.path) === 'sqlite' ? 'badge-sqlite' : 'badge-sqlcipher'"
+              >
+                {{ getDatabaseType(db.path) === 'sqlite' ? '📄 SQLite' : '🔒 SQLCipher' }}
+              </span>
+            </div>
+          </div>
+          
+          <!-- Right: Action Button -->
+          <div class="action-compact">
+            <button 
+              v-if="getDatabaseType(db.path) === 'sqlite'" 
+              @click="openMigrationModal(db)" 
+              class="compact-btn migrate-btn-compact"
+              title="Convert to encrypted SQLCipher"
+            >
+              🔒 Migrate
+            </button>
+            
+            <button 
+              v-if="getDatabaseType(db.path) === 'sqlcipher'" 
+              @click="openRekeyModal(db)" 
+              class="compact-btn rekey-btn-compact"
+              title="Change encryption password"
+            >
+              🔐 Rekey
+            </button>
+
+            <span 
+              v-if="getDatabaseType(db.path) === 'unknown'" 
+              class="no-action"
+            >
+              Unknown
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Connected Databases List -->
     <div v-if="connectedDatabases.length > 0" class="connected-databases">
       <h4>Connected Databases ({{ connectedDatabases.length }})</h4>
       
-      <!-- Comparison Status -->
-      <div class="comparison-status">
-        <div class="status-item">
-          <span class="status-label">Ready for comparison:</span>
-          <span :class="['status-value', canCompare ? 'ready' : 'waiting']">
-            {{ canCompare ? 'YES' : `Need ${2 - connectedDatabases.length} more database(s)` }}
-          </span>
-        </div>
-      </div>
-
+     
+      
       <!-- Database List -->
       <div class="database-list">
         <div v-for="(db, index) in connectedDatabases" :key="db.path" class="db-card">
@@ -98,27 +202,17 @@
                 <span class="table-count">{{ db.table_count }} tables</span>
               </div>
             </div>
-            <div class="db-actions">
-              <button @click="selectDatabase(db)" class="select-btn">Select</button>
-              <button @click="removeDatabase(db.path)" class="remove-btn">Remove</button>
-            </div>
+            
           </div>
           <div class="db-path">{{ db.path }}</div>
+          <div class="db-actions">
+              
+              <button @click="removeDatabase(db.path)" class="remove-btn">Remove</button>
+            </div>
         </div>
       </div>
 
-      <!-- Quick Actions -->
-      <div v-if="canCompare" class="quick-actions">
-        <h5>Quick Actions</h5>
-        <div class="action-buttons">
-          <button @click="startComparison" class="action-btn comparison-btn">
-            🔄 Compare All Databases
-          </button>
-          <button @click="viewTables" class="action-btn view-btn">
-            👁️ View Database Tables
-          </button>
-        </div>
-      </div>
+     
     </div>
 
     <div v-else class="no-databases">
@@ -127,14 +221,73 @@
         <p>Connect at least 2 SQLCipher databases to start comparing schemas.</p>
       </div>
     </div>
+
+    <!-- Migration Modal -->
+    <!-- <MigrationModal
+      v-if="selectedDatabaseForMigration"
+      :is-open="showMigrationModal"
+      :database-path="selectedDatabaseForMigration.path"
+      :database-name="selectedDatabaseForMigration.alias || selectedDatabaseForMigration.name"
+      :is-rekey="false"
+      @close="showMigrationModal = false"
+      @success="handleMigrationSuccess"
+    /> -->
+
+    <!-- Rekey Modal -->
+    <!-- <MigrationModal
+      v-if="selectedDatabaseForMigration"
+      :is-open="showRekeyModal"
+      :database-path="selectedDatabaseForMigration.path"
+      :database-name="selectedDatabaseForMigration.alias || selectedDatabaseForMigration.name"
+      :is-rekey="true"
+      @close="showRekeyModal = false"
+      @success="handleRekeySuccess"
+    /> -->
+
+     <!-- Add ConnectionModal to template -->
+    <Teleport to="body">
+      <ConnectionModal
+        ref="connectionModalRef"
+        :is-open="showConnectionModal"
+        :database-path="pendingConnectionPath"
+        @close="showConnectionModal = false"
+        @connect="handleConnectionModalConnect"
+      />
+    </Teleport>
+    <!-- Migration Modal with Teleport -->
+    <Teleport to="body">
+      <MigrationModal
+        v-if="selectedDatabaseForMigration"
+        :is-open="showMigrationModal"
+        :database-path="selectedDatabaseForMigration.path"
+        :database-name="selectedDatabaseForMigration.alias || selectedDatabaseForMigration.name"
+        :is-rekey="false"
+        @close="showMigrationModal = false"
+        @success="handleMigrationSuccess"
+      />
+    </Teleport>
+
+    <!-- Rekey Modal with Teleport -->
+    <Teleport to="body">
+      <MigrationModal
+        v-if="selectedDatabaseForMigration"
+        :is-open="showRekeyModal"
+        :database-path="selectedDatabaseForMigration.path"
+        :database-name="selectedDatabaseForMigration.alias || selectedDatabaseForMigration.name"
+        :is-rekey="true"
+        @close="showRekeyModal = false"
+        @success="handleRekeySuccess"
+    />
+</Teleport>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
-// import { open } from '@tauri-apps/plugin-dialog';
 import * as dialog from '@tauri-apps/plugin-dialog';
+import MigrationModal from './MigrationModal.vue';
+import ConnectionModal from './ConnectionModal.vue';
 
 interface DatabaseInfo {
   path: string;
@@ -154,22 +307,51 @@ const emit = defineEmits<{
 }>();
 
 // State
-const dbPath = ref('');
-const password = ref('');
-const dbAlias = ref('');
+// const dbPath = ref('');
+// const password = ref('');
+// const dbAlias = ref('');
+
+const dbPath = ref<string>('');
+//const password = ref<string>('');  // Even if input is commented, keep this
+const dbAlias = ref<string>('');
 const isConnecting = ref(false);
 const error = ref('');
 const successMessage = ref('');
 const connectedDatabases = ref<DatabaseInfo[]>([]);
 
+// Connection modal state
+const showConnectionModal = ref(false);
+const pendingConnectionPath = ref('');
+const connectionModalRef = ref<any>(null);
+
+// Migration state
+const selectedDatabaseForMigration = ref<DatabaseInfo | null>(null);
+const showMigrationModal = ref(false);
+const showRekeyModal = ref(false);
+const databaseTypes = ref<Map<string, string>>(new Map());
+
 // Computed
 const canCompare = computed(() => connectedDatabases.value.length >= 2);
 
+// Database type detection helpers
+const getDatabaseType = (dbPath: string): string => {
+  const type = databaseTypes.value.get(dbPath) || 'unknown';
+  return type;
+};
+
+const checkDatabaseType = async (dbPath: string) => {
+  try {
+    console.log('🔍 Checking database type for:', dbPath);
+    const type = await invoke<string>('check_database_type', { dbPath });
+    databaseTypes.value.set(dbPath, type);
+    console.log('✅ Database type detected:', type, 'for', dbPath);
+  } catch (error) {
+    console.error('❌ Failed to check database type:', error);
+    databaseTypes.value.set(dbPath, 'unknown');
+  }
+};
+
 // Methods
-// const selectFile = async () => {
-//   // Placeholder for future file dialog implementation
-//   alert('File browser not available yet. Please enter the full path manually.');
-// };
 const selectFile = async () => {
   try {
     const selected = await dialog.open({
@@ -190,6 +372,74 @@ const selectFile = async () => {
   }
 };
 
+// const handleConnect = async () => {
+//   if (!dbPath.value) {
+//     error.value = 'Please enter database path';
+//     return;
+//   }
+
+//   // Auto-fix common path issues
+//   let fixedPath = dbPath.value.trim();
+  
+//   // Handle tilde expansion
+//   if (fixedPath.startsWith('~/')) {
+//     const homeDir = await invoke<string>('get_home_directory').catch(() => '/home/user');
+//     fixedPath = fixedPath.replace('~', homeDir);
+//   }
+
+//   // Clean up path
+//   fixedPath = fixedPath.replace(/\\/g, '/');
+  
+//   isConnecting.value = true;
+//   error.value = '';
+//   successMessage.value = '';
+
+//   try {
+//     const response = await invoke<DatabaseInfo>('connect_database', {
+//       path: fixedPath,  // Fixed: was dbPath
+//       password: password.value || ''
+//     });
+
+//     const dbInfo: DatabaseInfo = {
+//       ...response,
+//       path: fixedPath,
+//       is_connected: true
+//     };
+    
+//     // Store password if provided
+//     dbInfo.password = password.value || '';
+//     // Add alias if provided
+//     if (dbAlias.value.trim()) {
+//       dbInfo.alias = dbAlias.value.trim();
+//     }
+    
+//     connectedDatabases.value.push(dbInfo);
+    
+//     // Check database type (SQLite vs SQLCipher)
+//     await checkDatabaseType(fixedPath);
+    
+//     const dbType = password.value ? 'SQLCipher (encrypted)' : 'SQLite (unencrypted)';
+//     successMessage.value = `Successfully connected to ${dbInfo.alias || dbInfo.name} as ${dbType} (${dbInfo.table_count} tables)`;
+//     emit('database-connected', dbInfo);
+    
+//     // Emit ready signal if we have enough databases
+//     if (canCompare.value) {
+//       emit('databases-ready', connectedDatabases.value);
+//     }
+    
+//     // Clear form
+//     dbPath.value = '';
+//     password.value = '';
+//     dbAlias.value = '';
+    
+//   } catch (err: any) {
+//     error.value = `Failed to connect: ${err}`;
+//   } finally {
+//     isConnecting.value = false;
+//   }
+// };
+
+
 const handleConnect = async () => {
   if (!dbPath.value) {
     error.value = 'Please enter database path';
@@ -199,128 +449,183 @@ const handleConnect = async () => {
   // Auto-fix common path issues
   let fixedPath = dbPath.value.trim();
   
-  // Add leading slash if missing (Linux/Mac paths)
-  if (!fixedPath.startsWith('/') && !fixedPath.startsWith('~') && !fixedPath.match(/^[A-Za-z]:\\/)) {
-    fixedPath = '/' + fixedPath;
-    dbPath.value = fixedPath; // Update the input field
+  // Handle tilde expansion
+  if (fixedPath.startsWith('~/')) {
+    const homeDir = await invoke<string>('get_home_directory').catch(() => '/home/user');
+    fixedPath = fixedPath.replace('~', homeDir);
   }
 
-  // Check if already connected
-  const existing = connectedDatabases.value.find(db => db.path === fixedPath);
-  if (existing) {
-    error.value = 'This database is already connected';
-    return;
-  }
-
-  isConnecting.value = true;
+  // Clean up path
+  fixedPath = fixedPath.replace(/\\/g, '/');
+  
   error.value = '';
   successMessage.value = '';
 
   try {
-    const dbInfo = await invoke('connect_database', {
-      path: fixedPath,
-      password: password.value || '' // Send empty string if no password
-    }) as DatabaseInfo;
+    // Check database type FIRST
+    console.log('🔍 Checking database type for:', fixedPath);
+    const dbType = await invoke<string>('check_database_type', { dbPath: fixedPath });
+    console.log('📊 Database type:', dbType);
+
+    if (dbType === 'sqlcipher') {
+      // SQLCipher - Show modal for password + settings
+      console.log('🔒 SQLCipher detected - showing connection modal');
+      pendingConnectionPath.value = fixedPath;
+      showConnectionModal.value = true;
+    } else {
+      // SQLite - Connect directly (no password needed)
+      console.log('📄 SQLite detected - connecting directly');
+      await connectDatabase(fixedPath, '', null);
+    }
+  } catch (err: any) {
+    error.value = `Failed to check database type: ${err}`;
+  }
+};
+
+const connectDatabase = async (path: string, password: string, settings: any) => {
+  isConnecting.value = true;
+  
+  if (connectionModalRef.value) {
+    connectionModalRef.value.setConnecting(true);
+  }
+
+  try {
+    const response = await invoke<DatabaseInfo>('connect_database', {
+      path: path,
+      password: password,
+      settings: settings // Can be null for SQLite
+    });
+
+    const dbInfo: DatabaseInfo = {
+      ...response,
+      path: path,
+      is_connected: true
+    };
     
-    dbInfo.password = password.value || '';
-    // Add alias if provided
+    dbInfo.password = password || '';
     if (dbAlias.value.trim()) {
       dbInfo.alias = dbAlias.value.trim();
     }
     
     connectedDatabases.value.push(dbInfo);
+    await checkDatabaseType(path);
     
-    const dbType = password.value ? 'SQLCipher (encrypted)' : 'SQLite (unencrypted)';
+    const dbType = password ? 'SQLCipher (encrypted)' : 'SQLite (unencrypted)';
     successMessage.value = `Successfully connected to ${dbInfo.alias || dbInfo.name} as ${dbType} (${dbInfo.table_count} tables)`;
     emit('database-connected', dbInfo);
     
-    // Emit ready signal if we have enough databases
     if (canCompare.value) {
       emit('databases-ready', connectedDatabases.value);
     }
     
     // Clear form
     dbPath.value = '';
-    password.value = '';
+    //password.value = '';
     dbAlias.value = '';
     
-  } catch (err) {
-    const errorMsg = String(err);
     
-    if (errorMsg.includes('appears to be encrypted')) {
-      error.value = '🔐 This database is encrypted (SQLCipher). Please enter the password.';
-    } else if (errorMsg.includes('wrong password')) {
-      error.value = '❌ Wrong password for SQLCipher database. Please check your password.';
-    } else if (errorMsg.includes('unable to open database file')) {
-      error.value = `❌ Cannot open database file: ${errorMsg}\n\n💡 Tips:\n• Check if the file path is correct\n• Ensure the file exists\n• Verify you have read permissions`;
-    } else {
-      error.value = `Connection failed: ${errorMsg}`;
+    // Close modal if open
+    showConnectionModal.value = false;
+    
+  } catch (err: any) {
+    error.value = `Failed to connect: ${err}`;
+    
+    if (connectionModalRef.value) {
+      connectionModalRef.value.setError(err.toString());
     }
   } finally {
     isConnecting.value = false;
+    
+    if (connectionModalRef.value) {
+      connectionModalRef.value.setConnecting(false);
+    }
   }
 };
 
-// const testBackend = async () => {
-//   try {
-//     const result = await invoke('test_connection') as string;
-//     successMessage.value = `Backend test: ${result}`;
-//     error.value = '';
-//   } catch (err) {
-//     error.value = `Backend test failed: ${err}`;
-//     successMessage.value = '';
-//   }
+const handleConnectionModalConnect = async (password: string, settings: any) => {
+  await connectDatabase(pendingConnectionPath.value, password, settings);
+};
+
+
+// const selectDatabase = (db: DatabaseInfo) => {
+//   emit('select-database', db);
 // };
 
-const selectDatabase = (database: DatabaseInfo) => {
-  emit('select-database', database);
-};
-
 const removeDatabase = (path: string) => {
-  const index = connectedDatabases.value.findIndex(db => db.path === path);
-  if (index > -1) {
-    const removed = connectedDatabases.value.splice(index, 1)[0];
-    successMessage.value = `Removed ${removed.alias || removed.name}`;
-    error.value = '';
+  connectedDatabases.value = connectedDatabases.value.filter(db => db.path !== path);
+  databaseTypes.value.delete(path);
+  
+  if (connectedDatabases.value.length === 0) {
+    successMessage.value = '';
   }
 };
 
-const startComparison = () => {
-  if (canCompare.value) {
-    emit('start-comparison', connectedDatabases.value);
-  }
+// const startComparison = () => {
+//   emit('start-comparison', connectedDatabases.value);
+// };
+
+// const viewTables = (db: DatabaseInfo) => {
+//   emit('view-tables', db);
+// };
+
+// Migration handlers
+const openMigrationModal = (db: DatabaseInfo) => {
+  selectedDatabaseForMigration.value = db;
+  showMigrationModal.value = true;
 };
 
-const viewTables = () => {
-  if (connectedDatabases.value.length > 0) {
-    emit('view-tables', connectedDatabases.value[0]);
-  }
+const openRekeyModal = (db: DatabaseInfo) => {
+  selectedDatabaseForMigration.value = db;
+  showRekeyModal.value = true;
+};
+
+const handleMigrationSuccess = async (outputPath: string) => {
+  showMigrationModal.value = false;
+  successMessage.value = `✅ Migration successful! Encrypted database created:\n${outputPath}`;
+  error.value = '';
+};
+
+const handleRekeySuccess = async (dbPath: string) => {
+  showRekeyModal.value = false;
+  successMessage.value = `✅ Database password changed successfully!`;
+  error.value = '';
+  await checkDatabaseType(dbPath);
 };
 </script>
 
 <style scoped>
 .database-connection {
-  padding: 20px;
+  padding: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+h3 {
+  margin: 0 0 8px 0;
+  color: var(--text-primary);
+  font-size: 1.75em;
 }
 
 .subtitle {
-  color: #6c757d;
-  margin-bottom: 25px;
-  font-size: 0.95em;
+  color: var(--text-secondary);
+  margin: 0 0 24px 0;
 }
 
+/* Connection Form */
 .connection-form {
-  background: #f8f9fa;
-  padding: 25px;
-  border-radius: 8px;
-  margin-bottom: 30px;
-  border: 1px solid #dee2e6;
+  background: var(--bg-card);
+  border: 2px solid var(--border-primary);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  max-width: 100%; /* Ensure it doesn't overflow */
+  box-sizing: border-box; /* Include padding in width calculation */
 }
 
 .connection-form h4 {
-  margin-top: 0;
-  margin-bottom: 20px;
-  color: #343a40;
+  margin: 0 0 20px 0;
+  color: var(--text-primary);
+  font-size: 1.2em;
 }
 
 .form-group {
@@ -329,192 +634,345 @@ const viewTables = () => {
 
 .form-group label {
   display: block;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
   font-weight: 600;
-  color: #495057;
-}
-
-.help-text {
-  display: block;
-  margin-top: 8px;
-  color: #6c757d;
-  font-size: 0.85em;
-  line-height: 1.4;
-}
-
-.help-text code {
-  background: #f1f3f4;
-  padding: 2px 6px;
-  border-radius: 3px;
-  font-family: 'Courier New', monospace;
-  font-size: 0.9em;
-  color: #495057;
+  color: var(--text-primary);
+  font-size: 0.95em;
 }
 
 .file-input-group {
   display: flex;
-  gap: 10px;
-}
-
-.file-path-input,
-.password-input,
-.alias-input {
-  width: 100%;
-  padding: 10px 14px;
-  border: 1px solid #ced4da;
-  border-radius: 6px;
-  font-size: 0.95em;
-  transition: border-color 0.2s;
+  gap: 12px;
+  align-items: stretch; /* Make both elements same height */
+  width: 100%; /* Ensure it takes full width */
 }
 
 .file-path-input {
   flex: 1;
+  padding: 12px 16px;
+  border: 2px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 1em;
+  min-width: 0; /* Important: allows input to shrink properly */
 }
 
-.file-path-input:focus,
-.password-input:focus,
-.alias-input:focus {
+.file-path-input:focus {
   outline: none;
-  border-color: #007bff;
-  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+  border-color: #3b82f6;
 }
 
 .select-file-btn {
-  padding: 10px 16px;
-  background: #007bff;  /* Change from #6c757d */
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;      /* Change from cursor: not-allowed */
-  font-size: 0.9em;
-  transition: background-color 0.2s;
+  padding: 12px 24px;
+  background: #f3f4f6;
+  border: 2px solid #d1d5db;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap; /* Prevent text wrapping */
+  flex-shrink: 0; /* Prevent button from shrinking */
 }
 
 .select-file-btn:hover {
-  background: #0056b3;  /* Add hover effect */
+  background: #e5e7eb;
 }
 
+.password-input,
+.alias-input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 1em;
+}
+
+.password-input:focus,
+.alias-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+}
+
+.help-text {
+  display: block;
+  margin-top: 6px;
+  color: var(--text-secondary);
+  font-size: 0.875em;
+}
 
 .form-actions {
-  display: flex;
-  gap: 12px;
-  margin-top: 25px;
-}
-
-.connect-btn,
-.test-btn {
-  padding: 12px 24px;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: 500;
-  font-size: 0.95em;
-  transition: background-color 0.2s;
+  margin-top: 24px;
 }
 
 .connect-btn {
-  background: #28a745;
+  padding: 14px 32px;
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
   color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 1em;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
 .connect-btn:hover:not(:disabled) {
-  background: #218838;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
 }
 
 .connect-btn:disabled {
-  background: #6c757d;
+  opacity: 0.6;
   cursor: not-allowed;
 }
 
-.test-btn {
-  background: #17a2b8;
-  color: white;
-}
-
-.test-btn:hover {
-  background: #138496;
-}
-
 .error-message {
-  margin-top: 15px;
-  padding: 12px;
-  background: #f8d7da;
-  color: #721c24;
-  border: 1px solid #f5c6cb;
-  border-radius: 6px;
+  margin-top: 16px;
+  padding: 12px 16px;
+  background: #fef2f2;
+  border: 1px solid #fca5a5;
+  border-radius: 8px;
+  color: #991b1b;
 }
 
 .success-message {
-  margin-top: 15px;
-  padding: 12px;
-  background: #d4edda;
-  color: #155724;
-  border: 1px solid #c3e6cb;
-  border-radius: 6px;
-}
-
-.connected-databases {
-  background: white;
-  border: 1px solid #dee2e6;
+  margin-top: 16px;
+  padding: 12px 16px;
+  background: #f0fdf4;
+  border: 1px solid #86efac;
   border-radius: 8px;
+  color: #166534;
+  white-space: pre-line;
+}
+
+/* Migration Tools Section - Compact Version */
+.migration-tools-section {
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+  border: 2px solid var(--border-primary);
+  border-radius: 12px;
   padding: 20px;
+  margin-bottom: 24px;
 }
 
-.connected-databases h4 {
-  margin-top: 0;
-  margin-bottom: 20px;
-  color: #343a40;
+.migration-tools-section h4 {
+  margin: 0 0 6px 0;
+  color: var(--text-primary);
+  font-size: 1.2em;
 }
 
-.comparison-status {
-  background: #e3f2fd;
-  padding: 15px;
-  border-radius: 6px;
-  margin-bottom: 20px;
-  border-left: 4px solid #2196f3;
+.section-subtitle {
+  color: var(--text-secondary);
+  margin: 0 0 16px 0;
+  font-size: 0.9em;
 }
 
-.status-item {
+.migration-list-compact {
+  background: var(--bg-card);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.migration-row-compact {
   display: flex;
+  align-items: center;
   justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-primary);
+  gap: 12px;
+  transition: background 0.2s;
+}
+
+.migration-row-compact:hover {
+  background: var(--bg-hover);
+}
+
+.migration-row-compact:last-child {
+  border-bottom: none;
+}
+
+.db-info-compact {
+  flex: 1;
+  min-width: 0; /* Allow text truncation */
+}
+
+.db-name-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.db-name-row strong {
+  color: var(--text-primary);
+  font-size: 0.95em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.type-badge-inline {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 0.75em;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.badge-sqlite {
+  background: #dbeafe;
+  color: #1e40af;
+  border: 1px solid #93c5fd;
+}
+
+.badge-sqlcipher {
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #86efac;
+}
+
+/* Dark mode badges */
+[data-theme="dark"] .badge-sqlite {
+  background: #1e3a8a;
+  color: #93c5fd;
+  border-color: #3730a3;
+}
+
+[data-theme="dark"] .badge-sqlcipher {
+  background: #064e3b;
+  color: #86efac;
+  border-color: #065f46;
+}
+
+.action-compact {
+  display: flex;
   align-items: center;
 }
 
-.status-label {
-  font-weight: 500;
-  color: #1565c0;
-}
-
-.status-value {
+.compact-btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
   font-weight: 600;
+  font-size: 0.85em;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
-.status-value.ready {
-  color: #2e7d32;
+.migrate-btn-compact {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  box-shadow: 0 2px 4px rgba(5, 150, 105, 0.2);
 }
 
-.status-value.waiting {
-  color: #f57c00;
+.migrate-btn-compact:hover {
+  background: linear-gradient(135deg, #059669, #047857);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(5, 150, 105, 0.3);
+}
+
+.rekey-btn-compact {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: white;
+  box-shadow: 0 2px 4px rgba(217, 119, 6, 0.2);
+}
+
+.rekey-btn-compact:hover {
+  background: linear-gradient(135deg, #d97706, #b45309);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(217, 119, 6, 0.3);
+}
+
+.no-action {
+  color: var(--text-tertiary);
+  font-size: 0.85em;
+  font-style: italic;
+}
+
+/* Responsive: Stack on very small screens */
+@media (max-width: 600px) {
+  .migration-row-compact {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  
+  .compact-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+
+/* Connected Databases */
+.connected-databases {
+  background: var(--bg-card);
+  border: 2px solid var(--border-primary);
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.connected-databases h4 {
+  margin: 0 0 20px 0;
+  color: var(--text-primary);
+  font-size: 1.2em;
+}
+
+.comparison-ready {
+  margin-bottom: 20px;
+  padding: 16px;
+  background: #dbeafe;
+  border: 2px solid #93c5fd;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.compare-btn {
+  padding: 12px 24px;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.compare-btn:hover {
+  background: #2563eb;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
 }
 
 .database-list {
   display: flex;
   flex-direction: column;
-  gap: 15px;
+  gap: 16px;
 }
 
 .db-card {
-  background: #f8f9fa;
-  border: 1px solid #dee2e6;
+  border: 2px solid var(--border-primary);
   border-radius: 8px;
-  padding: 15px;
+  padding: 16px;
+  transition: all 0.2s;
+}
+
+.db-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .db-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
 }
 
 .db-title {
@@ -524,15 +982,15 @@ const viewTables = () => {
 }
 
 .db-number {
-  background: #007bff;
+  background: #3b82f6;
   color: white;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 600;
+  font-weight: 700;
   font-size: 0.9em;
 }
 
@@ -543,151 +1001,102 @@ const viewTables = () => {
 }
 
 .db-info strong {
-  color: #495057;
+  color: var(--text-primary);
+  font-size: 1.05em;
 }
 
 .table-count {
-  font-size: 0.85em;
-  color: #6c757d;
+  color: var(--text-secondary);
+  font-size: 0.875em;
+}
+
+.db-card {
+  display: flex;
+  flex-direction: column;
 }
 
 .db-actions {
-  display: flex;
-  gap: 8px;
+  margin-top: auto; /* Pushes the button to the bottom */
+  padding-top: 12px;
+  text-align: right; /* Aligns the button to the right */
 }
+
 
 .select-btn,
 .remove-btn {
-  padding: 6px 12px;
+  padding: 8px 16px;
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.9em;
   cursor: pointer;
-  font-size: 0.85em;
-  font-weight: 500;
+  transition: all 0.2s;
 }
 
 .select-btn {
-  background: #007bff;
+  background: #3b82f6;
   color: white;
 }
 
 .select-btn:hover {
-  background: #0056b3;
+  background: #2563eb;
 }
 
 .remove-btn {
-  background: #dc3545;
+  background: #ef4444;
   color: white;
 }
 
 .remove-btn:hover {
-  background: #c82333;
+  background: #dc2626;
 }
 
 .db-path {
-  font-family: monospace;
-  font-size: 0.8em;
-  color: #6c757d;
-  background: #e9ecef;
-  padding: 6px 10px;
-  border-radius: 4px;
+  color: var(--text-secondary);
+  font-size: 0.875em;
+  font-family: 'Courier New', monospace;
   word-break: break-all;
 }
 
-.quick-actions {
-  margin-top: 25px;
-  padding: 20px;
-  background: #f1f8ff;
-  border-radius: 8px;
-  border: 1px solid #bee5eb;
+.comparison-actions {
+  margin-top: 24px;
+  text-align: center;
 }
 
-.quick-actions h5 {
-  margin-top: 0;
-  margin-bottom: 15px;
-  color: #0c5460;
-}
-
-.action-buttons {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.action-btn {
-  padding: 10px 20px;
+.compare-databases-btn {
+  padding: 14px 32px;
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 1em;
   cursor: pointer;
-  font-weight: 500;
-  font-size: 0.9em;
-  display: flex;
-  align-items: center;
-  gap: 8px;
   transition: all 0.2s;
 }
 
-.comparison-btn {
-  background: #28a745;
-  color: white;
-}
-
-.comparison-btn:hover {
-  background: #218838;
+.compare-databases-btn:hover {
+  background: linear-gradient(135deg, #059669, #047857);
   transform: translateY(-1px);
-}
-
-.view-btn {
-  background: #17a2b8;
-  color: white;
-}
-
-.view-btn:hover {
-  background: #138496;
-  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
 }
 
 .no-databases {
+  background: var(--bg-card);
+  border: 2px dashed #d1d5db;
+  border-radius: 12px;
+  padding: 48px 24px;
   text-align: center;
-  padding: 60px 20px;
-}
-
-.empty-state {
-  background: #f8f9fa;
-  padding: 40px;
-  border-radius: 8px;
-  border: 2px dashed #dee2e6;
 }
 
 .empty-state h4 {
-  color: #6c757d;
-  margin-bottom: 10px;
+  margin: 0 0 8px 0;
+  color: var(--text-secondary);
+  font-size: 1.2em;
 }
 
 .empty-state p {
-  color: #6c757d;
   margin: 0;
-}
-
-/* Responsive Design */
-@media (max-width: 768px) {
-  .db-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
-  }
-
-  .db-actions {
-    align-self: stretch;
-    justify-content: space-between;
-  }
-
-  .action-buttons {
-    flex-direction: column;
-  }
-
-  .action-btn {
-    justify-content: center;
-  }
+  color: #9ca3af;
 }
 </style>

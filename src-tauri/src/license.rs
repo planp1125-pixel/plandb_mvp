@@ -36,35 +36,21 @@ pub struct LicenseManager {
     license_file: PathBuf,
 }
 
+
 impl LicenseManager {
     pub fn new() -> Result<Self, String> {
         let app_data_dir = get_app_data_dir()?;
+        println!("📁 App data directory: {:?}", app_data_dir); // ADD THIS LINE
+        
         fs::create_dir_all(&app_data_dir)
             .map_err(|e| format!("Failed to create app data directory: {}", e))?;
         
+        let license_file = app_data_dir.join("license.json");
+        println!("📄 License file location: {:?}", license_file); // ADD THIS LINE
+        
         Ok(LicenseManager {
-            license_file: app_data_dir.join("license.json"),
+            license_file,
         })
-    }
-
-    pub async fn activate_license(&self, email: &str, license_key: &str) -> Result<LicenseStatus, String> {
-        // Validate format
-        if !self.validate_license_format(license_key) {
-            return Ok(LicenseStatus {
-                is_valid: false,
-                license_type: LicenseType::Trial,
-                days_remaining: None,
-                message: "Invalid license key format".to_string(),
-            });
-        }
-
-        // Verify with server
-        let license_info = self.verify_with_server(email, license_key).await?;
-        
-        // Save license locally
-        self.save_license(&license_info)?;
-        
-        Ok(self.get_license_status()?)
     }
 
     pub fn get_license_status(&self) -> Result<LicenseStatus, String> {
@@ -131,75 +117,69 @@ impl LicenseManager {
         self.save_license(&trial_license)
     }
 
-    fn validate_license_format(&self, key: &str) -> bool {
-        if key.len() != 19 {
-            return false;
-        }
 
-        let parts: Vec<&str> = key.split('-').collect();
-        if parts.len() != 4 {
-            return false;
-        }
+async fn verify_with_server(&self, email: &str, license_key: &str) -> Result<LicenseInfo, String> 
+{
+    let client = reqwest::Client::new();
+    let machine_id = get_machine_id();
+    
+    let server_url = "https://plandbdiff-licence.vercel.app/api/verify";
+    println!("🔗 Connecting to: {}", server_url); // ADD THIS FOR DEBUGGING
+    
+    let response = client
+        .post(server_url)
+        .json(&serde_json::json!({
+            "email": email,
+            "license_key": license_key,
+            "machine_id": machine_id, // ✅ USE THE VARIABLE
+        }))
+        .timeout(std::time::Duration::from_secs(10))
+        .send()
+        .await
+        .map_err(|e| {
+            println!("❌ Network error: {}", e); // ADD THIS
+            format!("License verification failed: {}", e)
+        })?;
 
-        parts.iter().all(|part| {
-            part.len() == 4 && part.chars().all(|c| c.is_alphanumeric())
-        })
+    println!("✅ Server response status: {}", response.status()); // ADD THIS
+    
+    if !response.status().is_success() {
+        return Err("Invalid license key or email".to_string());
     }
 
-    async fn verify_with_server(&self, email: &str, license_key: &str) -> Result<LicenseInfo, String> {
-        let client = reqwest::Client::new();
-        let machine_id = get_machine_id();
-        
-        // TODO: Replace with your actual license server URL
-       // let server_url = "https://your-license-server.vercel.app/api/verify";
-      //  let server_url = "http://localhost:3000/api/verify";
-      let server_url = "https://plandbdiff-7qwur9pu9-manikandans-projects-be37ef3a.vercel.app/api/verify";
-        let response = client
-            .post(server_url)
-            .json(&serde_json::json!({
-                "email": email,
-                "license_key": license_key,
-                "machine_id": machine_id,
-            }))
-            .timeout(std::time::Duration::from_secs(10))
-            .send()
-            .await
-            .map_err(|e| format!("License verification failed: {}. Check internet connection.", e))?;
+    let data: serde_json::Value = response.json().await
+        .map_err(|e| format!("Failed to parse server response: {}", e))?;
 
-        if !response.status().is_success() {
-            return Err("Invalid license key or email".to_string());
-        }
+    println!("📄 Server response: {:?}", data); // ADD THIS
 
-        let data: serde_json::Value = response.json().await
-            .map_err(|e| format!("Failed to parse server response: {}", e))?;
+    let license_type = match data["license_type"].as_str() {
+        Some("monthly") => LicenseType::Monthly,
+        Some("yearly") => LicenseType::Yearly,
+        Some("lifetime") => LicenseType::Lifetime,
+        _ => return Err("Invalid license type from server".to_string()),
+    };
 
-        let license_type = match data["license_type"].as_str() {
-            Some("monthly") => LicenseType::Monthly,
-            Some("yearly") => LicenseType::Yearly,
-            Some("lifetime") => LicenseType::Lifetime,
-            _ => return Err("Invalid license type from server".to_string()),
-        };
+    let expiry_date = if license_type == LicenseType::Lifetime {
+        None
+    } else {
+        Some(DateTime::parse_from_rfc3339(
+            data["expiry_date"].as_str().ok_or("Missing expiry date")?
+        )
+        .map_err(|e| format!("Invalid expiry date: {}", e))?
+        .with_timezone(&Utc))
+    };
 
-        let expiry_date = if license_type == LicenseType::Lifetime {
-            None
-        } else {
-            Some(DateTime::parse_from_rfc3339(
-                data["expiry_date"].as_str().ok_or("Missing expiry date")?
-            )
-            .map_err(|e| format!("Invalid expiry date: {}", e))?
-            .with_timezone(&Utc))
-        };
+    Ok(LicenseInfo {
+        email: email.to_string(),
+        license_key: license_key.to_string(),
+        license_type,
+        activation_date: Utc::now(),
+        expiry_date,
+        last_validation: Utc::now(),
+        machine_id,
+    })
+}
 
-        Ok(LicenseInfo {
-            email: email.to_string(),
-            license_key: license_key.to_string(),
-            license_type,
-            activation_date: Utc::now(),
-            expiry_date,
-            last_validation: Utc::now(),
-            machine_id,
-        })
-    }
 
     fn save_license(&self, license: &LicenseInfo) -> Result<(), String> {
         let json = serde_json::to_string_pretty(license)
@@ -219,13 +199,8 @@ impl LicenseManager {
             .map_err(|e| format!("Failed to parse license: {}", e))
     }
 
-    pub fn deactivate_license(&self) -> Result<(), String> {
-        if self.license_file.exists() {
-            fs::remove_file(&self.license_file)
-                .map_err(|e| format!("Failed to remove license: {}", e))?;
-        }
-        Ok(())
-    }
+
+ 
 }
 
 fn get_machine_id() -> String {
@@ -275,3 +250,22 @@ fn get_app_data_dir() -> Result<PathBuf, String> {
         Ok(PathBuf::from(home).join(".config").join(app_name))
     }
 }
+
+// #[tauri::command]
+// pub fn force_reset_license() -> Result<(), String> {
+//     let manager = LicenseManager::new()?;
+    
+//     // Delete license file
+//     if manager.license_file.exists() {
+//         println!("🗑️ Force deleting: {:?}", manager.license_file);
+//         fs::remove_file(&manager.license_file)
+//             .map_err(|e| format!("Failed to remove license: {}", e))?;
+//         println!("✅ License file deleted");
+//     }
+    
+//     // Create fresh trial
+//     manager.create_trial_license()?;
+//     println!("✅ Fresh trial created");
+    
+//     Ok(())
+// }

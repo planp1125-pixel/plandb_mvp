@@ -1,217 +1,36 @@
-/* Responsive Design */
-@media (max-width: 1024px) {
-  .nav-sidebar {
-    width: 3rem;
-  }
-  
-  .nav-icon {
-    width: 2.5rem;
-    height: 2.5rem;
-  }
-  
-  .main-content-with-nav {
-    margin-left: 3rem;
-  }
-  
-  .sidebar-toggle {
-    left: 3.625rem;
-  }
-  
-  .sidebar {
-    width: 18.75rem;
-    position: absolute;
-    z-index: 999;
-    background: var(--white);
-    box-shadow: 2px 0 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-    height: 100%;
-  }
-  
-  .sidebar-hidden {
-    transform: translateX(-100%);
-    width: 0;
-  }
-  
-  .tab {
-    padding: 0.75rem 1.25rem;
-  }
-}
+<template>
+  <div id="app" class="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 font-sans overflow-hidden">
+    <!-- Header -->
+    <header class="bg-gradient-to-r from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700 text-white shadow-lg border-b border-white/10 relative z-50">
+      <div class="px-6 py-4 flex items-center justify-between">
+        <div>
+          <h1 class="text-xl font-semibold mb-1 tracking-tight">SQLCipher Schema Comparison Tool</h1>
+          <div class="text-sm opacity-80 font-normal">Desktop application for SQLCipher database management</div>
+        </div>
 
-@media (max-width: 768px) {
-  .nav-sidebar {
-    width: 3rem;
-    padding: 0.75rem 0;
-  }
-  
-  .nav-icon {
-    width: 2.25rem;
-    height: 2.25rem;
-  }
-  
-  .main-content-with-nav {
-    margin-left: 3rem;
-  }
-  
-  .sidebar-toggle {
-    left: 3.625rem;
-    width: 2rem;
-    height: 2rem;
-    font-size: 0.75rem;
-  }
-  
-  .sidebar {
-    width: 18.75rem;
-    position: absolute;
-    z-index: 999;
-    background: var(--white);
-    box-shadow: 2px 0 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-  }
-  
-  .sidebar-hidden {
-    transform: translateX(-100%);
-  }
-  
-  .main-content {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    background: var(--white);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    width: 100%;
-  }
-
-  .main-content-fullwidth {
-    margin-left: 0;
-    width: 100%;
-  }
-  
-  .tabs {
-    padding: 0 0.625rem;
-    flex-wrap: wrap;
-  }
-  
-  .tab {
-    padding: 0.625rem 0.9375rem;
-    font-size: 0.8125rem;
-    flex: 1;
-    min-width: 6.25rem;
-  }
-  
-  .tab-panel {
-    padding: 0.9375rem;
-  }
-  
-  .content-panel {
-    padding: 1rem;
-  }
-  
-  .setting-item,
-  .profile-item {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.5rem;
-  }
-  
-  .setting-input,
-  .profile-input {
-    width: 100%;
-    min-width: auto;
-  }
-}
-
-/* Focus States for Accessibility */
-.sidebar-toggle:focus,
-.nav-icon:focus {
-  outline: 2px solid var(--primary-500);
-  outline-offset: 2px;
-}
-
-/* Animation for smooth transitions */
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.welcome-content {
-  animation: slideIn 0.5s ease-out;
-}
-
-.tabs {
-  animation: slideIn 0.3s ease-out;
-}
-
-.content-panel {
-  animation: slideIn 0.3s ease-out;
-}
-
-/* Print Styles */
-@media print {
-  .nav-sidebar,
-  .sidebar-toggle,
-  .sidebar {
-    display: none;
-  }
-  
-  .main-content {
-    width: 100%;
-    margin: 0;
-  }
-  
-  .main-content-with-nav {
-    margin-left: 0;
-  }
-  
-  .app-header {
-    background: var(--white);
-    color: var(--gray-900);
-    box-shadow: none;
-  }
-}
-    <template>
-  <div id="app">
-    <!-- <header class="app-header">
-      <div class="header-content">
-        <h1>SQLCipher Differ Tool</h1>
-        <div class="subtitle">Desktop application for SQLCipher database management</div>
+        <!-- Theme toggle -->
+        <button
+          class="px-3 py-1.5 text-sm rounded-lg border border-black/10 dark:border-white/10 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all duration-200"
+          @click="toggleTheme"
+          :title="isDark ? 'Switch to Light' : 'Switch to Dark'"
+        >
+          {{ isDark ? '🌙 Dark' : '☀️ Light' }}
+        </button>
       </div>
-    </header> -->
+    </header>
 
-    <header class="app-header">
-  <div class="header-content flex items-center justify-between">
-    <div>
-      <h1>SQLCipher Schema Comparison Tool</h1>
-      <div class="subtitle">Desktop application for SQLCipher database management</div>
-    </div>
-
-    <!-- Theme toggle -->
-    <button
-      class="px-3 py-1.5 text-sm rounded-lg border border-black/10 dark:border-white/10
-             bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100
-             hover:bg-slate-50 dark:hover:bg-slate-700 transition"
-      @click="toggleTheme"
-      :title="isDark ? 'Switch to Light' : 'Switch to Dark'"
-    >
-      {{ isDark ? '🌙 Dark' : '☀️ Light' }}
-    </button>
-  </div>
-</header>
- 
-
-
-    <main class="app-main">
-      <div class="container">
-        <!-- Left Navigation Icons -->
-        <nav class="nav-sidebar">
-          <div class="nav-icons">
+    <!-- Main Content -->
+    <main class="flex-1 flex overflow-hidden">
+      <div class="flex w-full h-full relative">
+        <!-- Left Navigation Sidebar -->
+        <nav class="w-16 bg-gray-800 dark:bg-gray-900 flex flex-col items-center py-4 shadow-lg z-40 flex-shrink-0">
+          <div class="flex flex-col gap-2 w-full">
             <button 
               class="nav-icon"
-              :class="{ 'nav-icon-active': activeNavItem === 'database' }"
+              :class="{
+                'nav-icon-active': activeNavItem === 'database',
+                'nav-icon-inactive': activeNavItem !== 'database'
+              }"
               @click="activeNavItem = 'database'"
               title="Database Connections"
             >
@@ -222,7 +41,10 @@
             
             <button 
               class="nav-icon"
-              :class="{ 'nav-icon-active': activeNavItem === 'settings' }"
+              :class="{
+                'nav-icon-active': activeNavItem === 'settings',
+                'nav-icon-inactive': activeNavItem !== 'settings'
+              }"
               @click="activeNavItem = 'settings'"
               title="Settings"
             >
@@ -233,7 +55,10 @@
             
             <button 
               class="nav-icon"
-              :class="{ 'nav-icon-active': activeNavItem === 'subscription' }"
+              :class="{
+                'nav-icon-active': activeNavItem === 'subscription',
+                'nav-icon-inactive': activeNavItem !== 'subscription'
+              }"
               @click="activeNavItem = 'subscription'"
               title="Subscription"
             >
@@ -244,7 +69,10 @@
             
             <button 
               class="nav-icon"
-              :class="{ 'nav-icon-active': activeNavItem === 'profile' }"
+              :class="{
+                'nav-icon-active': activeNavItem === 'profile',
+                'nav-icon-inactive': activeNavItem !== 'profile'
+              }"
               @click="activeNavItem = 'profile'"
               title="Profile"
             >
@@ -256,15 +84,22 @@
         </nav>
 
         <!-- Sidebar toggle button -->
-        <button class="sidebar-toggle" @click="toggleSidebar" v-show="activeNavItem === 'database'">
+        <button 
+          v-show="activeNavItem === 'database'"
+          @click="toggleSidebar"
+          class="sidebar-toggle"
+        >
           {{ isSidebarVisible ? '◀' : '▶' }}
         </button>
 
         <!-- Sidebar for database connections -->
         <aside 
-          class="sidebar" 
-          :class="{ 'sidebar-hidden': !isSidebarVisible || activeNavItem !== 'database' }"
           v-show="activeNavItem === 'database'"
+          class="sidebar"
+          :class="{
+            'sidebar-visible': isSidebarVisible && activeNavItem === 'database',
+            'sidebar-hidden': !isSidebarVisible || activeNavItem !== 'database'
+          }"
         >
           <DatabaseConnection 
             @database-connected="handleDatabaseConnected"
@@ -274,14 +109,14 @@
 
         <!-- Main content area -->
         <div 
-          class="main-content" 
-          :class="{ 
-            'main-content-fullwidth': !isSidebarVisible || activeNavItem !== 'database',
-            'main-content-with-nav': true 
+          class="main-content"
+          :class="{
+            'main-content-full': !isSidebarVisible || activeNavItem !== 'database',
+            'main-content-with-sidebar': isSidebarVisible && activeNavItem === 'database'
           }"
         >
           <!-- Database Content -->
-          <div v-if="activeNavItem === 'database'">
+          <div v-if="activeNavItem === 'database'" class="h-full">
             <Database 
               :connected-databases="connectedDatabases"
               :selected-database="selectedDatabase"
@@ -291,13 +126,19 @@
           </div>
 
           <!-- Settings Content -->
-          <Settings v-else-if="activeNavItem === 'settings'" />
+          <div v-else-if="activeNavItem === 'settings'" class="h-full">
+            <Settings />
+          </div>
 
           <!-- Subscription Content -->
-          <Subscription v-else-if="activeNavItem === 'subscription'" />
+          <div v-else-if="activeNavItem === 'subscription'" class="h-full">
+            <Subscription />
+          </div>
 
           <!-- Profile Content -->
-          <Profile v-else-if="activeNavItem === 'profile'" />
+          <div v-else-if="activeNavItem === 'profile'" class="h-full">
+            <Profile />
+          </div>
         </div>
       </div>
     </main>
@@ -305,7 +146,6 @@
 </template>
 
 <script setup lang="ts">
-// import { ref } from 'vue';
 import { ref, onMounted } from 'vue'
 import DatabaseConnection from './components/DatabaseConnection.vue';
 import Database from './components/Database.vue';
@@ -314,11 +154,11 @@ import Subscription from './components/Subscription.vue';
 import Profile from './components/Profile.vue';
 import type { DatabaseInfo, SchemaComparison as SchemaComparisonType } from './services/databaseService';
 
-
+// Theme management
 const isDark = ref(false)
 
 function applyTheme(dark: boolean) {
-  const root = document.documentElement // <html>
+  const root = document.documentElement
   root.classList.toggle('dark', dark)
   localStorage.setItem('theme', dark ? 'dark' : 'light')
   isDark.value = dark
@@ -336,20 +176,19 @@ onMounted(() => {
     const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches
     applyTheme(!!prefersDark)
   }
-  // keep in sync with OS changes (optional)
+  
   const mq = window.matchMedia?.('(prefers-color-scheme: dark)')
   mq?.addEventListener('change', e => {
-    // only auto-switch if user hasn't explicitly chosen
     if (!localStorage.getItem('theme')) applyTheme(e.matches)
   })
 })
-// State
+
+// App state
 const connectedDatabases = ref<DatabaseInfo[]>([]);
 const selectedDatabase = ref<DatabaseInfo | null>(null);
 const activeTab = ref('explorer');
 const isSidebarVisible = ref(true);
-const activeNavItem = ref('database'); // Add navigation state
-
+const activeNavItem = ref('database');
 
 // Toggle sidebar visibility
 const toggleSidebar = () => {
@@ -385,465 +224,110 @@ const handleTableSelected = (tableName: string) => {
 </script>
 
 <style scoped>
-/* Tailwind-inspired utility classes */
-
-/* Color Variables */
-/*:root {
-  --primary-500: #6366f1;
-  --primary-600: #4f46e5;
-  --primary-700: #3730a3;
-  --gray-50: #f8fafc;
-  --gray-100: #f1f5f9;
-  --gray-200: #e2e8f0;
-  --gray-300: #cbd5e1;
-  --gray-500: #64748b;
-  --gray-700: #334155;
-  --gray-800: #1e293b;
-  --gray-900: #0f172a;
-  --white: #ffffff;
-  --blue-500: #3b82f6;
-  --blue-600: #2563eb;
-  --blue-700: #1d4ed8;
-} 
-
-:root {
-  --primary-500: #6366f1;
-  --primary-600: #4f46e5;
-  --gray-50: #f8fafc;
-  --gray-100: #f1f5f9;
-  --gray-800: #1e293b;
-  --gray-900: #0f172a;
-  --white: #ffffff;
-} 
-
-
-:root.dark {
-  --primary-500: #818cf8;
-  --primary-600: #6366f1;
-  --gray-50: #0f172a;     
-  --gray-100: #1e293b;    
-  --gray-800: #f1f5f9;    
-  --gray-900: #f8fafc;     
-  --white: #0f172a;      
-}
-*/
-
-/* Reset and Base */
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-/* App Container */
-#app {
-  font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
-  height: 100vh;
-  background-color: var(--gray-50);
-  color: var(--gray-900);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  line-height: 1.6;
-}
-
-/* Header */
-.app-header {
-  background: linear-gradient(135deg, var(--primary-500) 0%, var(--primary-600) 100%);
-  
-  color: var(--white);
-  padding: 1rem 1.5rem;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  position: relative;
-  z-index: 50;
-}
-
-.header-content {
-  max-width: none;
-}
-
-.app-header h1 {
-  font-size: 1.5rem;
-  font-weight: 600;
-  margin: 0 0 0.25rem 0;
-  letter-spacing: -0.025em;
-}
-
-.subtitle {
-  font-size: 0.875rem;
-  opacity: 0.8;
-  font-weight: 400;
-}
-
-/* Main Layout */
-.app-main {
-  flex: 1;
-  display: flex;
-  overflow: hidden;
-}
-
-.container {
-  display: flex;
-  width: 100%;
-  height: 100%;
-  position: relative;
-  overflow: hidden;
-}
-
-/* Left Navigation Sidebar */
-.nav-sidebar {
-  width: 4rem;
-  background: var(--gray-800);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 1rem 0;
-  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
-  z-index: 200;
-}
-
-.nav-icons {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  width: 100%;
-}
-
+/* Navigation Icons */
 .nav-icon {
-  width: 3rem;
-  height: 3rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: none;
-  border: none;
-  color: var(--gray-300);
-  cursor: pointer;
-  border-radius: 0.75rem;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  margin: 0 0.5rem;
+  @apply w-12 h-12 flex items-center justify-center bg-transparent border-none cursor-pointer rounded-xl transition-all duration-200 mx-2;
 }
 
-.nav-icon:hover {
-  background: var(--gray-700);
-  color: var(--white);
-  transform: translateX(2px);
+.nav-icon-inactive {
+  @apply text-gray-300 hover:bg-gray-700 hover:text-white hover:translate-x-0.5;
 }
 
 .nav-icon-active {
-  background: var(--primary-500);
-  color: var(--white);
-}
-
-.nav-icon-active:hover {
-  background: var(--primary-600);
-  transform: translateX(2px);
+  @apply bg-blue-500 text-white hover:bg-blue-600 hover:translate-x-0.5;
 }
 
 /* Sidebar Toggle Button */
 .sidebar-toggle {
-  position: absolute;
-  top: 0.625rem;
-  left: 4.625rem; /* Adjust for nav sidebar width */
-  z-index: 1000;
-  background: var(--primary-500);
-  color: var(--white);
-  border: none;
-  border-radius: 0.5rem;
-  width: 2.5rem;
-  height: 2.5rem;
-  cursor: pointer;
-  font-size: 0.875rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.sidebar-toggle:hover {
-  background: var(--primary-600);
-  transform: translateY(-1px);
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-}
-
-.sidebar-toggle:active {
-  transform: translateY(0);
+  @apply absolute top-2 left-[4.5rem] z-30 bg-blue-500 text-white border-none rounded-lg w-10 h-10 cursor-pointer text-sm flex items-center justify-center shadow-lg transition-all duration-200 hover:bg-blue-600 hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0;
 }
 
 /* Sidebar */
 .sidebar {
-  width: 25rem;
-  flex-shrink: 0;
-  background: var(--white);
-  border-right: 1px solid var(--gray-200);
-  overflow-y: auto;
-  height: 100%;
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
-  z-index: 100;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  @apply w-80 flex-shrink-0 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 overflow-y-auto h-full transition-all duration-300 relative z-20 shadow-lg;
+}
+
+.sidebar-visible {
+  @apply translate-x-0;
 }
 
 .sidebar-hidden {
-  transform: translateX(-100%);
-  width: 0;
-  border-right: none;
+  @apply -translate-x-full w-0 border-r-0;
 }
 
-/* Custom Scrollbar */
+/* Main Content */
+.main-content {
+  @apply flex-1 flex flex-col overflow-auto bg-white dark:bg-gray-800 transition-all duration-300 min-h-full;
+}
+
+.main-content-with-sidebar {
+  @apply ml-0;
+}
+
+.main-content-full {
+  @apply ml-0;
+}
+
+/* Custom scrollbar for sidebar */
 .sidebar::-webkit-scrollbar {
   width: 6px;
 }
 
 .sidebar::-webkit-scrollbar-track {
-  background: var(--gray-100);
+  @apply bg-gray-100 dark:bg-gray-700;
 }
 
 .sidebar::-webkit-scrollbar-thumb {
-  background: var(--gray-300);
-  border-radius: 3px;
+  @apply bg-gray-300 dark:bg-gray-600 rounded;
 }
 
 .sidebar::-webkit-scrollbar-thumb:hover {
-  background: var(--primary-500);
-}
-
-.main-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background: var(--white);
-  transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  height: 100%; /* Add this */
-}
-
-/* Ensure database content gets full height */
-.main-content > div {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-/* Make sure individual components can scroll */
-.main-content :deep(.content-panel) {
-  height: 100%;
-  overflow-y: auto;
-  flex: 1;
-}
-.main-content-fullwidth {
-  margin-left: 0;
-}
-
-.main-content-with-nav {
-  margin-left: 4rem; /* Account for nav sidebar */
-}
-
-/* Welcome Screen */
-.welcome-screen {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  background: var(--white);
-  padding: 2rem;
-}
-
-.welcome-content {
-  text-align: center;
-  max-width: 28rem;
-  padding: 2.5rem;
-  background: var(--gray-50);
-  border-radius: 1rem;
-  border: 1px solid var(--gray-200);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
-}
-
-.welcome-content h2 {
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: var(--gray-900);
-  margin-bottom: 1rem;
-}
-
-.welcome-content p {
-  color: var(--gray-700);
-  margin-bottom: 1.5rem;
-}
-
-.welcome-content ul {
-  text-align: left;
-  color: var(--gray-600);
-  padding-left: 1.25rem;
-}
-
-.welcome-content li {
-  margin-bottom: 0.5rem;
-}
-
-/* Tabs Container */
-.tabs-container {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow: hidden;
-}
-
-/* Tabs Navigation */
-.tabs {
-  display: flex;
-  background: var(--white);
-  border-bottom: 1px solid var(--gray-200);
-  flex-shrink: 0;
-  padding: 0 1.25rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
-}
-
-.tab {
-  padding: 1rem 1.5rem;
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--gray-500);
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  border-bottom: 3px solid transparent;
-  white-space: nowrap;
-  border-radius: 0.5rem 0.5rem 0 0;
-  position: relative;
-  margin: 0 0.25rem;
-}
-
-.tab:hover {
-  background: var(--gray-100);
-  color: var(--primary-600);
-}
-
-.tab-active {
-  color: var(--primary-600);
-  background: var(--white);
-  border-bottom-color: var(--primary-500);
-  box-shadow: 0 -2px 0 var(--primary-500);
-}
-
-.tab:focus {
-  outline: 2px solid var(--primary-500);
-  outline-offset: -2px;
-}
-
-/* Tab Content */
-.tab-content {
-  flex: 1;
-  overflow: hidden;
-}
-
-.tab-panel {
-  height: 100%;
-  overflow: auto;
-  padding: 1.5rem;
-  background: var(--gray-50);
-}
-
-/* Custom scrollbar for tab panels */
-.tab-panel::-webkit-scrollbar {
-  width: 8px;
-}
-
-.tab-panel::-webkit-scrollbar-track {
-  background: var(--gray-100);
-}
-
-.tab-panel::-webkit-scrollbar-thumb {
-  background: var(--gray-300);
-  border-radius: 4px;
-}
-
-.tab-panel::-webkit-scrollbar-thumb:hover {
-  background: var(--primary-500);
-}
-
-/* Deep selectors for child components */
-.tab-panel :deep(.database-explorer),
-.tab-panel :deep(.schema-comparison),
-.tab-panel :deep(.table-viewer) {
-  max-width: 100%;
-  margin: 0;
-  padding: 0.625rem;
+  @apply bg-blue-500;
 }
 
 /* Responsive Design */
 @media (max-width: 1024px) {
+  .nav-sidebar {
+    width: 3rem;
+  }
+  
+  .nav-icon {
+    @apply w-10 h-10;
+  }
+  
+  .sidebar-toggle {
+    @apply left-[3.5rem];
+  }
+  
   .sidebar {
-    width: 18.75rem;
-    position: absolute;
-    z-index: 999;
-    background: var(--white);
-    box-shadow: 2px 0 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-    height: 100%;
-  }
-  
-  .sidebar-hidden {
-    transform: translateX(-100%);
-    width: 0;
-  }
-  
-  .tab {
-    padding: 0.75rem 1.25rem;
+    @apply w-72 absolute z-30 bg-white dark:bg-gray-800 shadow-xl h-full;
   }
 }
 
 @media (max-width: 768px) {
+  .nav-sidebar {
+    @apply w-12 py-3;
+  }
+  
+  .nav-icon {
+    @apply w-9 h-9;
+  }
+  
+  .sidebar-toggle {
+    @apply left-[3.5rem] w-8 h-8 text-xs;
+  }
+  
   .sidebar {
-    width: 18.75rem;
-    position: absolute;
-    z-index: 999;
-    background: var(--white);
-    box-shadow: 2px 0 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    @apply w-64;
   }
   
-  .sidebar-hidden {
-    transform: translateX(-100%);
+  .app-header h1 {
+    @apply text-lg;
   }
   
-  .main-content {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    background: var(--white);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    width: 100%;
+  .app-header .subtitle {
+    @apply text-xs;
   }
-
-  .main-content-fullwidth {
-    margin-left: 0;
-    width: 100%;
-  }
-  
-  .tabs {
-    padding: 0 0.625rem;
-    flex-wrap: wrap;
-  }
-  
-  .tab {
-    padding: 0.625rem 0.9375rem;
-    font-size: 0.8125rem;
-    flex: 1;
-    min-width: 6.25rem;
-  }
-  
-  .tab-panel {
-    padding: 0.9375rem;
-  }
-}
-
-/* Focus States for Accessibility */
-.sidebar-toggle:focus {
-  outline: 2px solid var(--primary-500);
-  outline-offset: 2px;
 }
 
 /* Animation for smooth transitions */
@@ -868,54 +352,23 @@ const handleTableSelected = (tableName: string) => {
 
 /* Print Styles */
 @media print {
+  .nav-sidebar,
   .sidebar-toggle,
   .sidebar {
-    display: none;
+    @apply hidden;
   }
   
   .main-content {
-    width: 100%;
-    margin: 0;
+    @apply w-full m-0;
   }
   
   .app-header {
-    background: var(--white);
-    color: var(--gray-900);
-    box-shadow: none;
+    @apply bg-white text-gray-900 shadow-none;
   }
 }
 
-/*html.dark {
-  color-scheme: dark;
+/* Ensure child components use full height */
+.main-content > div {
+  @apply h-full flex flex-col;
 }
-
-html.dark #app {
-  background-color: #0f172a;
-  color: #f8fafc;
-}
-
-html.dark .app-header {
-  background: linear-gradient(135deg, #4338ca 0%, #3730a3 100%);
-}
-
-html.dark .sidebar,
-html.dark .main-content {
-  background: #1e293b;
-  border-color: #334155;
-}
-
-html.dark .nav-sidebar {
-  background: #0f172a;
-}
-
-html.dark .welcome-content {
-  background: #1e293b;
-  border-color: #334155;
-  color: #f8fafc;
-}
-
-html.dark .tab-panel {
-  background: #1e293b;
-}*/
-
 </style>

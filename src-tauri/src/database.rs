@@ -19,6 +19,10 @@ pub enum DatabaseType {
 }
 
 impl DatabaseManager {
+
+
+
+    
     pub fn new() -> Self {
         Self {
             connections: HashMap::new(),
@@ -155,7 +159,13 @@ impl DatabaseManager {
     // }
 
     /// Connect to database with automatic type detection
-pub fn connect_database(&mut self, path: &str, password: &str) -> anyhow::Result<DatabaseInfo> {
+    /// 
+pub fn connect_database(
+    &mut self, 
+    path: &str, 
+    password: &str,
+    settings: Option<serde_json::Value> // Add this parameter
+) -> anyhow::Result<DatabaseInfo> {
     println!("Attempting to connect to database: {}", path);
     
     let db_path = Path::new(path);
@@ -163,6 +173,7 @@ pub fn connect_database(&mut self, path: &str, password: &str) -> anyhow::Result
     
     match db_type {
         DatabaseType::SQLite => {
+            // SQLite connection (no password/settings needed)
             let conn = Connection::open(db_path)
                 .with_context(|| format!("Failed to open database file: {}", path))?;
             
@@ -178,7 +189,7 @@ pub fn connect_database(&mut self, path: &str, password: &str) -> anyhow::Result
                 table_count,
                 is_connected: true,
                 alias: None,
-                password: Some(password.to_string()), // Make sure this stores the actual password
+                password: Some(password.to_string()),
             };
             
             self.connections.insert(path.to_string(), conn);
@@ -189,42 +200,58 @@ pub fn connect_database(&mut self, path: &str, password: &str) -> anyhow::Result
             let conn = Connection::open(db_path)
                 .with_context(|| format!("Failed to open database file: {}", path))?;
             
-            let key_formats = vec![
-                format!("PRAGMA key = '{}';", password),
-                format!("PRAGMA key = \"{}\";", password),
-                format!("PRAGMA key = {};", password),
-                format!("PRAGMA key='{}';", password),
-            ];
-
-            let mut sqlcipher_success = false;
-            let mut last_error = String::new();
-            let mut table_count = 0;
-
-            for key_format in key_formats {
-                println!("Trying SQLCipher key format: {}", key_format.replace(password, "****"));
+            // Set password
+            conn.pragma_update(None, "key", password)
+                .with_context(|| "Failed to set encryption key")?;
+            
+            // Apply settings from user or use defaults
+            if let Some(s) = settings {
+                // Extract settings from JSON
+                let page_size = s["page_size"].as_str().unwrap_or("4096");
+                let kdf_iter = s["kdf_iterations"].as_str().unwrap_or("256000");
+                let hmac_algo = s["hmac_algorithm"].as_str().unwrap_or("HMAC_SHA256");
+                let kdf_algo = s["kdf_algorithm"].as_str().unwrap_or("PBKDF2_HMAC_SHA256");
                 
-                if let Err(e) = conn.execute_batch(&key_format) {
-                    last_error = format!("Key format failed: {}", e);
-                    continue;
-                }
+                println!("📝 Applying user settings: page_size={}, kdf_iter={}", page_size, kdf_iter);
                 
-                match conn.query_row("SELECT COUNT(*) FROM sqlite_master WHERE type='table';", [], |row| row.get::<_, i32>(0)) {
-                    Ok(count) => {
-                        println!("SQLCipher key accepted! Found {} tables.", count);
-                        sqlcipher_success = true;
-                        table_count = count;
-                        break;
-                    },
-                    Err(e) => {
-                        last_error = format!("Key verification failed: {}", e);
-                        continue;
-                    }
-                }
+                conn.pragma_update(None, "cipher_page_size", page_size)
+                    .with_context(|| "Failed to set page size")?;
+                
+                conn.pragma_update(None, "kdf_iter", kdf_iter)
+                    .with_context(|| "Failed to set KDF iterations")?;
+                
+                conn.pragma_update(None, "cipher_hmac_algorithm", hmac_algo)
+                    .with_context(|| "Failed to set HMAC algorithm")?;
+                
+                conn.pragma_update(None, "cipher_kdf_algorithm", kdf_algo)
+                    .with_context(|| "Failed to set KDF algorithm")?;
+            } else {
+                // Use default settings (same as migration defaults)
+                println!("📝 Applying default settings");
+                
+                conn.pragma_update(None, "cipher_page_size", "4096")
+                    .with_context(|| "Failed to set page size")?;
+                
+                conn.pragma_update(None, "kdf_iter", "256000")
+                    .with_context(|| "Failed to set KDF iterations")?;
+                
+                conn.pragma_update(None, "cipher_hmac_algorithm", "HMAC_SHA256")
+                    .with_context(|| "Failed to set HMAC algorithm")?;
+                
+                conn.pragma_update(None, "cipher_kdf_algorithm", "PBKDF2_HMAC_SHA256")
+                    .with_context(|| "Failed to set KDF algorithm")?;
             }
-
-            if !sqlcipher_success {
-                return Err(anyhow::anyhow!("Failed to connect to SQLCipher database. Last error: {}", last_error));
-            }
+            
+            println!("✅ SQLCipher settings applied");
+            
+            // Verify connection
+            let table_count: i32 = conn.query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='table';",
+                [],
+                |row| row.get(0)
+            ).with_context(|| "Key verification failed - incorrect password or settings")?;
+            
+            println!("✅ SQLCipher key accepted! Found {} tables.", table_count);
 
             let db_name = db_path
                 .file_name()
@@ -238,17 +265,19 @@ pub fn connect_database(&mut self, path: &str, password: &str) -> anyhow::Result
                 table_count,
                 is_connected: true,
                 alias: None,
-                password: Some(password.to_string()), // Make sure this stores the actual password
+                password: Some(password.to_string()),
             };
 
             self.connections.insert(path.to_string(), conn);
             self.connected_databases.insert(path.to_string(), db_info.clone());
-            println!("Database connection stored successfully with password");
+            println!("✅ Database connection stored successfully");
             
             Ok(db_info)
         }
     }
 }
+
+
     pub fn get_tables(&self, db_path: &str) -> anyhow::Result<Vec<TableInfo>> {
         let conn = self.connections.get(db_path)
             .context("Database not connected")?;
@@ -300,62 +329,146 @@ pub fn connect_database(&mut self, path: &str, password: &str) -> anyhow::Result
         Ok(columns)
     }
 
-    pub fn get_table_data(&self, db_path: &str, table_name: &str, limit: Option<i64>) -> anyhow::Result<TableData> {
-        let conn = self.connections.get(db_path)
-            .context("Database not connected")?;
+    // pub fn get_table_data(&self, db_path: &str, table_name: &str, limit: Option<i64>) -> anyhow::Result<TableData> {
+    //     let conn = self.connections.get(db_path)
+    //         .context("Database not connected")?;
 
-        // Get column names
-        let columns = self.get_table_columns(conn, table_name)?;
-        let column_names: Vec<String> = columns.iter().map(|c| c.name.clone()).collect();
+    //     // Get column names
+    //     let columns = self.get_table_columns(conn, table_name)?;
+    //     let column_names: Vec<String> = columns.iter().map(|c| c.name.clone()).collect();
 
-        // Get total count
-        let total_count: i64 = conn.query_row(
-            &format!("SELECT COUNT(*) FROM \"{}\"", table_name),
-            [],
-            |row| row.get(0),
-        )?;
+    //     // Get total count
+    //     let total_count: i64 = conn.query_row(
+    //         &format!("SELECT COUNT(*) FROM \"{}\"", table_name),
+    //         [],
+    //         |row| row.get(0),
+    //     )?;
 
-        // Build dynamic SELECT query using column names to ensure order
-        let col_list = column_names.iter()
-            .map(|c| format!("\"{}\"", c))
-            .collect::<Vec<_>>()
-            .join(", ");
-        let query = match limit {
-            Some(limit) => format!("SELECT {} FROM \"{}\" LIMIT {}", col_list, table_name, limit),
-            None => format!("SELECT {} FROM \"{}\"", col_list, table_name),
-        };
+    //     // Build dynamic SELECT query using column names to ensure order
+    //     let col_list = column_names.iter()
+    //         .map(|c| format!("\"{}\"", c))
+    //         .collect::<Vec<_>>()
+    //         .join(", ");
+    //     let query = match limit {
+    //         Some(limit) => format!("SELECT {} FROM \"{}\" LIMIT {}", col_list, table_name, limit),
+    //         None => format!("SELECT {} FROM \"{}\"", col_list, table_name),
+    //     };
 
-        let mut stmt = conn.prepare(&query)?;
-        let column_count = stmt.column_count();
+    //     let mut stmt = conn.prepare(&query)?;
+    //     let column_count = stmt.column_count();
         
-        // Return rows as arrays (your existing format)
-        let rows: Vec<Vec<serde_json::Value>> = stmt.query_map([], |row| {
-            let mut row_data = Vec::new();
-            for i in 0..column_count {
-                let value: Value = row.get(i)?;
-                let json_value = match value {
-                    Value::Null => serde_json::Value::Null,
-                    Value::Integer(i) => serde_json::Value::Number(i.into()),
-                    Value::Real(f) => serde_json::Value::Number(
-                        serde_json::Number::from_f64(f).unwrap_or(0.into())
-                    ),
-                    Value::Text(s) => serde_json::Value::String(s),
-                    Value::Blob(b) => serde_json::Value::String(
-                        format!("<BLOB {} bytes>", b.len())
-                    ),
-                };
-                row_data.push(json_value);
-            }
-            Ok(row_data)
-        })?.collect::<RusqliteResult<Vec<_>>>()?;
+    //     // Return rows as arrays (your existing format)
+    //     let rows: Vec<Vec<serde_json::Value>> = stmt.query_map([], |row| {
+    //         let mut row_data = Vec::new();
+    //         for i in 0..column_count {
+    //             let value: Value = row.get(i)?;
+    //             let json_value = match value {
+    //                 Value::Null => serde_json::Value::Null,
+    //                 Value::Integer(i) => serde_json::Value::Number(i.into()),
+    //                 Value::Real(f) => serde_json::Value::Number(
+    //                     serde_json::Number::from_f64(f).unwrap_or(0.into())
+    //                 ),
+    //                 Value::Text(s) => serde_json::Value::String(s),
+    //                 Value::Blob(b) => serde_json::Value::String(
+    //                     format!("<BLOB {} bytes>", b.len())
+    //                 ),
+    //             };
+    //             row_data.push(json_value);
+    //         }
+    //         Ok(row_data)
+    //     })?.collect::<RusqliteResult<Vec<_>>>()?;
 
-        Ok(TableData {
-            columns: column_names,
-            rows,
-            total_count,
-        })
-    }
+    //     Ok(TableData {
+    //         columns: column_names,
+    //         rows,
+    //         total_count,
+    //     })
+    // }
 
+
+
+    // REPLACE the existing get_table_data function in database.rs (around line 303)
+// with this version that supports OFFSET
+
+
+
+pub fn get_table_data(
+    &self, 
+    db_path: &str, 
+    table_name: &str, 
+    limit: Option<i64>,
+    offset: Option<i64>  // ← NEW PARAMETER
+) -> anyhow::Result<TableData> {
+    let conn = self.connections.get(db_path)
+        .context("Database not connected")?;
+
+    // Get column names
+    let columns = self.get_table_columns(conn, table_name)?;
+    let column_names: Vec<String> = columns.iter().map(|c| c.name.clone()).collect();
+
+    // Get total count
+    let total_count: i64 = conn.query_row(
+        &format!("SELECT COUNT(*) FROM \"{}\"", table_name),
+        [],
+        |row| row.get(0),
+    )?;
+
+    // Build dynamic SELECT query using column names to ensure order
+    let col_list = column_names.iter()
+        .map(|c| format!("\"{}\"", c))
+        .collect::<Vec<_>>()
+        .join(", ");
+    
+    // ← UPDATED: Build query with OFFSET support
+    let query = match (limit, offset) {
+        (Some(l), Some(o)) => format!(
+            "SELECT {} FROM \"{}\" LIMIT {} OFFSET {}", 
+            col_list, table_name, l, o
+        ),
+        (Some(l), None) => format!(
+            "SELECT {} FROM \"{}\" LIMIT {}", 
+            col_list, table_name, l
+        ),
+        (None, Some(o)) => format!(
+            "SELECT {} FROM \"{}\" OFFSET {}", 
+            col_list, table_name, o
+        ),
+        (None, None) => format!(
+            "SELECT {} FROM \"{}\"", 
+            col_list, table_name
+        ),
+    };
+
+    let mut stmt = conn.prepare(&query)?;
+    let column_count = stmt.column_count();
+    
+    // Return rows as arrays (your existing format)
+    let rows: Vec<Vec<serde_json::Value>> = stmt.query_map([], |row| {
+        let mut row_data = Vec::new();
+        for i in 0..column_count {
+            let value: Value = row.get(i)?;
+            let json_value = match value {
+                Value::Null => serde_json::Value::Null,
+                Value::Integer(i) => serde_json::Value::Number(i.into()),
+                Value::Real(f) => serde_json::Value::Number(
+                    serde_json::Number::from_f64(f).unwrap_or(0.into())
+                ),
+                Value::Text(s) => serde_json::Value::String(s),
+                Value::Blob(b) => serde_json::Value::String(
+                    format!("<BLOB {} bytes>", b.len())
+                ),
+            };
+            row_data.push(json_value);
+        }
+        Ok(row_data)
+    })?.collect::<RusqliteResult<Vec<_>>>()?;
+
+    Ok(TableData {
+        columns: column_names,
+        rows,
+        total_count,
+    })
+}
     pub fn compare_schemas(&self, db1_path: &str, db2_path: &str) -> anyhow::Result<SchemaComparison> {
         let tables1 = self.get_tables(db1_path)?;
         let tables2 = self.get_tables(db2_path)?;
@@ -391,6 +504,85 @@ pub fn connect_database(&mut self, path: &str, password: &str) -> anyhow::Result
             identical_tables,
         })
     }
+
+// Fast data comparison using SQL joins - handles 500K+ rows easily
+pub fn compare_table_data_fast(
+    &self,
+    db1_path: &str,
+    db2_path: &str,
+    table_name: &str,
+    primary_key: &str,
+) -> anyhow::Result<DataComparisonResult> {
+    let conn1 = self.connections.get(db1_path)
+        .context("Database 1 not connected")?;
+    let _conn2 = self.connections.get(db2_path)
+        .context("Database 2 not connected")?;
+    
+    // Attach second database to first connection
+    conn1.execute(
+        &format!("ATTACH DATABASE '{}' AS db2", db2_path),
+        [],
+    )?;
+    
+    // Get total row counts (fast)
+    let count1: i64 = conn1.query_row(
+        &format!("SELECT COUNT(*) FROM {}", table_name),
+        [],
+        |row| row.get(0)
+    )?;
+    
+    let count2: i64 = conn1.query_row(
+        &format!("SELECT COUNT(*) FROM db2.{}", table_name),
+        [],
+        |row| row.get(0)
+    )?;
+    
+    // Find rows only in DB1 (deleted rows)
+    let deleted_count: i64 = conn1.query_row(
+        &format!(
+            "SELECT COUNT(*) FROM {} t1 
+             WHERE NOT EXISTS (
+                 SELECT 1 FROM db2.{} t2 
+                 WHERE t2.{} = t1.{}
+             )",
+            table_name, table_name, primary_key, primary_key
+        ),
+        [],
+        |row| row.get(0)
+    )?;
+    
+    // Find rows only in DB2 (inserted rows)
+    let inserted_count: i64 = conn1.query_row(
+        &format!(
+            "SELECT COUNT(*) FROM db2.{} t2 
+             WHERE NOT EXISTS (
+                 SELECT 1 FROM {} t1 
+                 WHERE t1.{} = t2.{}
+             )",
+            table_name, table_name, primary_key, primary_key
+        ),
+        [],
+        |row| row.get(0)
+    )?;
+    
+    // Find modified rows (exists in both but different)
+    // This is an approximation - exact comparison would need column-by-column check
+    let potentially_modified = (count1 - deleted_count).min(count2 - inserted_count);
+    
+    // Detach database
+    conn1.execute("DETACH DATABASE db2", [])?;
+    
+    Ok(DataComparisonResult {
+        table_name: table_name.to_string(),
+        total_rows_db1: count1,
+        total_rows_db2: count2,
+        rows_inserted: inserted_count,
+        rows_deleted: deleted_count,
+        rows_potentially_modified: potentially_modified,
+        identical: count1 == count2 && inserted_count == 0 && deleted_count == 0,
+    })
+}
+
 
     fn tables_are_identical(&self, table1: &TableInfo, table2: &TableInfo) -> bool {
         if table1.columns.len() != table2.columns.len() {

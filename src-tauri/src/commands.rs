@@ -1,17 +1,3 @@
-// use crate::database::DatabaseManager;
-// use crate::models::*;
-// use std::sync::Mutex;
-// use std::time::Duration;
-// use tauri::State;
-// use tokio::time::timeout;
-// use rusqlite::Connection;
-// use std::fs;
-// use std::path::PathBuf;
-// use chrono::{Utc, Duration as ChronoDuration};
-// use sha2::{Sha256, Digest};
-// //use rusqlite::{Connection, types::Value};
-// //use crate::models::SchemaComparison;
-// use crate::license::{LicenseManager, LicenseStatus};
 
 
 use crate::database::DatabaseManager;
@@ -21,34 +7,85 @@ use std::time::Duration;
 use tauri::State;
 use tokio::time::timeout;
 use rusqlite::Connection;
+use std::path::Path;
+use chrono::Local;
+use std::io::Read;
+
 
 use crate::license::{LicenseManager, LicenseStatus};
 use std::fs;
 use std::path::PathBuf;
 use chrono::{DateTime, Utc};  // ← Add DateTime here
-use sha2::{Sha256, Digest};
 // ADD THIS TYPE ALIAS AFTER YOUR IMPORTS
 type LicenseManagerState = Mutex<LicenseManager>;
 type DbManager = Mutex<DatabaseManager>;
 
+
+
 #[tauri::command]
 pub async fn connect_database(
+    db_manager: State<'_, Mutex<DatabaseManager>>,
     path: String,
     password: String,
-    manager: State<'_, DbManager>,
+    settings: Option<serde_json::Value>, // Add this parameter
 ) -> Result<DatabaseInfo, String> {
-    let mut db_manager = manager.lock().unwrap();
+    let mut manager = db_manager.lock().unwrap();
     
-    match db_manager.connect_database(&path, &password) {
+    // Parse settings if provided
+    let sqlcipher_settings = if let Some(s) = settings {
+        Some(s)
+    } else {
+        None
+    };
+    
+    match manager.connect_database(&path, &password, sqlcipher_settings) {
         Ok(db_info) => {
-            println!("Successfully connected to database: {}", path);
+            println!("✅ Connected to database: {}", path);
             Ok(db_info)
         },
         Err(e) => {
-            println!("Failed to connect to database {}: {}", path, e);
+            println!("❌ Failed to connect: {}", e);
             Err(format!("Connection failed: {}", e))
         }
     }
+}
+
+#[tauri::command]
+pub async fn get_table_info(db_path: String, table_name: String) -> Result<TableInfo, String> {
+    use rusqlite::Connection;
+    
+    let conn = Connection::open(&db_path)
+        .map_err(|e| format!("Failed to open database: {}", e))?;
+    
+    let mut stmt = conn.prepare(&format!("PRAGMA table_info({})", table_name))
+        .map_err(|e| format!("Failed to get table info: {}", e))?;
+    
+    let mut columns = Vec::new();
+    let rows = stmt.query_map([], |row| {
+        Ok(ColumnInfo {
+            name: row.get(1)?,
+            data_type: row.get(2)?,
+            is_nullable: row.get::<_, i32>(3)? == 0,
+            default_value: row.get(4).ok(),
+            is_primary_key: row.get::<_, i32>(5)? == 1,
+        })
+    }).map_err(|e| format!("Query failed: {}", e))?;
+    
+    for row in rows {
+        columns.push(row.map_err(|e| format!("Row error: {}", e))?);
+    }
+    
+    let row_count: i64 = conn.query_row(
+        &format!("SELECT COUNT(*) FROM {}", table_name),
+        [],
+        |row| row.get(0)
+    ).unwrap_or(0);
+    
+    Ok(TableInfo {
+        name: table_name,
+        row_count,
+        columns,
+    })
 }
 
 #[tauri::command]
@@ -71,11 +108,13 @@ pub async fn get_database_tables(
 }
 
 
+
 #[tauri::command]
 pub async fn get_table_data(
     db_path: String,
     table_name: String,
     limit: Option<i64>,
+    offset: Option<i64>,  // ← NEW PARAMETER
     manager: State<'_, DbManager>,
 ) -> Result<TableData, String> {
     // Add timeout for large queries (60 seconds)
@@ -85,10 +124,10 @@ pub async fn get_table_data(
         let db_manager = manager.lock().unwrap();
         
         // Log the request with more details
-        println!("Fetching table '{}' from '{}' with limit: {:?}", 
-                table_name, db_path, limit);
+        println!("Fetching table '{}' from '{}' with limit: {:?}, offset: {:?}", 
+                table_name, db_path, limit, offset);
         
-        db_manager.get_table_data(&db_path, &table_name, limit)
+        db_manager.get_table_data(&db_path, &table_name, limit, offset)  // ← Pass offset
     }).await;
     
     match result {
@@ -106,15 +145,13 @@ pub async fn get_table_data(
             }
         },
         Err(_) => {
-            println!("Timeout occurred while fetching table '{}' (limit: {:?})", 
-                    table_name, limit);
+            println!("Timeout occurred while fetching table '{}' (limit: {:?}, offset: {:?})", 
+                    table_name, limit, offset);
             Err(format!("Query timeout - table '{}' took too long to fetch. Try using a smaller row limit.", 
                        table_name))
         }
     }
 }
-
-
 #[tauri::command]
 pub async fn compare_database_schemas(
     db1_path: String,
@@ -131,6 +168,30 @@ pub async fn compare_database_schemas(
         Err(e) => {
             println!("Failed to compare schemas: {}", e);
             Err(format!("Schema comparison failed: {}", e))
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn compare_table_data_fast(
+    db1_path: String,
+    db2_path: String,
+    table_name: String,
+    primary_key: String,
+    manager: State<'_, DbManager>,
+) -> Result<DataComparisonResult, String> {
+    let db_manager = manager.lock().unwrap();
+    
+    println!("Fast comparing table '{}' between databases", table_name);
+    
+    match db_manager.compare_table_data_fast(&db1_path, &db2_path, &table_name, &primary_key) {
+        Ok(result) => {
+            println!("Data comparison completed: {} total rows", result.total_rows_db1);
+            Ok(result)
+        },
+        Err(e) => {
+            println!("Failed to compare data: {}", e);
+            Err(format!("Data comparison failed: {}", e))
         }
     }
 }
@@ -685,13 +746,14 @@ pub async fn check_trial_status(
 
 // Helper functions (add these at the end of commands.rs)
 
+
 async fn verify_license_with_server(email: &str, license_key: &str) -> Result<crate::license::LicenseInfo, String> {
-    use sha2::{Sha256, Digest};
-    
     let client = reqwest::Client::new();
     let machine_id = get_machine_id_inline();
     
-    let server_url = "http://localhost:3000/api/verify";
+   // let server_url = "http://localhost:3000/api/verify";
+    //let server_url = "https://plandbdiff-licence.vercel.app/api/verify";
+    let server_url = "https://plandbdiff-license-02-1xyxdl83k-manikandans-projects-be37ef3a.vercel.app/api/verify";
     
     let response = client
         .post(server_url)
@@ -802,3 +864,350 @@ fn get_machine_id_inline() -> String {
     let result = hasher.finalize();
     format!("{:x}", result)
 }
+
+
+#[tauri::command]
+pub async fn migrate_to_sqlcipher(
+    source_path: String,
+    password: String,
+     settings: MigrationSettings,
+) -> Result<MigrationResult, String> 
+{
+    // Validate source file exists
+    if !Path::new(&source_path).exists() {
+        return Err("Source database file not found".to_string());
+    }
+
+    // Generate output filename
+    let source = Path::new(&source_path);
+    let file_stem = source
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .ok_or("Invalid source filename")?;
+    
+    let timestamp = Local::now().format("%Y%m%d_%H%M%S");
+    let output_filename = format!("{}_encrypted_{}.db", file_stem, timestamp);
+    
+    let output_path = source
+        .parent()
+        .ok_or("Invalid source path")?
+        .join(&output_filename)
+        .to_str()
+        .ok_or("Invalid output path")?
+        .to_string();
+
+    // Open source database (unencrypted SQLite)
+    let source_conn = Connection::open(&source_path)
+        .map_err(|e| format!("Failed to open source database: {}", e))?;
+
+    // Get list of tables - FIXED
+    let tables: Vec<String> = {
+        let mut stmt = source_conn
+            .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
+            .map_err(|e| format!("Failed to query tables: {}", e))?;
+
+        let rows = stmt.query_map([], |row| row.get(0))
+            .map_err(|e| format!("Failed to read tables: {}", e))?;
+        
+        let mut result = Vec::new();
+        for row in rows {
+            result.push(row.map_err(|e| format!("Failed to collect tables: {}", e))?);
+        }
+        result
+    };
+
+    // Get table schemas
+    let mut table_schemas = Vec::new();
+    for table_name in &tables {
+        let schema: String = {
+            let mut schema_stmt = source_conn
+                .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name=?1")
+                .map_err(|e| format!("Failed to prepare schema query: {}", e))?;
+
+            schema_stmt
+                .query_row([table_name], |row| row.get(0))
+                .map_err(|e| format!("Failed to get schema for table {}: {}", table_name, e))?
+        };
+
+        table_schemas.push((table_name.clone(), schema));
+    }
+
+    // Get indexes - FIXED
+    let indexes: Vec<String> = {
+        let mut idx_stmt = source_conn
+            .prepare("SELECT sql FROM sqlite_master WHERE type='index' AND sql IS NOT NULL")
+            .map_err(|e| format!("Failed to query indexes: {}", e))?;
+
+        let rows = idx_stmt.query_map([], |row| row.get(0))
+            .map_err(|e| format!("Failed to read indexes: {}", e))?;
+        
+        let mut result = Vec::new();
+        for row in rows {
+            result.push(row.map_err(|e| format!("Failed to collect indexes: {}", e))?);
+        }
+        result
+    };
+
+    // Get triggers - FIXED
+    let triggers: Vec<String> = {
+        let mut trigger_stmt = source_conn
+            .prepare("SELECT sql FROM sqlite_master WHERE type='trigger'")
+            .map_err(|e| format!("Failed to query triggers: {}", e))?;
+
+        let rows = trigger_stmt.query_map([], |row| row.get(0))
+            .map_err(|e| format!("Failed to read triggers: {}", e))?;
+        
+        let mut result = Vec::new();
+        for row in rows {
+            result.push(row.map_err(|e| format!("Failed to collect triggers: {}", e))?);
+        }
+        result
+    };
+
+    // Get views - FIXED
+    let views: Vec<String> = {
+        let mut view_stmt = source_conn
+            .prepare("SELECT sql FROM sqlite_master WHERE type='view'")
+            .map_err(|e| format!("Failed to query views: {}", e))?;
+
+        let rows = view_stmt.query_map([], |row| row.get(0))
+            .map_err(|e| format!("Failed to read views: {}", e))?;
+        
+        let mut result = Vec::new();
+        for row in rows {
+            result.push(row.map_err(|e| format!("Failed to collect views: {}", e))?);
+        }
+        result
+    };
+
+    // Create encrypted database with SQLCipher
+    let mut dest_conn = Connection::open(&output_path)
+        .map_err(|e| format!("Failed to create destination database: {}", e))?;
+
+    // Set encryption key and settings
+    dest_conn
+        .pragma_update(None, "key", &password)
+        .map_err(|e| format!("Failed to set encryption key: {}", e))?;
+
+    apply_sqlcipher_settings(&mut dest_conn, &settings)?;
+
+   // Begin transaction
+    dest_conn
+        .execute("BEGIN TRANSACTION", [])
+        .map_err(|e| format!("Failed to begin transaction: {}", e))?;
+
+    // Create tables
+    for (table_name, schema) in &table_schemas {
+        dest_conn
+            .execute(schema, [])
+            .map_err(|e| format!("Failed to create table {}: {}", table_name, e))?;
+    }
+
+    // Copy data for each table
+    for table_name in &tables {
+        let column_count: usize = {
+            let col_stmt = source_conn
+                .prepare(&format!("SELECT * FROM {} LIMIT 0", table_name))
+                .map_err(|e| format!("Failed to get columns for {}: {}", table_name, e))?;
+            col_stmt.column_count()
+        };
+
+        // Read all data - FIXED
+        let rows_data: Vec<Vec<rusqlite::types::Value>> = {
+            let mut data_stmt = source_conn
+                .prepare(&format!("SELECT * FROM {}", table_name))
+                .map_err(|e| format!("Failed to prepare data query for {}: {}", table_name, e))?;
+
+            let rows = data_stmt
+                .query_map([], |row| {
+                    let mut values = Vec::new();
+                    for i in 0..column_count {
+                        values.push(row.get::<_, rusqlite::types::Value>(i)?);
+                    }
+                    Ok(values)
+                })
+                .map_err(|e| format!("Failed to query data from {}: {}", table_name, e))?;
+
+            let mut result = Vec::new();
+            for row in rows {
+                result.push(row.map_err(|e| format!("Failed to read rows from {}: {}", table_name, e))?);
+            }
+            result
+        };
+
+        // Insert data
+        let placeholders = (0..column_count)
+            .map(|_| "?")
+            .collect::<Vec<_>>()
+            .join(", ");
+        let insert_sql = format!("INSERT INTO {} VALUES ({})", table_name, placeholders);
+
+        for row_values in rows_data {
+            let params: Vec<&dyn rusqlite::ToSql> = row_values
+                .iter()
+                .map(|v| v as &dyn rusqlite::ToSql)
+                .collect();
+
+            dest_conn
+                .execute(&insert_sql, params.as_slice())
+                .map_err(|e| format!("Failed to insert data into {}: {}", table_name, e))?;
+        }
+    }
+
+    // Create indexes
+    for index_sql in indexes {
+        dest_conn
+            .execute(&index_sql, [])
+            .map_err(|e| format!("Failed to create index: {}", e))?;
+    }
+
+    // Create triggers
+    for trigger_sql in triggers {
+        dest_conn
+            .execute(&trigger_sql, [])
+            .map_err(|e| format!("Failed to create trigger: {}", e))?;
+    }
+
+    // Create views
+    for view_sql in views {
+        dest_conn
+            .execute(&view_sql, [])
+            .map_err(|e| format!("Failed to create view: {}", e))?;
+    }
+
+    // Commit transaction
+    dest_conn
+        .execute("COMMIT", [])
+        .map_err(|e| format!("Failed to commit transaction: {}", e))?;
+
+    // Close connections
+    drop(dest_conn);
+    drop(source_conn);
+
+    Ok(MigrationResult {
+        output_path: output_path.clone(),
+        message: format!("Successfully migrated to SQLCipher: {}", output_filename),
+        success: true,
+    })
+}
+
+#[tauri::command]
+pub async fn check_database_type(db_path: String) -> Result<String, String> {
+    use std::io::Read;
+    
+    // Check if database is encrypted (SQLCipher) or plain SQLite
+    let mut file = std::fs::File::open(&db_path)
+        .map_err(|e| format!("Failed to open file: {}", e))?;
+
+    let mut buffer = [0u8; 16];
+    file.read_exact(&mut buffer)
+        .map_err(|e| format!("Failed to read file header: {}", e))?;
+
+    // SQLite files start with "SQLite format 3\0"
+    let sqlite_magic = b"SQLite format 3\0";
+    
+    if buffer.starts_with(sqlite_magic) {
+        Ok("sqlite".to_string())
+    } else {
+        // If it doesn't start with SQLite magic, it's likely encrypted
+        Ok("sqlcipher".to_string())
+    }
+}
+
+#[tauri::command]
+pub async fn rekey_sqlcipher_database(
+    db_path: String,
+    old_password: String,
+    new_password: String,
+    settings: MigrationSettings,
+) -> Result<MigrationResult, String> {
+    use std::path::Path;
+    
+    // Validate file exists
+    if !Path::new(&db_path).exists() {
+        return Err("Database file not found".to_string());
+    }
+
+    // Open database with old password
+    let mut conn = Connection::open(&db_path)
+        .map_err(|e| format!("Failed to open database: {}", e))?;
+
+    // Set old encryption key
+    conn.pragma_update(None, "key", &old_password)
+        .map_err(|e| format!("Failed to unlock database with old password: {}", e))?;
+
+    // Verify old password works by trying to read
+    conn.execute("SELECT count(*) FROM sqlite_master", [])
+        .map_err(|_| "Old password is incorrect or database is corrupted".to_string())?;
+
+    // Apply new settings before rekeying
+    apply_sqlcipher_settings(&mut conn, &settings)?;
+
+    // Rekey with new password
+    conn.pragma_update(None, "rekey", &new_password)
+        .map_err(|e| format!("Failed to rekey database: {}", e))?;
+
+    // Close connection
+    drop(conn);
+
+    // Verify new password works
+    let mut verify_conn = Connection::open(&db_path)
+        .map_err(|e| format!("Failed to reopen database: {}", e))?;
+
+    verify_conn
+        .pragma_update(None, "key", &new_password)
+        .map_err(|e| format!("Failed to verify new password: {}", e))?;
+
+    apply_sqlcipher_settings(&mut verify_conn, &settings)?;
+
+    verify_conn
+        .execute("SELECT count(*) FROM sqlite_master", [])
+        .map_err(|_| "Rekey verification failed".to_string())?;
+
+    drop(verify_conn);
+
+    Ok(MigrationResult {
+        output_path: db_path.clone(),
+        message: "Database successfully rekeyed with new password".to_string(),
+        success: true,
+    })
+
+    
+}
+
+// Helper function - NOT a tauri command, so no #[tauri::command] attribute
+fn apply_sqlcipher_settings(
+    conn: &mut Connection,
+    settings: &MigrationSettings,
+) -> Result<(), String> {
+    // Set cipher page size
+    conn.pragma_update(None, "cipher_page_size", &settings.page_size)
+        .map_err(|e| format!("Failed to set page size: {}", e))?;
+
+    // Set KDF iterations
+    conn.pragma_update(None, "kdf_iter", &settings.kdf_iterations)
+        .map_err(|e| format!("Failed to set KDF iterations: {}", e))?;
+
+    // Set HMAC algorithm
+    let hmac_value = match settings.hmac_algorithm.as_str() {
+        "HMAC_SHA1" => "HMAC_SHA1",
+        "HMAC_SHA256" => "HMAC_SHA256",
+        "HMAC_SHA512" => "HMAC_SHA512",
+        _ => "HMAC_SHA256",
+    };
+    conn.pragma_update(None, "cipher_hmac_algorithm", hmac_value)
+        .map_err(|e| format!("Failed to set HMAC algorithm: {}", e))?;
+
+    // Set KDF algorithm
+    let kdf_value = match settings.kdf_algorithm.as_str() {
+        "PBKDF2_HMAC_SHA1" => "PBKDF2_HMAC_SHA1",
+        "PBKDF2_HMAC_SHA256" => "PBKDF2_HMAC_SHA256",
+        "PBKDF2_HMAC_SHA512" => "PBKDF2_HMAC_SHA512",
+        _ => "PBKDF2_HMAC_SHA256",
+    };
+    conn.pragma_update(None, "cipher_kdf_algorithm", kdf_value)
+        .map_err(|e| format!("Failed to set KDF algorithm: {}", e))?;
+
+    Ok(())
+}
+

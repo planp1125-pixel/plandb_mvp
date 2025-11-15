@@ -36,13 +36,18 @@ fn main() {
             commands::connect_database,
             commands::get_database_tables,
             commands::get_table_data,
+            commands::get_table_info,
             commands::compare_database_schemas,
+            commands::compare_table_data_fast,
             commands::generate_schema_patch,
             commands::generate_data_patch,
             commands::get_license_status,
             commands::activate_license,
             commands::deactivate_license,
             commands::check_trial_status,
+            commands::migrate_to_sqlcipher,
+            commands::rekey_sqlcipher_database,
+            commands::check_database_type,
         ])
         .run(tauri::generate_context!())
                 .expect("error while running tauri application");

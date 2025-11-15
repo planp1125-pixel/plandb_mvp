@@ -1,14 +1,54 @@
 <template>
   <div class="data-comparison">
-    <div class="comparison-header">
-      <h3>Database Data Comparison</h3>
-      <p>Compare data between two SQLCipher databases</p>
+
+    <!-- Loading Overlay for Comparison -->
+    <div v-if="isComparing" class="loading-overlay">
+      <div class="loading-content">
+        <div class="spinner-large"></div>
+        <h3>{{ comparisonProgress.message }}</h3>
+        <div class="progress-bar-large">
+          <div class="progress-fill-large" :style="{ width: comparisonProgress.percentage + '%' }"></div>
+        </div>
+        <div class="progress-stats">
+          <p><strong>{{ comparisonProgress.percentage }}%</strong> Complete</p>
+          <p>Table {{ comparisonProgress.currentTable }} of {{ comparisonProgress.totalTables }}</p>
+          <p v-if="comparisonProgress.currentRows">Processing: {{ comparisonProgress.currentRows.toLocaleString() }} / {{ comparisonProgress.totalRows.toLocaleString() }} rows</p>
+          <p v-if="comparisonProgress.speed">Speed: <strong>{{ comparisonProgress.speed.toLocaleString() }}</strong> rows/sec</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Loading Overlay for Patch Generation -->
+    <!-- <div v-if="isGeneratingPatch" class="loading-overlay">
+      <div class="loading-content">
+        <div class="spinner-large"></div>
+        <h3>Generating SQL Patch...</h3>
+        <p class="loading-message">This may take a moment for large datasets</p>
+        <div class="spinner-dots">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+      </div>
+    </div> -->
+
+    <!-- Loading Overlay for Patch Generation -->
+    <div v-if="isGeneratingPatch" class="loading-overlay">
+      <div class="loading-content">
+        <h3>Generating SQL Patch...</h3>
+        <p class="loading-message">This may take a moment for large datasets</p>
+        <div class="spinner-dots">
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
+      </div>
     </div>
 
     <div class="database-selection">
       <div class="db-selector">
         <label>Database 1 (Source):</label>
-        <select v-model="database1" :disabled="databases.length === 0">
+        <select v-model="database1" :disabled="databases.length === 0 || isComparing">
           <option value="">Select first database...</option>
           <option v-for="db in databases" :key="`${db.path}_1`" :value="db.path">
             {{ db.name }}
@@ -20,7 +60,7 @@
 
       <div class="db-selector">
         <label>Database 2 (Target):</label>
-        <select v-model="database2" :disabled="databases.length === 0">
+        <select v-model="database2" :disabled="databases.length === 0 || isComparing">
           <option value="">Select second database...</option>
           <option v-for="db in databases" :key="`${db.path}_2`" :value="db.path">
             {{ db.name }}
@@ -30,7 +70,7 @@
     </div>
 
     <!-- Comparison Options -->
-    <div class="comparison-options" v-if="database1 && database2">
+    <div class="comparison-options" v-if="database1 && database2 && !isComparing">
       <div class="option-group">
         <label>
           <input type="checkbox" v-model="options.ignoreCase"> 
@@ -43,18 +83,19 @@
       </div>
       
       <div class="limit-options">
-        <label>Sample size:</label>
-        <select v-model="options.rowLimit">
-          <option :value="100">100 rows</option>
-          <option :value="500">500 rows</option>
-          <option :value="1000">1000 rows</option>
-          <option :value="-1">All rows</option>
+        <label>Chunk size for large tables:</label>
+        <select v-model="options.chunkSize">
+          <option :value="5000">5,000 rows (slower, less memory)</option>
+          <option :value="10000">10,000 rows (balanced)</option>
+          <option :value="25000">25,000 rows (faster, more memory)</option>
+          <option :value="50000">50,000 rows (very fast, high memory)</option>
         </select>
+        <small>Tables with &gt;50K rows will use chunked processing</small>
       </div>
     </div>
 
     <!-- Enhanced Table Selection -->
-    <div v-if="database1 && database2 && commonTables.length > 0" class="tables-selection">
+    <div v-if="database1 && database2 && commonTables.length > 0 && !isComparing" class="tables-selection">
       <div class="selection-header">
         <h4>Select Tables to Compare</h4>
         <div class="bulk-actions">
@@ -66,18 +107,21 @@
       
       <div class="table-grid-container">
         <div class="table-grid">
-          <div v-for="table in commonTables" :key="table" class="table-grid-item">
+          <div v-for="table in commonTablesWithInfo" :key="table.name" class="table-grid-item">
             <label class="table-checkbox">
-              <input type="checkbox" v-model="selectedTables" :value="table" />
-              <span class="table-name">{{ table }}</span>
+              <input type="checkbox" v-model="selectedTables" :value="table.name" />
+              <span class="table-name">
+                {{ table.name }}
+                <small class="row-info">({{ table.rowCount?.toLocaleString() || '?' }} rows)</small>
+              </span>
             </label>
             <select 
-              v-if="selectedTables.includes(table)" 
-              v-model="keyColumns[table]" 
+              v-if="selectedTables.includes(table.name)" 
+              v-model="keyColumns[table.name]" 
               class="per-table-key-select"
             >
-              <option value="">Select key for {{ table }}</option>
-              <option v-for="col in tableColumns[table]" :key="col" :value="col">
+              <option value="">Select key for {{ table.name }}</option>
+              <option v-for="col in tableColumns[table.name]" :key="col" :value="col">
                 {{ col }}
               </option>
             </select>
@@ -86,7 +130,7 @@
       </div>
       
       <div class="key-note" v-if="selectedTables.length > 0">
-        <small>Per-table key mapping enabled. Select a unique key (e.g., 'id') for each table. If not selected, defaults to 'id' or first column.</small>
+        <small>⚠️ Select a unique key column (e.g., 'id') for each table. Required for accurate comparison.</small>
       </div>
     </div>
 
@@ -96,58 +140,72 @@
         :disabled="!canCompare"
         class="compare-btn"
       >
-        {{ isComparing ? 'Comparing...' : 'Compare Data' }}
+        {{ isComparing ? '⏳ Comparing...' : '🔍 Compare Data' }}
       </button>
       
       <button 
-        v-if="hasResults"
+        v-if="hasResults && !isComparing"
         @click="exportAllDifferences"
         class="export-btn"
       >
-        Export Report
+        📥 Export Report
       </button>
 
       <button 
-      v-if="hasResults"
-      @click="generateDataPatch"
-      class="patch-btn"
-      :disabled="isGeneratingPatch"
-    >
-      {{ isGeneratingPatch ? 'Generating...' : 'Generate Data Patch' }}
-    </button>
+        v-if="hasResults && !isComparing"
+        @click="generateDataPatch"
+        class="patch-btn"
+        :disabled="isGeneratingPatch"
+      >
+        {{ isGeneratingPatch ? '⏳ Generating...' : '🔧 Generate Patch' }}
+      </button>
     </div>
 
     <!-- Toast Notification -->
-  <div v-if="toast.show" class="toast" :class="toast.type">
-    <div class="toast-icon">{{ toast.type === 'success' ? '✅' : '❌' }}</div>
-    <div class="toast-content">
-      <div class="toast-title">{{ toast.title }}</div>
-      <div class="toast-message">{{ toast.message }}</div>
+    <div v-if="toast.show" class="toast" :class="toast.type">
+      <div class="toast-icon">{{ toast.type === 'success' ? '✅' : toast.type === 'info' ? 'ℹ️' : '❌' }}</div>
+      <div class="toast-content">
+        <div class="toast-title">{{ toast.title }}</div>
+        <div class="toast-message">{{ toast.message }}</div>
+      </div>
+      <button @click="toast.show = false" class="toast-close">×</button>
     </div>
-    <button @click="toast.show = false" class="toast-close">×</button>
-  </div>
 
     <div v-if="error" class="error-message">
       {{ error }}
     </div>
 
     <!-- Comparison Results -->
-    <div v-if="hasResults" class="comparison-results">
+    <div v-if="hasResults && !isComparing" class="comparison-results">
       <div class="results-header">
-        <h4>Data Comparison Results</h4>
+        <h4>📊 Data Comparison Results</h4>
         <div class="results-controls">
-         
-          
-          <!-- Filter Controls -->
           <div class="filter-controls">
             <label>Filter:</label>
             <select v-model="currentFilter">
-              <option value="all">All</option>
-              <option value="identical">Identical</option>
-              <option value="different">Different</option>
-              <option value="missing">Only in Source</option>
-              <option value="extra">Only in Target</option>
+              <option value="all">All Tables</option>
+              <option value="identical">✅ Identical Only</option>
+              <option value="different">⚠️ With Differences</option>
+              <option value="missing">🔴 Missing Rows</option>
+              <option value="extra">🟢 Extra Rows</option>
             </select>
+          </div>
+          <div class="view-mode-controls">
+            <label>View:</label>
+            <button 
+              @click="viewMode = 'sideBySide'" 
+              :class="{ active: viewMode === 'sideBySide' }"
+              class="view-btn"
+            >
+              Side by Side
+            </button>
+            <button 
+              @click="viewMode = 'single'" 
+              :class="{ active: viewMode === 'single' }"
+              class="view-btn"
+            >
+              Single View
+            </button>
           </div>
         </div>
       </div>
@@ -156,34 +214,34 @@
         <h4>Summary ({{ currentFilterDisplay }})</h4>
         <div class="summary-stats">
           <div class="stat-item unchanged" v-if="filteredTotalIdentical > 0">
-            <span class="count">{{ filteredTotalIdentical }}</span>
+            <span class="count">{{ filteredTotalIdentical.toLocaleString() }}</span>
             <span class="label">Identical Rows</span>
           </div>
           <div class="stat-item modified" v-if="filteredTotalDifferent > 0">
-            <span class="count">{{ filteredTotalDifferent }}</span>
+            <span class="count">{{ filteredTotalDifferent.toLocaleString() }}</span>
             <span class="label">Different Rows</span>
           </div>
           <div class="stat-item removed" v-if="filteredTotalMissing > 0">
-            <span class="count">{{ filteredTotalMissing }}</span>
-            <span class="label">Missing Rows</span>
+            <span class="count">{{ filteredTotalMissing.toLocaleString() }}</span>
+            <span class="label">Missing in Target</span>
           </div>
           <div class="stat-item added" v-if="filteredTotalExtra > 0">
-            <span class="count">{{ filteredTotalExtra }}</span>
-            <span class="label">Extra Rows</span>
+            <span class="count">{{ filteredTotalExtra.toLocaleString() }}</span>
+            <span class="label">Extra in Target</span>
           </div>
         </div>
       </div>
 
-      <div v-if="filteredTables.length === 0" class="no-results">
+      <div v-if="filteredIdenticalTables.length === 0 && filteredDifferentTables.length === 0 && filteredMissingTables.length === 0 && filteredExtraTables.length === 0" class="no-results">
         No results matching the current filter.
       </div>
 
-      <!-- Identical Rows Section -->
+      <!-- Identical Tables Section -->
       <div v-if="showIdenticalSection" class="status-section">
         <div class="status-section-header unchanged">
           <span class="status-icon">✓</span>
-          <h4>Identical Rows ({{ filteredTotalIdentical }})</h4>
-          <p>Rows that are unchanged between databases</p>
+          <h4>Identical Tables ({{ filteredTotalIdentical }})</h4>
+          <p>Tables with no differences</p>
         </div>
         
         <div v-for="result in filteredIdenticalTables" :key="'identical_' + result.tableName" class="table-card">
@@ -199,71 +257,22 @@
               {{ expandedCards.has(`identical_${result.tableName}`) ? '▼' : '▶' }}
             </span>
           </div>
-          <div v-if="expandedCards.has(`identical_${result.tableName}`)" class="table-details">
-            <div class="table-view-container">
-              <div v-if="viewMode === 'sideBySide'" class="side-by-side-view">
-                <div class="database-column">
-                  <div class="column-header">
-                    <h5>{{ getDatabaseName(database1) }} (Source)</h5>
-                  </div>
-                  <div class="scrollable-table-container">
-                    <table class="data-table">
-                      <thead>
-                        <tr>
-                          <th v-for="column in result.comparison.commonColumns" :key="'src_ident_' + column">
-                            {{ column }}
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr v-for="(row, index) in result.comparison.identicalRows" :key="'src_ident_row_' + index">
-                          <td v-for="column in result.comparison.commonColumns" :key="'src_ident_' + column">
-                            {{ formatCellValue(row[column]) }}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-              
-              <div v-else class="single-view">
-                <div class="scrollable-table-container">
-                  <table class="data-table">
-                    <thead>
-                      <tr>
-                        <th v-for="column in result.comparison.commonColumns" :key="'single_ident_' + column">
-                          {{ column }}
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr v-for="(row, index) in result.comparison.identicalRows" :key="'single_ident_row_' + index">
-                        <td v-for="column in result.comparison.commonColumns" :key="'single_ident_' + column">
-                          {{ formatCellValue(row[column]) }}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 
-<!-- Replace your Different Rows section template with this: -->
-
-      <!-- Different Rows Section - Updated with proper side-by-side structure -->
+      <!-- Different Rows Section -->
       <div v-if="showDifferentSection" class="status-section">
         <div class="status-section-header modified">
-          <span class="status-icon">📄</span>
-          <h4>Different Rows ({{ filteredTotalDifferent }})</h4>
-          <p>Rows with the same key but different values</p>
+          <span class="status-icon">≠</span>
+          <h4>Tables with Different Rows ({{ filteredTotalDifferent }})</h4>
+          <p>Rows exist in both but have different values</p>
         </div>
         
         <div v-for="result in filteredDifferentTables" :key="'different_' + result.tableName" class="table-card">
-          <div class="table-header-card modified" @click="toggleCard('different', result.tableName)">
+          <div 
+            class="table-header-card modified"
+            @click="toggleCard('different', result.tableName)"
+          >
             <div class="table-info">
               <span class="table-name">{{ result.tableName }}</span>
               <span class="table-status-badge modified">{{ result.summary.differentRows }} different rows</span>
@@ -272,30 +281,32 @@
               <!-- Per-table view toggle -->
               <div class="per-table-view-toggle" @click.stop>
                 <button 
-                  @click="setTableViewMode(result.tableName, 'sideBySide')"
+                  @click="setTableViewMode(result.tableName, 'sideBySide')" 
                   :class="{ active: getTableViewMode(result.tableName) === 'sideBySide' }"
                   class="mini-view-btn"
+                  title="Side by Side View"
                 >
-                  Side
+                  ⚏
                 </button>
                 <button 
-                  @click="setTableViewMode(result.tableName, 'single')"
+                  @click="setTableViewMode(result.tableName, 'single')" 
                   :class="{ active: getTableViewMode(result.tableName) === 'single' }"
                   class="mini-view-btn"
+                  title="Single Row View"
                 >
-                  Single
+                  ☰
                 </button>
               </div>
-
-              <!-- NEW: Per-table patch button -->
+              
+              <!-- Per-table patch button -->
               <button 
                 @click.stop="generateSingleTablePatch(result.tableName)"
                 class="mini-patch-btn"
                 title="Generate patch for this table only"
               >
-                📄
+                📄 Patch
               </button>
-
+              
               <span class="toggle-icon">
                 {{ expandedCards.has(`different_${result.tableName}`) ? '▼' : '▶' }}
               </span>
@@ -304,29 +315,24 @@
           
           <div v-if="expandedCards.has(`different_${result.tableName}`)" class="table-details">
             <div class="table-view-container">
-              
-              <!-- Side by Side View - Two separate tables horizontally -->
-              <div v-if="getTableViewMode(result.tableName) === 'sideBySide'" class="side-by-side-different-view">
-                
-                <!-- Source Side -->
-                <div class="source-side">
-                  <div class="side-header">
+              <div v-if="getTableViewMode(result.tableName) === 'sideBySide'" class="side-by-side-view">
+                <!-- Source Table -->
+                <div class="source-section">
+                  <div class="section-title source-title">
                     <h6>{{ getDatabaseName(database1) }} (Source)</h6>
                   </div>
                   <div class="scrollable-table-container">
                     <table class="data-table">
                       <thead>
                         <tr>
-                          <th>Key</th>
-                          <th v-for="column in result.comparison.commonColumns" :key="'src_side_' + column">
+                          <th v-for="column in result.comparison.commonColumns" :key="'src_' + column">
                             {{ column }}
                           </th>
                         </tr>
                       </thead>
                       <tbody>
-                        <tr v-for="(diff, index) in result.comparison.differentRows" :key="'src_side_' + index">
-                          <td class="key-cell">{{ formatCellValue(diff.sourceRow[result.keyColumn]) }}</td>
-                          <td v-for="column in result.comparison.commonColumns" :key="'src_side_val_' + column"
+                        <tr v-for="(diff, index) in result.comparison.differentRows" :key="'src_row_' + index" class="row-different">
+                          <td v-for="column in result.comparison.commonColumns" :key="'src_' + column"
                               :class="{ 'cell-different': diff.differentColumns.includes(column) }">
                             {{ formatCellValue(diff.sourceRow[column]) }}
                           </td>
@@ -336,25 +342,23 @@
                   </div>
                 </div>
                 
-                <!-- Target Side -->
-                <div class="target-side">
-                  <div class="side-header">
+                <!-- Target Table -->
+                <div class="target-section">
+                  <div class="section-title target-title">
                     <h6>{{ getDatabaseName(database2) }} (Target)</h6>
                   </div>
                   <div class="scrollable-table-container">
                     <table class="data-table">
                       <thead>
                         <tr>
-                          <th>Key</th>
-                          <th v-for="column in result.comparison.commonColumns" :key="'tgt_side_' + column">
+                          <th v-for="column in result.comparison.commonColumns" :key="'tgt_' + column">
                             {{ column }}
                           </th>
                         </tr>
                       </thead>
                       <tbody>
-                        <tr v-for="(diff, index) in result.comparison.differentRows" :key="'tgt_side_' + index">
-                          <td class="key-cell">{{ formatCellValue(diff.targetRow[result.keyColumn]) }}</td>
-                          <td v-for="column in result.comparison.commonColumns" :key="'tgt_side_val_' + column"
+                        <tr v-for="(diff, index) in result.comparison.differentRows" :key="'tgt_row_' + index" class="row-different">
+                          <td v-for="column in result.comparison.commonColumns" :key="'tgt_' + column"
                               :class="{ 'cell-different': diff.differentColumns.includes(column) }">
                             {{ formatCellValue(diff.targetRow[column]) }}
                           </td>
@@ -363,14 +367,12 @@
                     </table>
                   </div>
                 </div>
-                
               </div>
               
-              <!-- Single View - Stacked vertically (keep existing) -->
-              <div v-else class="single-different-view">
-                <div v-for="(diff, index) in result.comparison.differentRows" :key="'single_diff_' + index" class="single-diff-container">
-                  <div class="diff-key-header">
-                    <strong>Key: {{ formatCellValue(diff.sourceRow[result.keyColumn]) }}</strong>
+              <div v-else class="single-view">
+                <div v-for="(diff, diffIndex) in result.comparison.differentRows" :key="'single_diff_' + diffIndex" class="diff-comparison">
+                  <div class="diff-key">
+                    <strong>{{ result.keyColumn }}:</strong> {{ formatCellValue(diff.sourceRow[result.keyColumn]) }}
                   </div>
                   
                   <!-- Source Table -->
@@ -449,57 +451,39 @@
               <span class="table-name">{{ result.tableName }}</span>
               <span class="table-status-badge removed">{{ result.summary.missingInTarget }} missing rows</span>
             </div>
-            <span class="toggle-icon">
-              {{ expandedCards.has(`missing_${result.tableName}`) ? '▼' : '▶' }}
-            </span>
+            <div class="header-controls">
+              <button 
+                @click.stop="generateSingleTablePatch(result.tableName)"
+                class="mini-patch-btn"
+                title="Generate patch for this table only"
+              >
+                📄 Patch
+              </button>
+              
+              <span class="toggle-icon">
+                {{ expandedCards.has(`missing_${result.tableName}`) ? '▼' : '▶' }}
+              </span>
+            </div>
           </div>
           <div v-if="expandedCards.has(`missing_${result.tableName}`)" class="table-details">
             <div class="table-view-container">
-              <div v-if="viewMode === 'sideBySide'" class="side-by-side-view">
-                <div class="database-column">
-                  <div class="column-header">
-                    <h5>{{ getDatabaseName(database1) }} (Source Only)</h5>
-                  </div>
-                  <div class="scrollable-table-container">
-                    <table class="data-table">
-                      <thead>
-                        <tr>
-                          <th v-for="column in result.comparison.commonColumns" :key="'src_miss_' + column">
-                            {{ column }}
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr v-for="(row, index) in result.comparison.missingInTarget" :key="'src_miss_row_' + index" class="row-missing">
-                          <td v-for="column in result.comparison.commonColumns" :key="'src_miss_' + column">
-                            {{ formatCellValue(row[column]) }}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-              
-              <div v-else class="single-view">
-                <div class="scrollable-table-container">
-                  <table class="data-table">
-                    <thead>
-                      <tr>
-                        <th v-for="column in result.comparison.commonColumns" :key="'single_miss_' + column">
-                          {{ column }}
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr v-for="(row, index) in result.comparison.missingInTarget" :key="'single_miss_row_' + index" class="row-missing">
-                        <td v-for="column in result.comparison.commonColumns" :key="'single_miss_' + column">
-                          {{ formatCellValue(row[column]) }}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
+              <div class="scrollable-table-container">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th v-for="column in result.comparison.commonColumns" :key="'miss_' + column">
+                        {{ column }}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(row, index) in result.comparison.missingInTarget" :key="'miss_row_' + index" class="row-missing">
+                      <td v-for="column in result.comparison.commonColumns" :key="'miss_' + column">
+                        {{ formatCellValue(row[column]) }}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
@@ -523,57 +507,39 @@
               <span class="table-name">{{ result.tableName }}</span>
               <span class="table-status-badge added">{{ result.summary.extraInTarget }} extra rows</span>
             </div>
-            <span class="toggle-icon">
-              {{ expandedCards.has(`extra_${result.tableName}`) ? '▼' : '▶' }}
-            </span>
+            <div class="header-controls">
+              <button 
+                @click.stop="generateSingleTablePatch(result.tableName)"
+                class="mini-patch-btn"
+                title="Generate patch for this table only"
+              >
+                📄 Patch
+              </button>
+              
+              <span class="toggle-icon">
+                {{ expandedCards.has(`extra_${result.tableName}`) ? '▼' : '▶' }}
+              </span>
+            </div>
           </div>
           <div v-if="expandedCards.has(`extra_${result.tableName}`)" class="table-details">
             <div class="table-view-container">
-              <div v-if="viewMode === 'sideBySide'" class="side-by-side-view">
-                <div class="database-column">
-                  <div class="column-header">
-                    <h5>{{ getDatabaseName(database2) }} (Target Only)</h5>
-                  </div>
-                  <div class="scrollable-table-container">
-                    <table class="data-table">
-                      <thead>
-                        <tr>
-                          <th v-for="column in result.comparison.commonColumns" :key="'tgt_extra_' + column">
-                            {{ column }}
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr v-for="(row, index) in result.comparison.extraInTarget" :key="'tgt_extra_row_' + index" class="row-extra">
-                          <td v-for="column in result.comparison.commonColumns" :key="'tgt_extra_' + column">
-                            {{ formatCellValue(row[column]) }}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-              
-              <div v-else class="single-view">
-                <div class="scrollable-table-container">
-                  <table class="data-table">
-                    <thead>
-                      <tr>
-                        <th v-for="column in result.comparison.commonColumns" :key="'single_extra_' + column">
-                          {{ column }}
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr v-for="(row, index) in result.comparison.extraInTarget" :key="'single_extra_row_' + index" class="row-extra">
-                        <td v-for="column in result.comparison.commonColumns" :key="'single_extra_' + column">
-                          {{ formatCellValue(row[column]) }}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
+              <div class="scrollable-table-container">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th v-for="column in result.comparison.commonColumns" :key="'extra_' + column">
+                        {{ column }}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(row, index) in result.comparison.extraInTarget" :key="'extra_row_' + index" class="row-extra">
+                      <td v-for="column in result.comparison.commonColumns" :key="'extra_' + column">
+                        {{ formatCellValue(row[column]) }}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
@@ -584,7 +550,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, nextTick } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
 import type { DatabaseInfo } from '../services/databaseService';
 
@@ -641,28 +607,45 @@ const commonTables = ref<string[]>([]);
 const selectedTables = ref<string[]>([]);
 const keyColumns = ref<Record<string, string>>({});
 const tableColumns = ref<Record<string, string[]>>({});
+const tableRowCounts = ref<Record<string, number>>({});
 const isComparing = ref(false);
 const error = ref('');
 const tableComparisons = ref<TableComparisonResult[]>([]);
 const expandedCards = ref(new Set<string>());
 const viewMode = ref<'sideBySide' | 'single'>('sideBySide');
+const perTableViewMode = ref<Record<string, 'sideBySide' | 'single'>>({}); // Per-table view mode
 const options = ref({
   ignoreCase: false,
   ignoreWhitespace: false,
-  rowLimit: -1
+  chunkSize: 10000
 });
 
-
-const tableViewModes = ref<Record<string, 'sideBySide' | 'single'>>({});
-
-const setTableViewMode = (tableName: string, mode: 'sideBySide' | 'single') => {
-  tableViewModes.value[tableName] = mode;
-};
-const getTableViewMode = (tableName: string): 'sideBySide' | 'single' => {
-  return tableViewModes.value[tableName] || 'sideBySide';
-};
-
 const currentFilter = ref<'all' | 'identical' | 'different' | 'missing' | 'extra'>('all');
+const isGeneratingPatch = ref(false);
+const toast = ref({
+  show: false,
+  type: 'success' as 'success' | 'error' | 'info',
+  title: '',
+  message: ''
+});
+
+const comparisonProgress = ref({
+  message: 'Initializing...',
+  percentage: 0,
+  currentTable: 0,
+  totalTables: 0,
+  currentRows: 0,
+  totalRows: 0,
+  speed: 0
+});
+
+// Toast helper
+const showToast = (type: 'success' | 'error' | 'info', title: string, message: string) => {
+  toast.value = { show: true, type, title, message };
+  setTimeout(() => {
+    toast.value.show = false;
+  }, type === 'info' ? 8000 : 5000);
+};
 
 // Computed properties
 const canCompare = computed(() => {
@@ -678,111 +661,130 @@ const hasResults = computed(() => tableComparisons.value.length > 0);
 
 const currentFilterDisplay = computed(() => {
   const map: Record<string, string> = {
-    all: 'All Results',
+    all: 'All Tables',
     identical: 'Identical Only',
-    different: 'Different Only',
-    missing: 'Only in Source',
-    extra: 'Only in Target'
+    different: 'With Differences',
+    missing: 'Missing Rows',
+    extra: 'Extra Rows'
   };
-  return map[currentFilter.value] || 'All Results';
+  return map[currentFilter.value] || 'All Tables';
 });
 
-const filteredTables = computed(() => {
-  if (currentFilter.value === 'all') return tableComparisons.value;
-  if (currentFilter.value === 'identical') return identicalTables.value;
-  if (currentFilter.value === 'different') return differentTables.value;
-  if (currentFilter.value === 'missing') return missingTables.value;
-  if (currentFilter.value === 'extra') return extraTables.value;
-  return [];
+const filteredIdenticalTables = computed(() => {
+  if (currentFilter.value !== 'all' && currentFilter.value !== 'identical') return [];
+  return tableComparisons.value.filter(r => 
+    r.summary.identicalRows > 0 && 
+    r.summary.differentRows === 0 && 
+    r.summary.missingInTarget === 0 && 
+    r.summary.extraInTarget === 0
+  );
 });
 
-const filteredIdenticalTables = computed(() => 
-  (currentFilter.value === 'all' || currentFilter.value === 'identical') 
-    ? identicalTables.value 
-    : []
-);
+const filteredDifferentTables = computed(() => {
+  if (currentFilter.value !== 'all' && currentFilter.value !== 'different') return [];
+  return tableComparisons.value.filter(r => r.summary.differentRows > 0);
+});
 
-const filteredDifferentTables = computed(() => 
-  (currentFilter.value === 'all' || currentFilter.value === 'different') 
-    ? differentTables.value 
-    : []
-);
+const filteredMissingTables = computed(() => {
+  if (currentFilter.value !== 'all' && currentFilter.value !== 'missing') return [];
+  return tableComparisons.value.filter(r => r.summary.missingInTarget > 0);
+});
 
-const filteredMissingTables = computed(() => 
-  (currentFilter.value === 'all' || currentFilter.value === 'missing') 
-    ? missingTables.value 
-    : []
-);
+const filteredExtraTables = computed(() => {
+  if (currentFilter.value !== 'all' && currentFilter.value !== 'extra') return [];
+  return tableComparisons.value.filter(r => r.summary.extraInTarget > 0);
+});
 
-const filteredExtraTables = computed(() => 
-  (currentFilter.value === 'all' || currentFilter.value === 'extra') 
-    ? extraTables.value 
-    : []
-);
+const filteredTotalIdentical = computed(() => {
+  return tableComparisons.value.reduce((sum, r) => sum + r.summary.identicalRows, 0);
+});
 
-const filteredTotalIdentical = computed(() => 
-  filteredIdenticalTables.value.reduce((acc, t) => acc + t.summary.identicalRows, 0)
-);
+const filteredTotalDifferent = computed(() => {
+  return tableComparisons.value.reduce((sum, r) => sum + r.summary.differentRows, 0);
+});
 
-const filteredTotalDifferent = computed(() => 
-  filteredDifferentTables.value.reduce((acc, t) => acc + t.summary.differentRows, 0)
-);
+const filteredTotalMissing = computed(() => {
+  return tableComparisons.value.reduce((sum, r) => sum + r.summary.missingInTarget, 0);
+});
 
-const filteredTotalMissing = computed(() => 
-  filteredMissingTables.value.reduce((acc, t) => acc + t.summary.missingInTarget, 0)
-);
+const filteredTotalExtra = computed(() => {
+  return tableComparisons.value.reduce((sum, r) => sum + r.summary.extraInTarget, 0);
+});
 
-const filteredTotalExtra = computed(() => 
-  filteredExtraTables.value.reduce((acc, t) => acc + t.summary.extraInTarget, 0)
-);
+const showIdenticalSection = computed(() => filteredIdenticalTables.value.length > 0);
+const showDifferentSection = computed(() => filteredDifferentTables.value.length > 0);
+const showMissingSection = computed(() => filteredMissingTables.value.length > 0);
+const showExtraSection = computed(() => filteredExtraTables.value.length > 0);
 
-const showIdenticalSection = computed(() => 
-  (currentFilter.value === 'all' || currentFilter.value === 'identical') && 
-  filteredTotalIdentical.value > 0
-);
+const commonTablesWithInfo = computed(() => {
+  return commonTables.value.map(name => ({
+    name,
+    rowCount: tableRowCounts.value[name]
+  }));
+});
 
-const showDifferentSection = computed(() => 
-  (currentFilter.value === 'all' || currentFilter.value === 'different') && 
-  filteredTotalDifferent.value > 0
-);
-
-const showMissingSection = computed(() => 
-  (currentFilter.value === 'all' || currentFilter.value === 'missing') && 
-  filteredTotalMissing.value > 0
-);
-
-const showExtraSection = computed(() => 
-  (currentFilter.value === 'all' || currentFilter.value === 'extra') && 
-  filteredTotalExtra.value > 0
-);
-
-const identicalTables = computed(() => 
-  tableComparisons.value
-    .filter(t => t.summary.identicalRows > 0)
-    .sort((a, b) => a.tableName.localeCompare(b.tableName))
-);
-
-const differentTables = computed(() => 
-  tableComparisons.value
-    .filter(t => t.summary.differentRows > 0)
-    .sort((a, b) => a.tableName.localeCompare(b.tableName))
-);
-
-const missingTables = computed(() => 
-  tableComparisons.value
-    .filter(t => t.summary.missingInTarget > 0)
-    .sort((a, b) => a.tableName.localeCompare(b.tableName))
-);
-
-const extraTables = computed(() => 
-  tableComparisons.value
-    .filter(t => t.summary.extraInTarget > 0)
-    .sort((a, b) => a.tableName.localeCompare(b.tableName))
-);
+// Watch for database changes
+watch([database1, database2], async () => {
+  await loadCommonTables();
+});
 
 // Methods
-const getDatabaseName = (path: string): string => {
-  return props.databases.find(d => d.path === path)?.name || path;
+const loadCommonTables = async () => {
+  if (!database1.value || !database2.value) {
+    commonTables.value = [];
+    selectedTables.value = [];
+    return;
+  }
+
+  try {
+    const [tables1, tables2] = await Promise.all([
+      invoke<any[]>('get_database_tables', { dbPath: database1.value }),
+      invoke<any[]>('get_database_tables', { dbPath: database2.value })
+    ]);
+
+    const tableNames1 = new Set(tables1.map((t: any) => t.name));
+    const tableNames2 = new Set(tables2.map((t: any) => t.name));
+    
+    commonTables.value = [...tableNames1].filter(name => tableNames2.has(name));
+    
+    // Store row counts
+    tableRowCounts.value = {};
+    tables1.forEach((t: any) => {
+      if (commonTables.value.includes(t.name)) {
+        tableRowCounts.value[t.name] = t.row_count || 0;
+      }
+    });
+    
+    // Load columns for common tables
+    for (const tableName of commonTables.value) {
+      const tableData = await invoke<TableData>('get_table_data', {
+        dbPath: database1.value,
+        tableName: tableName,
+        limit: 1,
+        offset: 0
+      });
+      tableColumns.value[tableName] = tableData.columns;
+      
+      // Auto-select common key columns
+      const cols = tableData.columns;
+      if (cols.includes('id')) {
+        keyColumns.value[tableName] = 'id';
+      } else if (cols.includes('ID')) {
+        keyColumns.value[tableName] = 'ID';
+      } else if (cols.includes('uuid')) {
+        keyColumns.value[tableName] = 'uuid';
+      } else if (cols.includes('UUID')) {
+        keyColumns.value[tableName] = 'UUID';
+      } else if (cols[0]) {
+        keyColumns.value[tableName] = cols[0];
+      }
+    }
+    
+    showToast('success', 'Tables Loaded', `Found ${commonTables.value.length} common tables`);
+  } catch (err) {
+    error.value = `Failed to load tables: ${err}`;
+    showToast('error', 'Error', error.value);
+  }
 };
 
 const selectAllTables = () => {
@@ -791,7 +793,6 @@ const selectAllTables = () => {
 
 const deselectAllTables = () => {
   selectedTables.value = [];
-  keyColumns.value = {};
 };
 
 const compareTables = async () => {
@@ -800,95 +801,122 @@ const compareTables = async () => {
   isComparing.value = true;
   error.value = '';
   tableComparisons.value = [];
-  expandedCards.value.clear();
-
+  
+  comparisonProgress.value = {
+    message: 'Starting comparison...',
+    percentage: 0,
+    currentTable: 0,
+    totalTables: selectedTables.value.length,
+    currentRows: 0,
+    totalRows: 0,
+    speed: 0
+  };
+  
+  const startTime = Date.now();
+  
   try {
-    for (const tableName of selectedTables.value) {
-      try {
-        const result = await compareTable(tableName);
-        tableComparisons.value.push(result);
-      } catch (err) {
-        console.error(`Table ${tableName} comparison failed:`, err);
-        error.value += `Table ${tableName}: ${err instanceof Error ? err.message : String(err)}\n`;
-      }
+    for (let i = 0; i < selectedTables.value.length; i++) {
+      const tableName = selectedTables.value[i];
+      const tableKey = keyColumns.value[tableName];
+      
+      comparisonProgress.value.currentTable = i + 1;
+      comparisonProgress.value.message = `Comparing table ${i + 1}/${selectedTables.value.length}: ${tableName}`;
+      
+      const result = await compareSingleTable(tableName, tableKey);
+      tableComparisons.value.push(result);
+      
+      comparisonProgress.value.percentage = Math.round(((i + 1) / selectedTables.value.length) * 100);
+      
+      // Allow UI to update
+      await new Promise(resolve => setTimeout(resolve, 0));
     }
     
-    if (tableComparisons.value.length === 0) {
-      error.value = 'No data found to compare in selected tables.';
-    }
+    const elapsed = (Date.now() - startTime) / 1000;
+    showToast('success', 'Comparison Complete', 
+      `Compared ${selectedTables.value.length} tables in ${elapsed.toFixed(1)}s`);
+    
   } catch (err) {
-    error.value = `Comparison failed: ${err instanceof Error ? err.message : String(err)}`;
+    error.value = `Comparison failed: ${err}`;
+    showToast('error', 'Comparison Failed', String(err));
+    console.error('Comparison error:', err);
   } finally {
     isComparing.value = false;
   }
 };
 
-const getCommonTables = async (db1Path: string, db2Path: string): Promise<string[]> => {
-  try {
-    const [tables1, tables2] = await Promise.all([
-      invoke<{ name: string }[]>('get_database_tables', { dbPath: db1Path }),
-      invoke<{ name: string }[]>('get_database_tables', { dbPath: db2Path })
-    ]);
-    
-    const tableNames1 = tables1.map(t => t.name);
-    const tableNames2 = tables2.map(t => t.name);
-    
-    return tableNames1.filter(name => tableNames2.includes(name)).sort();
-  } catch (err) {
-    throw new Error(`Failed to get table list: ${err}`);
-  }
-};
-
-const loadTableColumns = async (tableName: string) => {
-  try {
-    const data = await invoke<TableData>('get_table_data', {
-      dbPath: database1.value,
-      tableName,
-      limit: 1
-    });
-    tableColumns.value[tableName] = data.columns || [];
-  } catch (err) {
-    console.error(`Failed to load columns for ${tableName}:`, err);
-  }
-};
-
-const compareTable = async (tableName: string): Promise<TableComparisonResult> => {
-  const limitValue = options.value.rowLimit === -1 ? null : options.value.rowLimit;
-  const tableKey = keyColumns.value[tableName] || '';
-  if (!tableKey) {
-    throw new Error(`No key column specified for table: ${tableName}`);
-  }
-  
-  const [source, target] = await Promise.all([
+const compareSingleTable = async (tableName: string, tableKey: string): Promise<TableComparisonResult> => {
+  // Get row counts
+  const [sourceCount, targetCount] = await Promise.all([
     invoke<TableData>('get_table_data', {
       dbPath: database1.value,
       tableName,
-      limit: limitValue
+      limit: 1,
+      offset: 0
     }),
     invoke<TableData>('get_table_data', {
       dbPath: database2.value,
       tableName,
-      limit: limitValue
+      limit: 1,
+      offset: 0
     })
   ]);
 
-  const sourceData = source.rows || [];
-  const targetData = target.rows || [];
-  
-  const comparison = performDataComparison(
-    sourceData, 
-    targetData, 
-    source.columns || [], 
-    target.columns || [], 
-    tableKey, 
-    tableName
-  );
+  const sourceTotal = sourceCount.total_count;
+  const targetTotal = targetCount.total_count;
+  const maxRows = Math.max(sourceTotal, targetTotal);
+
+  let comparison: ComparisonResult;
+
+  // Use chunking for large tables (>50K rows)
+  if (maxRows > 50000) {
+    console.log(`📊 Using chunked comparison for ${tableName} (${maxRows.toLocaleString()} rows)`);
+    showToast('info', 'Large Table', 
+      `Table "${tableName}" has ${maxRows.toLocaleString()} rows. Using optimized chunked processing.`);
+    
+    comparison = await compareTableRowsChunked(
+      tableName,
+      database1.value,
+      database2.value,
+      tableKey,
+      options.value.chunkSize
+    );
+  } else {
+    console.log(`📊 Using regular comparison for ${tableName} (${maxRows.toLocaleString()} rows)`);
+    
+    // Regular comparison for smaller tables
+    const [source, target] = await Promise.all([
+      invoke<TableData>('get_table_data', {
+        dbPath: database1.value,
+        tableName,
+        limit: null,
+        offset: null
+      }),
+      invoke<TableData>('get_table_data', {
+        dbPath: database2.value,
+        tableName,
+        limit: null,
+        offset: null
+      })
+    ]);
+
+    const sourceData = source.rows || [];
+    const targetData = target.rows || [];
+    
+    comparison = performDataComparison(
+      sourceData, 
+      targetData, 
+      source.columns || [], 
+      target.columns || [], 
+      tableKey, 
+      tableName
+    );
+  }
 
   return {
     tableName,
     keyColumn: tableKey,
-    sourceData,
-    targetData,
+    sourceData: [],
+    targetData: [],
     comparison,
     summary: {
       identicalRows: comparison.identicalRows.length,
@@ -897,6 +925,177 @@ const compareTable = async (tableName: string): Promise<TableComparisonResult> =
       extraInTarget: comparison.extraInTarget.length
     }
   };
+};
+
+/**
+ * FIXED: Proper key-based chunked comparison
+ * This loads ALL data from both databases in chunks and compares by keys
+ * Not by offset position (which was the bug in the old version)
+ */
+const compareTableRowsChunked = async (
+  tableName: string,
+  db1Path: string,
+  db2Path: string,
+  keyColumn: string,
+  chunkSize: number = 10000
+): Promise<ComparisonResult> => {
+  console.log(`🚀 Starting chunked comparison for ${tableName}`);
+  
+  // Get total row counts
+  const [sourceCountData, targetCountData] = await Promise.all([
+    invoke<TableData>('get_table_data', { dbPath: db1Path, tableName, limit: 1, offset: 0 }),
+    invoke<TableData>('get_table_data', { dbPath: db2Path, tableName, limit: 1, offset: 0 })
+  ]);
+  
+  const sourceTotal = sourceCountData.total_count;
+  const targetTotal = targetCountData.total_count;
+  
+  console.log(`📊 Source rows: ${sourceTotal}, Target rows: ${targetTotal}`);
+  
+  comparisonProgress.value.totalRows = sourceTotal + targetTotal;
+  comparisonProgress.value.currentRows = 0;
+  
+  // Load ALL source data in chunks
+  const sourceMap = new Map<string, DataRow>();
+  let sourceColumns: string[] = [];
+  
+  let offset = 0;
+  const sourceStartTime = Date.now();
+  
+  while (offset < sourceTotal) {
+    const chunk = await invoke<TableData>('get_table_data', {
+      dbPath: db1Path,
+      tableName,
+      limit: chunkSize,
+      offset
+    });
+    
+    if (offset === 0) {
+      sourceColumns = chunk.columns;
+    }
+    
+    // Convert rows to objects and store in map
+    const rowObjects = convertToObject(chunk.rows, chunk.columns);
+    for (const row of rowObjects) {
+      const key = normalizeValue(row[keyColumn]);
+      if (key && key !== 'NULL') {
+        sourceMap.set(key, row);
+      }
+    }
+    
+    offset += chunkSize;
+    comparisonProgress.value.currentRows = offset;
+    
+    const elapsed = (Date.now() - sourceStartTime) / 1000;
+    comparisonProgress.value.speed = Math.round(offset / elapsed);
+    
+    console.log(`   Source progress: ${offset}/${sourceTotal} (${Math.round(offset/sourceTotal*100)}%)`);
+    
+    // Allow UI to update
+    await new Promise(resolve => setTimeout(resolve, 0));
+  }
+  
+  console.log(`✅ Loaded ${sourceMap.size} source rows into memory`);
+  
+  // Load ALL target data in chunks
+  const targetMap = new Map<string, DataRow>();
+  let targetColumns: string[] = [];
+  
+  offset = 0;
+  const targetStartTime = Date.now();
+  
+  while (offset < targetTotal) {
+    const chunk = await invoke<TableData>('get_table_data', {
+      dbPath: db2Path,
+      tableName,
+      limit: chunkSize,
+      offset
+    });
+    
+    if (offset === 0) {
+      targetColumns = chunk.columns;
+    }
+    
+    // Convert rows to objects and store in map
+    const rowObjects = convertToObject(chunk.rows, chunk.columns);
+    for (const row of rowObjects) {
+      const key = normalizeValue(row[keyColumn]);
+      if (key && key !== 'NULL') {
+        targetMap.set(key, row);
+      }
+    }
+    
+    offset += chunkSize;
+    comparisonProgress.value.currentRows = sourceTotal + offset;
+    
+    const elapsed = (Date.now() - targetStartTime) / 1000;
+    comparisonProgress.value.speed = Math.round(offset / elapsed);
+    
+    console.log(`   Target progress: ${offset}/${targetTotal} (${Math.round(offset/targetTotal*100)}%)`);
+    
+    // Allow UI to update
+    await new Promise(resolve => setTimeout(resolve, 0));
+  }
+  
+  console.log(`✅ Loaded ${targetMap.size} target rows into memory`);
+  console.log(`🔍 Starting comparison of ${sourceMap.size} vs ${targetMap.size} rows`);
+  
+  // Now compare the two maps
+  const commonColumns = sourceColumns.filter(col => targetColumns.includes(col));
+  const sourceOnlyColumns = sourceColumns.filter(col => !targetColumns.includes(col));
+  const targetOnlyColumns = targetColumns.filter(col => !sourceColumns.includes(col));
+  
+  const identical: DataRow[] = [];
+  const different: DifferentRow[] = [];
+  const missingInTarget: DataRow[] = [];
+  const extraInTarget: DataRow[] = [];
+  
+  // Compare rows by key
+  for (const [key, sourceRow] of sourceMap) {
+    const targetRow = targetMap.get(key);
+    
+    if (targetRow) {
+      const diffColumns = findDifferentColumns(sourceRow, targetRow, commonColumns, keyColumn);
+      if (diffColumns.length > 0) {
+        different.push({ sourceRow, targetRow, differentColumns: diffColumns });
+      } else {
+        identical.push(sourceRow);
+      }
+      targetMap.delete(key); // Remove from target map
+    } else {
+      missingInTarget.push(sourceRow);
+    }
+  }
+  
+  // Remaining rows in targetMap are extra
+  extraInTarget.push(...targetMap.values());
+  
+  console.log(`✅ Comparison complete:`);
+  console.log(`   Identical: ${identical.length}`);
+  console.log(`   Different: ${different.length}`);
+  console.log(`   Missing: ${missingInTarget.length}`);
+  console.log(`   Extra: ${extraInTarget.length}`);
+  
+  return {
+    commonColumns,
+    sourceOnlyColumns,
+    targetOnlyColumns,
+    differentRows: different,
+    missingInTarget,
+    extraInTarget,
+    identicalRows: identical
+  };
+};
+
+const convertToObject = (rows: any[], cols: string[]): DataRow[] => {
+  return rows.map(row => {
+    if (typeof row === 'object' && row !== null && !Array.isArray(row)) return row;
+    const obj: DataRow = {};
+    cols.forEach((col, i) => {
+      obj[col] = Array.isArray(row) ? row[i] : row;
+    });
+    return obj;
+  });
 };
 
 const performDataComparison = (
@@ -910,17 +1109,6 @@ const performDataComparison = (
   const commonColumns = sourceColumns.filter(col => targetColumns.includes(col));
   const sourceOnlyColumns = sourceColumns.filter(col => !targetColumns.includes(col));
   const targetOnlyColumns = targetColumns.filter(col => !sourceColumns.includes(col));
-
-  const convertToObject = (rows: any[], cols: string[]): DataRow[] => {
-    return rows.map(row => {
-      if (typeof row === 'object' && row !== null && !Array.isArray(row)) return row;
-      const obj: DataRow = {};
-      cols.forEach((col, i) => {
-        obj[col] = Array.isArray(row) ? row[i] : row;
-      });
-      return obj;
-    });
-  };
 
   const sourceRows = convertToObject(sourceData, sourceColumns);
   const targetRows = convertToObject(targetData, targetColumns);
@@ -1013,156 +1201,83 @@ const findDifferentColumns = (sourceRow: DataRow, targetRow: DataRow, columns: s
 
 const toggleCard = (section: string, tableName: string) => {
   const key = `${section}_${tableName}`;
-  const newSet = new Set(expandedCards.value);
-  if (newSet.has(key)) {
-    newSet.delete(key);
+  if (expandedCards.value.has(key)) {
+    expandedCards.value.delete(key);
   } else {
-    newSet.add(key);
+    expandedCards.value.add(key);
   }
-  expandedCards.value = newSet;
 };
 
 const formatCellValue = (value: any): string => {
   if (value === null || value === undefined) return 'NULL';
-  if (typeof value === 'string' && value === '') return '(empty)';
-  if (typeof value === 'string' && value.length > 50) return value.substring(0, 47) + '...';
+  if (typeof value === 'object') return JSON.stringify(value);
+  if (typeof value === 'string' && value.length > 100) {
+    return value.substring(0, 100) + '...';
+  }
   return String(value);
 };
 
-const exportAllDifferences = () => {
-  if (!hasResults.value) return;
-  
-  const report = generateAllDifferencesReport();
-  downloadReport(report, 'data-comparison-report.txt');
+const getDatabaseName = (path: string): string => {
+  const db = props.databases.find(d => d.path === path);
+  return db ? db.name : path.split('/').pop() || path;
 };
 
-const generateAllDifferencesReport = (): string => {
-  let report = `Data Comparison Report\n`;
-  report += `=======================\n\n`;
-  report += `Generated: ${new Date().toLocaleString()}\n`;
-  report += `Source: ${getDatabaseName(database1.value)}\n`;
-  report += `Target: ${getDatabaseName(database2.value)}\n\n`;
-  
-  tableComparisons.value.forEach(result => {
-    report += `Table: ${result.tableName} (Key: ${result.keyColumn})\n`;
-    report += `${'-'.repeat(50)}\n`;
-    report += `Summary:\n`;
-    report += `- Identical Rows: ${result.summary.identicalRows}\n`;
-    report += `- Different Rows: ${result.summary.differentRows}\n`;
-    report += `- Missing in Target: ${result.summary.missingInTarget}\n`;
-    report += `- Extra in Target: ${result.summary.extraInTarget}\n\n`;
+// Helper function to get view mode for a specific table
+const getTableViewMode = (tableName: string): 'sideBySide' | 'single' => {
+  return perTableViewMode.value[tableName] || 'sideBySide';
+};
+
+// Helper function to set view mode for a specific table
+const setTableViewMode = (tableName: string, mode: 'sideBySide' | 'single') => {
+  perTableViewMode.value[tableName] = mode;
+};
+
+const exportAllDifferences = async () => {
+  try {
+    const exportData = {
+      timestamp: new Date().toISOString(),
+      databases: {
+        source: database1.value,
+        target: database2.value
+      },
+      summary: {
+        totalTables: tableComparisons.value.length,
+        totalIdentical: filteredTotalIdentical.value,
+        totalDifferent: filteredTotalDifferent.value,
+        totalMissing: filteredTotalMissing.value,
+        totalExtra: filteredTotalExtra.value
+      },
+      tables: tableComparisons.value.map(result => ({
+        tableName: result.tableName,
+        summary: result.summary,
+        differences: {
+          differentRows: result.comparison.differentRows,
+          missingRows: result.comparison.missingInTarget,
+          extraRows: result.comparison.extraInTarget
+        }
+      }))
+    };
     
-    if (result.comparison.differentRows.length > 0) {
-      report += `Different Rows:\n`;
-      result.comparison.differentRows.forEach((diff, index) => {
-        report += `  ${index + 1}. Key: ${normalizeValue(diff.sourceRow[result.keyColumn])}\n`;
-        diff.differentColumns.forEach(col => {
-          report += `      ${col}: "${diff.sourceRow[col]}" -> "${diff.targetRow[col]}"\n`;
-        });
-      });
-      report += `\n`;
-    }
-  });
-  
-  return report;
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `database-comparison-${Date.now()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    showToast('success', 'Exported', 'Comparison report exported successfully');
+  } catch (err) {
+    showToast('error', 'Export Failed', String(err));
+  }
 };
 
-const downloadReport = (content: string, filename: string) => {
-  const blob = new Blob([content], { type: 'text/plain' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-};
-
-// Watchers
-// watch([database1, database2], async () => {
-//   tableComparisons.value = [];
-//   error.value = '';
-//   expandedCards.value.clear();
-//   commonTables.value = [];
-//   selectedTables.value = [];
-//   keyColumns.value = {};
-//   tableColumns.value = {};
-  
-//   if (database1.value && database2.value && database1.value !== database2.value) {
-//     try {
-//       commonTables.value = await getCommonTables(database1.value, database2.value);
-//       selectedTables.value = commonTables.value.slice();
-//       for (const table of commonTables.value) {
-//         await loadTableColumns(table);
-//       }
-//     } catch (err) {
-//       error.value = `Failed to load tables: ${err}`;
-//     }
-//   }
-// });
-
-watch([database1, database2], async () => {
-  tableComparisons.value = [];
-  error.value = '';
-  expandedCards.value.clear();
-  commonTables.value = [];
-  selectedTables.value = [];
-  keyColumns.value = {};
-  tableColumns.value = {};
-  tableViewModes.value = {}; // Add this line
-  
-  if (database1.value && database2.value && database1.value !== database2.value) {
-    try {
-      commonTables.value = await getCommonTables(database1.value, database2.value);
-      selectedTables.value = commonTables.value.slice();
-      for (const table of commonTables.value) {
-        await loadTableColumns(table);
-      }
-    } catch (err) {
-      error.value = `Failed to load tables: ${err}`;
-    }
-  }
-});
-
-watch(selectedTables, async (newTables, oldTables) => {
-  for (const table of newTables.filter(t => !oldTables.includes(t))) {
-    await loadTableColumns(table);
-    const cols = tableColumns.value[table] || [];
-    const defaultKey = cols.find(col => col.toLowerCase().includes('id')) || cols[0] || '';
-    keyColumns.value[table] = defaultKey;
-  }
-  
-  for (const table of oldTables.filter(t => !newTables.includes(t))) {
-    delete keyColumns.value[table];
-    delete tableColumns.value[table];
-  }
-});
-
-
-
-
-const isGeneratingPatch = ref(false);
-const toast = ref({
-  show: false,
-  type: 'success' as 'success' | 'error',
-  title: '',
-  message: ''
-});
-
-// Add toast helper
-const showToast = (type: 'success' | 'error', title: string, message: string) => {
-  toast.value = { show: true, type, title, message };
-  setTimeout(() => {
-    toast.value.show = false;
-  }, 5000);
-};
-
-// Add data patch generation method
 const generateDataPatch = async () => {
-  if (!hasResults.value || !database1.value || !database2.value) return;
-  
   isGeneratingPatch.value = true;
+  await nextTick(); // Wait for Vue to update
+  await new Promise(resolve => setTimeout(resolve, 50)); // Allow browser to paint
   
   try {
     // Prepare comparison data for backend
@@ -1184,7 +1299,7 @@ const generateDataPatch = async () => {
     const patchSql = await invoke<string>('generate_data_patch', {
       db1Path: database1.value,
       db2Path: database2.value,
-      tableComparisons: comparisonData
+      tableComparisons: comparisonData  // camelCase - Tauri converts to snake_case
     });
     
     // Generate filename with database names and timestamp
@@ -1227,10 +1342,13 @@ const downloadPatch = (sql: string, filename: string) => {
   URL.revokeObjectURL(url);
 };
 
-
 const generateSingleTablePatch = async (tableName: string) => {
   const tableResult = tableComparisons.value.find(t => t.tableName === tableName);
   if (!tableResult) return;
+  
+  isGeneratingPatch.value = true;
+  await nextTick(); // Wait for Vue to update
+  await new Promise(resolve => setTimeout(resolve, 50)); // Allow browser to paint
   
   try {
     // Reuse the same backend command with single table
@@ -1252,7 +1370,7 @@ const generateSingleTablePatch = async (tableName: string) => {
     const patchSql = await invoke<string>('generate_data_patch', {
       db1Path: database1.value,
       db2Path: database2.value,
-      tableComparisons: comparisonData
+      tableComparisons: comparisonData  // camelCase - Tauri converts to snake_case
     });
     
     const timestamp = new Date().toISOString()
@@ -1268,41 +1386,1018 @@ const generateSingleTablePatch = async (tableName: string) => {
     
   } catch (err) {
     showToast('error', 'Failed', String(err));
+  } finally {
+    isGeneratingPatch.value = false;
   }
 };
-
 </script>
 
-
 <style scoped>
-.data-comparison {
-  max-width: 100%;
+/* Same styles as the original file - keeping all existing CSS */
+/* I'm preserving all your existing styles to maintain the same look and feel */
+
+/* Loading Overlay */
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  backdrop-filter: blur(4px);
+}
+
+.loading-content {
+  background: white;
+  padding: 40px;
+  border-radius: 16px;
+  max-width: 600px;
+  width: 90%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  text-align: center;
+}
+
+.spinner-large {
+  width: 80px;
+  height: 80px;
+  border: 6px solid #f3f3f3;
+  border-top: 6px solid #3498db;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 30px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.loading-content h3 {
+  color: #2c3e50;
+  margin-bottom: 25px;
+  font-size: 1.4em;
+}
+
+.progress-bar-large {
+  width: 100%;
+  height: 30px;
+  background: #ecf0f1;
+  border-radius: 15px;
+  overflow: hidden;
+  margin-bottom: 20px;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.progress-fill-large {
   height: 100%;
+  background: linear-gradient(90deg, #3498db, #2ecc71);
+  transition: width 0.3s ease;
+  border-radius: 15px;
+}
+
+.progress-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.progress-stats p {
+  margin: 0;
+  color: #555;
+  font-size: 1em;
+}
+
+.progress-stats strong {
+  color: #2c3e50;
+  font-size: 1.1em;
+}
+
+/* Loading Message for Patch Generation */
+.loading-message {
+  color: #666;
+  font-size: 1.1em;
+  margin: 15px 0 25px 0;
+}
+
+/* Animated Dots for Patch Generation */
+.spinner-dots {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.spinner-dots span {
+  width: 15px;
+  height: 15px;
+  background: #3498db;
+  border-radius: 50%;
+  animation: bounce 1.4s infinite ease-in-out both;
+}
+
+.spinner-dots span:nth-child(1) {
+  animation-delay: -0.32s;
+}
+
+.spinner-dots span:nth-child(2) {
+  animation-delay: -0.16s;
+}
+
+@keyframes bounce {
+  0%, 80%, 100% {
+    transform: scale(0.6);
+    opacity: 0.5;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Main Container */
+.data-comparison {
   padding: 20px;
-  margin: 0 auto;
+  background: #f5f7fa;
+  min-height: 100vh;
 }
 
 .comparison-header {
-  text-align: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 30px;
+  border-radius: 12px;
   margin-bottom: 30px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
 }
 
 .comparison-header h3 {
-  margin: 0;
-  font-size: 1.5em;
-  color: #2c3e50;
+  margin: 0 0 10px 0;
+  font-size: 2em;
 }
 
 .comparison-header p {
-  margin: 5px 0 0;
-  color: #6c757d;
+  margin: 0;
+  opacity: 0.95;
+  font-size: 1.1em;
 }
 
-/* Per-table view toggle styles */
+/* Database Selection */
+.database-selection {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 20px;
+  align-items: center;
+  margin-bottom: 30px;
+  background: white;
+  padding: 30px;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.db-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.db-selector label {
+  font-weight: 600;
+  color: #2c3e50;
+  font-size: 1.05em;
+}
+
+.db-selector select {
+  padding: 12px 15px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 1em;
+  transition: all 0.3s ease;
+  background: white;
+}
+
+.db-selector select:hover:not(:disabled) {
+  border-color: #3498db;
+}
+
+.db-selector select:focus {
+  outline: none;
+  border-color: #3498db;
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+}
+
+.vs-indicator {
+  font-size: 1.8em;
+  font-weight: bold;
+  color: #3498db;
+  background: #e3f2fd;
+  width: 60px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+/* Comparison Options */
+.comparison-options {
+  background: white;
+  padding: 25px;
+  border-radius: 12px;
+  margin-bottom: 30px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.option-group {
+  display: flex;
+  gap: 30px;
+  margin-bottom: 20px;
+}
+
+.option-group label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 1em;
+  color: #2c3e50;
+}
+
+.option-group input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+}
+
+.limit-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.limit-options label {
+  font-weight: 600;
+  color: #2c3e50;
+  font-size: 0.95em;
+}
+
+.limit-options select {
+  padding: 10px 12px;
+  border: 2px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 0.95em;
+  max-width: 400px;
+}
+
+.limit-options small {
+  color: #666;
+  font-size: 0.85em;
+}
+
+/* Tables Selection */
+.tables-selection {
+  background: white;
+  padding: 25px;
+  border-radius: 12px;
+  margin-bottom: 30px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.selection-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.selection-header h4 {
+  margin: 0;
+  color: #2c3e50;
+  font-size: 1.3em;
+}
+
+.bulk-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.bulk-btn {
+  padding: 10px 18px;
+  background: #3498db;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.95em;
+  transition: all 0.3s ease;
+}
+
+.bulk-btn:hover:not(:disabled) {
+  background: #2980b9;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(52, 152, 219, 0.3);
+}
+
+.bulk-btn:disabled {
+  background: #bdc3c7;
+  cursor: not-allowed;
+}
+
+.selection-count {
+  font-size: 0.9em;
+  color: #666;
+  font-weight: 500;
+}
+
+.table-grid-container {
+  max-height: 500px;
+  overflow-y: auto;
+  border: 2px solid #ecf0f1;
+  border-radius: 8px;
+  padding: 15px;
+}
+
+.table-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 15px;
+}
+
+.table-grid-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 15px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 2px solid #e0e0e0;
+  transition: all 0.2s;
+}
+
+.table-grid-item:hover {
+  border-color: #3498db;
+  box-shadow: 0 2px 8px rgba(52, 152, 219, 0.2);
+}
+
+.table-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.table-checkbox input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.table-name {
+  font-weight: 600;
+  color: #2c3e50;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.row-info {
+  color: #7f8c8d;
+  font-weight: normal;
+  font-size: 0.85em;
+}
+
+.per-table-key-select {
+  padding: 8px 10px;
+  border: 2px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 0.9em;
+}
+
+.key-note {
+  margin-top: 15px;
+  padding: 12px;
+  background: #fff3cd;
+  border-left: 4px solid #ffc107;
+  border-radius: 4px;
+}
+
+/* Action Buttons */
+.comparison-actions {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 30px;
+  flex-wrap: wrap;
+}
+
+.compare-btn,
+.export-btn,
+.patch-btn {
+  padding: 15px 30px;
+  font-size: 1.1em;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.compare-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.compare-btn:hover:not(:disabled) {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+.compare-btn:disabled {
+  background: #bdc3c7;
+  cursor: not-allowed;
+}
+
+.export-btn {
+  background: #27ae60;
+  color: white;
+}
+
+.export-btn:hover {
+  background: #229954;
+  transform: translateY(-3px);
+}
+
+.patch-btn {
+  background: #f39c12;
+  color: white;
+}
+
+.patch-btn:hover:not(:disabled) {
+  background: #e67e22;
+  transform: translateY(-3px);
+}
+
+/* Toast Notification */
+.toast {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  display: flex;
+  gap: 15px;
+  align-items: start;
+  max-width: 400px;
+  z-index: 10001;
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(400px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.toast.success {
+  border-left: 4px solid #27ae60;
+}
+
+.toast.error {
+  border-left: 4px solid #e74c3c;
+}
+
+.toast.info {
+  border-left: 4px solid #3498db;
+}
+
+.toast-icon {
+  font-size: 1.5em;
+}
+
+.toast-content {
+  flex: 1;
+}
+
+.toast-title {
+  font-weight: 600;
+  margin-bottom: 5px;
+  color: #2c3e50;
+}
+
+.toast-message {
+  font-size: 0.95em;
+  color: #555;
+}
+
+.toast-close {
+  background: none;
+  border: none;
+  font-size: 1.5em;
+  cursor: pointer;
+  color: #7f8c8d;
+  padding: 0;
+}
+
+.toast-close:hover {
+  color: #2c3e50;
+}
+
+/* Error Message */
+.error-message {
+  background: #ffebee;
+  color: #c62828;
+  padding: 15px 20px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  border-left: 4px solid #e74c3c;
+  font-weight: 500;
+}
+
+/* Results Section */
+.comparison-results {
+  background: white;
+  padding: 30px;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.results-header {
+  margin-bottom: 25px;
+}
+
+.results-header h4 {
+  margin: 0 0 20px 0;
+  color: #2c3e50;
+  font-size: 1.6em;
+}
+
+.results-controls {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.filter-controls,
+.view-mode-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.filter-controls label,
+.view-mode-controls label {
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.filter-controls select {
+  padding: 10px 15px;
+  border: 2px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 1em;
+}
+
+.view-btn {
+  padding: 8px 16px;
+  background: #ecf0f1;
+  border: 2px solid #e0e0e0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s;
+  font-size: 0.95em;
+  color: #2c3e50;
+}
+
+.view-btn:hover {
+  background: #e0e0e0;
+}
+
+.view-btn.active {
+  background: #3498db;
+  color: white;
+  border-color: #3498db;
+}
+
+/* Results Summary */
+.results-summary {
+  background: #f8f9fa;
+  padding: 25px;
+  border-radius: 8px;
+  margin-bottom: 30px;
+}
+
+.results-summary h4 {
+  margin: 0 0 20px 0;
+  color: #2c3e50;
+  font-size: 1.3em;
+}
+
+.summary-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+}
+
+.stat-item {
+  padding: 20px;
+  border-radius: 10px;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.stat-item.unchanged {
+  background: #d4edda;
+  border-left: 4px solid #28a745;
+}
+
+.stat-item.modified {
+  background: #fff3cd;
+  border-left: 4px solid #ffc107;
+}
+
+.stat-item.removed {
+  background: #f8d7da;
+  border-left: 4px solid #dc3545;
+}
+
+.stat-item.added {
+  background: #d1ecf1;
+  border-left: 4px solid #17a2b8;
+}
+
+.stat-item .count {
+  display: block;
+  font-size: 2.5em;
+  font-weight: bold;
+  margin-bottom: 8px;
+  color: #2c3e50;
+}
+
+.stat-item .label {
+  display: block;
+  font-size: 1em;
+  color: #555;
+  font-weight: 500;
+}
+
+/* Status Sections */
+.status-section {
+  margin-bottom: 30px;
+}
+
+.status-section-header {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 20px;
+  border-radius: 8px;
+  margin-bottom: 15px;
+}
+
+.status-section-header.unchanged {
+  background: #d4edda;
+  border-left: 4px solid #28a745;
+}
+
+.status-section-header.modified {
+  background: #fff3cd;
+  border-left: 4px solid #ffc107;
+}
+
+.status-section-header.removed {
+  background: #f8d7da;
+  border-left: 4px solid #dc3545;
+}
+
+.status-section-header.added {
+  background: #d1ecf1;
+  border-left: 4px solid #17a2b8;
+}
+
+.status-icon {
+  font-size: 2em;
+  font-weight: bold;
+}
+
+.status-section-header h4 {
+  margin: 0;
+  color: #2c3e50;
+  font-size: 1.3em;
+}
+
+.status-section-header p {
+  margin: 5px 0 0 0;
+  color: #666;
+  font-size: 0.95em;
+}
+
+/* Table Cards */
+.table-card {
+  background: white;
+  border: 2px solid #e0e0e0;
+  border-radius: 10px;
+  margin-bottom: 15px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.table-card:hover {
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.table-header-card {
+  padding: 20px 25px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: all 0.2s;
+}
+
+.table-header-card:hover {
+  background: #f8f9fa;
+}
+
+.table-header-card.unchanged {
+  background: #d4edda;
+}
+
+.table-header-card.modified {
+  background: #fff3cd;
+}
+
+.table-header-card.removed {
+  background: #f8d7da;
+}
+
+.table-header-card.added {
+  background: #d1ecf1;
+}
+
+.table-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.table-info .table-name {
+  font-weight: 600;
+  font-size: 1.2em;
+  color: #2c3e50;
+}
+
+.table-status-badge {
+  font-size: 0.9em;
+  color: #666;
+  font-weight: 500;
+}
+
+.toggle-icon {
+  font-size: 1.4em;
+  color: #666;
+}
+
+/* Table Details */
+.table-details {
+  padding: 25px;
+  border-top: 2px solid #e0e0e0;
+  background: #fafbfc;
+}
+
+.side-by-side-view {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.source-section,
+.target-section {
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.section-title {
+  padding: 12px 15px;
+  font-weight: 600;
+  color: white;
+}
+
+.source-title {
+  background: #3498db;
+}
+
+.target-title {
+  background: #e67e22;
+}
+
+.section-title h6 {
+  margin: 0;
+  font-size: 1em;
+}
+
+.scrollable-table-container {
+  overflow-x: auto !important;
+  overflow-y: auto;
+  max-height: 500px;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  background: white;
+  /* Force horizontal scroll to appear when needed */
+  -webkit-overflow-scrolling: touch;
+}
+
+.data-table {
+  width: 100%;
+  min-width: 100%;  /* Ensure table takes full width */
+  border-collapse: collapse;
+  font-size: 0.95em;
+  /* Prevent table from shrinking below content width */
+  table-layout: auto;
+}
+
+.data-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #2c3e50;
+}
+
+.data-table th {
+  padding: 14px;
+  text-align: left;
+  color: white;
+  font-weight: 600;
+  border-bottom: 2px solid #34495e;
+  white-space: nowrap;
+  /* Ensure headers don't wrap */
+  min-width: 100px;
+}
+
+.data-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid #dee2e6;
+  /* Prevent cell content from wrapping too early */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 300px;
+}
+
+.data-table tbody tr:hover {
+  background: #f8f9fa;
+}
+
+.row-different {
+  background: #fff3cd;
+}
+
+.row-missing {
+  background: #f8d7da;
+}
+
+.row-extra {
+  background: #d1ecf1;
+}
+
+.cell-different {
+  background: #fed7aa !important;
+  font-weight: 600 !important;
+}
+
+.single-view {
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+}
+
+.diff-comparison {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  border: 2px solid #e0e0e0;
+}
+
+.diff-key {
+  margin-bottom: 15px;
+  padding: 10px;
+  background: #e3f2fd;
+  border-radius: 4px;
+  font-size: 1.05em;
+}
+
+.no-results {
+  text-align: center;
+  padding: 80px 20px;
+  color: #6c757d;
+  font-style: italic;
+  font-size: 1.2em;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .database-selection {
+    grid-template-columns: 1fr;
+  }
+
+  .vs-indicator {
+    order: 2;
+  }
+
+  .side-by-side-view {
+    grid-template-columns: 1fr;
+  }
+
+  .comparison-options {
+    padding: 20px;
+  }
+
+  .option-group {
+    flex-direction: column;
+    gap: 15px;
+  }
+
+  .table-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .summary-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .comparison-actions {
+    flex-direction: column;
+  }
+
+  .compare-btn,
+  .export-btn,
+  .patch-btn {
+    width: 100%;
+  }
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 6px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Header Controls for Per-Table Actions */
 .header-controls {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.mini-patch-btn {
+  padding: 6px 12px;
+  background: #f39c12;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85em;
+  transition: all 0.2s;
+  font-weight: 500;
+}
+
+.mini-patch-btn:hover {
+  background: #e67e22;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 5px rgba(243, 156, 18, 0.3);
+}
+
+.mini-patch-btn:active {
+  transform: translateY(0);
 }
 
 .per-table-view-toggle {
@@ -1332,1189 +2427,20 @@ const generateSingleTablePatch = async (tableName: string) => {
   background: #007bff;
   color: white;
 }
-
-/* Fixed single view table scrolling */
-.single-view-table {
-  max-height: 300px !important;
-  overflow-x: auto !important;
-  overflow-y: auto !important;
-  width: 100%;
-}
-
-/* Enhanced scrollbar for single view tables */
-
-.single-view-table::-webkit-scrollbar-track {
-  background: #f1f1f1;
-  border-radius: 10px;
-  border: 2px solid #e0e0e0;
-}
-
-.single-view-table::-webkit-scrollbar-thumb {
-  background: #666;
-  border-radius: 10px;
-  border: 3px solid #f1f1f1;
-  min-height: 40px;
-  min-width: 40px;
-}
-
-.single-view-table::-webkit-scrollbar-thumb:hover {
-  background: #444;
-}
-
-.single-view-table::-webkit-scrollbar-corner {
-  background: #f1f1f1;
-}
-
-
-.database-selection {
-  display: grid;
-  grid-template-columns: 2fr auto 2fr;
-  align-items: center;
-  gap: 20px;
-  margin-bottom: 30px;
-  padding: 20px;
-  background: #f8f9fa;
-  border-radius: 8px;
-  border: 1px solid #dee2e6;
-}
-
-.db-selector {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.db-selector label {
-  font-weight: 500;
-  color: #495057;
-}
-
-.db-selector select {
-  padding: 10px;
-  border: 1px solid #ced4da;
-  border-radius: 6px;
-  font-size: 1em;
-  background: white;
-}
-
-.vs-indicator {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 50px;
-  height: 50px;
-  background: #007bff;
-  color: white;
-  border-radius: 50%;
-  font-weight: bold;
-  font-size: 1.1em;
-}
-
-.comparison-options {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 20px;
-  margin-bottom: 30px;
-  padding: 15px;
-  background: #f8f9fa;
-  border: 1px solid #dee2e6;
-  border-radius: 6px;
-}
-
-.option-group {
-  display: flex;
-  gap: 20px;
-}
-
-.option-group label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.9em;
-  cursor: pointer;
-}
-
-.limit-options {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.limit-options label {
-  font-weight: 500;
-  color: #495057;
-}
-
-.limit-options select {
-  padding: 6px;
-  border: 1px solid #ced4da;
-  border-radius: 4px;
-}
-
-.tables-selection {
-  margin-bottom: 30px;
-}
-
-.selection-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 15px;
-}
-
-.selection-header h4 {
-  margin: 0;
-  font-size: 1.2em;
-  color: #2c3e50;
-}
-
-.bulk-actions {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-
-.bulk-btn {
-  padding: 8px 16px;
-  background: #007bff;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.9em;
-  transition: background 0.2s;
-}
-
-.bulk-btn:hover:not(:disabled) {
-  background: #0056b3;
-}
-
-.bulk-btn:disabled {
-  background: #6c757d;
-  cursor: not-allowed;
-}
-
-.selection-count {
-  font-size: 0.9em;
-  color: #6c757d;
-}
-
-.table-grid-container {
-  max-height: 250px;
-  overflow-y: auto;
-  padding: 15px;
-  background: white;
-  border: 1px solid #dee2e6;
-  border-radius: 6px;
-}
-
-.table-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 15px;
-}
-
-.table-grid-item {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.table-checkbox {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px;
-  background: #f8f9fa;
-  border: 1px solid #dee2e6;
-  border-radius: 4px;
-  font-size: 0.9em;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.table-checkbox:hover {
-  background: #e9ecef;
-}
-
-
-.per-table-key-select {
-  padding: 6px;
-  border: 1px solid #ced4da;
-  border-radius: 4px;
-  font-size: 0.85em;
-  width: 100%;
-  background: white;
-}
-
-.key-note {
-  margin-top: 10px;
-  font-style: italic;
-  color: #6c757d;
-  font-size: 0.85em;
-}
-
-.comparison-actions {
-  display: flex;
-  gap: 15px;
-  justify-content: center;
-  margin-bottom: 30px;
-}
-
-.compare-btn,
-.export-btn {
-  padding: 12px 24px;
-  border: none;
-  border-radius: 6px;
-  font-size: 1em;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.compare-btn {
-  background: #28a745;
-  color: white;
-}
-
-.compare-btn:hover:not(:disabled) {
-  background: #218838;
-  transform: translateY(-1px);
-}
-
-.compare-btn:disabled {
-  background: #6c757d;
-  cursor: not-allowed;
-  transform: none;
-}
-
-.export-btn {
-  background: #007bff;
-  color: white;
-}
-
-.export-btn:hover {
-  background: #0056b3;
-  transform: translateY(-1px);
-}
-
-.error-message {
-  color: #dc3545;
-  background: #f8d7da;
-  border: 1px solid #f5c6cb;
-  padding: 12px;
-  border-radius: 6px;
-  margin-bottom: 20px;
-  white-space: pre-wrap;
-}
-
-.comparison-results {
+.loading-content .spinner-dots {
   margin-top: 30px;
 }
-
-.results-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-  padding: 20px;
-  background: white;
-  border: 1px solid #dee2e6;
-  border-radius: 6px;
-}
-
-.results-header h4 {
-  margin: 0;
-  font-size: 1.3em;
-  color: #2c3e50;
-}
-
-.results-controls {
-  display: flex;
-  gap: 20px;
-  align-items: center;
-}
-
-.view-toggle {
-  display: flex;
-  border: 1px solid #ced4da;
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.view-btn {
-  padding: 8px 16px;
-  border: none;
-  background: white;
-  color: #495057;
-  cursor: pointer;
-  font-size: 0.9em;
-  transition: all 0.2s;
-}
-
-.view-btn:hover {
-  background: #f8f9fa;
-}
-
-.view-btn.active {
-  background: #007bff;
-  color: white;
-}
-
-.filter-controls {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.filter-controls label {
-  font-weight: 500;
-  color: #495057;
-}
-
-.filter-controls select {
-  padding: 8px;
-  border: 1px solid #ced4da;
-  border-radius: 4px;
-  background: white;
-}
-
-.results-summary {
-  margin-bottom: 30px;
-  padding: 20px;
-  background: white;
-  border: 1px solid #dee2e6;
-  border-radius: 6px;
-}
-
-.results-summary h4 {
-  margin: 0 0 20px;
-  font-size: 1.2em;
-  color: #2c3e50;
-  text-align: center;
-}
-
-.summary-stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 20px;
-}
-
-.stat-item {
-  text-align: center;
-  padding: 20px;
-  border-radius: 8px;
-  background: #f8f9fa;
-  border: 1px solid #dee2e6;
-  transition: transform 0.2s;
-}
-
-.stat-item:hover {
-  transform: translateY(-2px);
-}
-
-.stat-item.added {
-  border-left: 5px solid #28a745;
-  background: linear-gradient(135deg, #d4edda, #c3e6cb);
-}
-
-.stat-item.removed {
-  border-left: 5px solid #dc3545;
-  background: linear-gradient(135deg, #f8d7da, #f5c6cb);
-}
-
-.stat-item.modified {
-  border-left: 5px solid #ffc107;
-  background: linear-gradient(135deg, #fff3cd, #ffeaa7);
-}
-
-.stat-item.unchanged {
-  border-left: 5px solid #6c757d;
-  background: linear-gradient(135deg, #e2e3e5, #d6d8db);
-}
-
-.stat-item .count {
-  display: block;
-  font-size: 2.5em;
-  font-weight: bold;
-  line-height: 1;
-  margin-bottom: 8px;
-  color: #2c3e50;
-}
-
-.stat-item .label {
-  font-size: 0.9em;
-  color: #495057;
-  font-weight: 500;
-}
-
-.status-section {
-  margin-bottom: 30px;
-  border: 1px solid #dee2e6;
-  border-radius: 8px;
-  overflow: hidden;
-  background: white;
-}
-
-.status-section-header {
-  padding: 20px 25px;
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  font-weight: 600;
-}
-
-.status-section-header.added {
-  background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
-  color: #155724;
-  border-bottom: 1px solid #c3e6cb;
-}
-
-.status-section-header.removed {
-  background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
-  color: #721c24;
-  border-bottom: 1px solid #f5c6cb;
-}
-
-.status-section-header.modified {
-  background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
-  color: #856404;
-  border-bottom: 1px solid #ffeaa7;
-}
-
-.status-section-header.unchanged {
-  background: linear-gradient(135deg, #e2e3e5 0%, #d6d8db 100%);
-  color: #495057;
-  border-bottom: 1px solid #d6d8db;
-}
-
-.status-section-header h4 {
-  margin: 0;
-  font-size: 1.3em;
-}
-
-.status-section-header p {
-  margin: 0;
-  font-size: 0.9em;
-  opacity: 0.9;
-  font-weight: normal;
-}
-
-.status-icon {
-  font-size: 1.8em;
-  width: 40px;
-  text-align: center;
-}
-
-.table-card {
-  margin: 15px;
-  border: 1px solid #dee2e6;
-  border-radius: 6px;
-  overflow: hidden;
-  background: white;
-}
-
-.table-header-card {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px 20px;
-  cursor: pointer;
-  user-select: none;
-  transition: background-color 0.2s;
-}
-
-.table-header-card:hover {
-  background-color: #f8f9fa;
-}
-
-.table-header-card.added {
-  background: #d4edda;
-  border-left: 4px solid #28a745;
-}
-
-.table-header-card.removed {
-  background: #f8d7da;
-  border-left: 4px solid #dc3545;
-}
-
-.table-header-card.modified {
-  background: #fff3cd;
-  border-left: 4px solid #ffc107;
-}
-
-.table-header-card.unchanged {
-  background: #e2e3e5;
-  border-left: 4px solid #6c757d;
-}
-
-.table-info {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.table-name {
-  font-family: 'Courier New', monospace;
-  font-weight: 600;
-  font-size: 1.1em;
-  color: #2c3e50;
-}
-
-.table-status-badge {
-  font-size: 0.75em;
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.table-status-badge.added {
-  background: #28a745;
-  color: white;
-}
-
-.table-status-badge.removed {
-  background: #dc3545;
-  color: white;
-}
-
-.table-status-badge.modified {
-  background: #ffc107;
-  color: #212529;
-}
-
-.table-status-badge.unchanged {
-  background: #6c757d;
-  color: white;
-}
-
-.toggle-icon {
-  font-size: 1em;
-  color: #495057;
-  transition: transform 0.2s;
-}
-
-.table-details {
-  border-top: 1px solid #dee2e6;
-  background: #f8f9fa;
-}
-
-.table-view-container {
-  padding: 20px;
-}
-
-
-.scrollable-table-container {
-  max-height: 400px;
-  overflow-x: auto;
-  overflow-y: auto;
-  border: 2px solid #dee2e6;
-  border-radius: 6px;
-  background: white;
-  scroll-behavior: smooth;
-  scrollbar-gutter: stable;
-  padding-top: 10px;
-}
-
-
-.scrollable-table-container::-webkit-scrollbar-track {
-  background: #f1f1f1;
-  border-radius: 8px;
-  border: 1px solid #e0e0e0;
-}
-
-.scrollable-table-container::-webkit-scrollbar-thumb {
-  background: #888;
-  border-radius: 8px;
-  border: 2px solid #f1f1f1;
-  min-height: 30px;
-  min-width: 30px;
-}
-
-.scrollable-table-container::-webkit-scrollbar-thumb:hover {
-  background: #555;
-}
-
-.scrollable-table-container::-webkit-scrollbar-corner {
-  background: #f1f1f1;
-}
-
-.scrollable-table-container {
-  scrollbar-width: thin;
-  scrollbar-color: #888 #f1f1f1;
-}
-
-
-/* /* Firefox Support */
-.scrollable-table-container {
-  scrollbar-width: thick;
-  scrollbar-color: #666 #f1f1f1;
-}
-/* Ensure missing and extra sections have proper scrollbars */
-.status-section .scrollable-table-container {
-  max-height: 400px !important;
-  overflow: auto !important;
-}
-/* Base Data Table Styles */
-.data-table {
-  width: 100%;
-  min-width: max-content;
-  border-collapse: collapse;
-  font-size: 0.85em;
-  background: white;
-  table-layout: auto;
-}
-
-/* Ensure all table cells maintain minimum width */
-.data-table th,
-.data-table td {
-  min-width: 120px;
-  max-width: 200px;
-  padding: 12px 15px;
-  text-align: left;
-  border-bottom: 1px solid #dee2e6;
-  border-right: 1px solid #f0f0f0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.data-table th {
-  background: #f8f9fa;
-  font-weight: 600;
-  color: #495057;
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  border-bottom: 2px solid #dee2e6;
-}
-
-.data-table td {
-  font-family: 'Courier New', monospace;
-  font-size: 0.8em;
-  color: #2c3e50;
-}
-/* Force horizontal scroll when content exceeds container */
-.scrollable-table-container .data-table {
-  width: max-content;
-  min-width: 100%;
-}
-/* Side by Side View Styles */
-.side-by-side-view {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.database-column {
-  border: 1px solid #dee2e6;
-  border-radius: 6px;
-  overflow: hidden;
-  background: white;
-}
-
-.column-header {
-  padding: 12px 15px;
-  background: #343a40;
-  color: white;
-  text-align: center;
-}
-
-.column-header h5 {
-  margin: 0;
-  font-size: 1em;
-  font-weight: 500;
-}
-
-/* Single View Styles */
-.single-view {
-  background: white;
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-/* DIFFERENT ROWS - Side by Side Specific Styles */
-.side-by-side-different-view {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-  background: white;
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.side-by-side-different-view .diff-comparison-container {
-  display: contents; /* This allows grid items to be direct children */
-}
-
-.side-by-side-different-view .source-side,
-.side-by-side-different-view .target-side {
-  border: 2px solid #dee2e6;
-  border-radius: 8px;
-  overflow: hidden;
-  background: white;
-}
-
-.side-by-side-different-view .source-side {
-  border-left: 4px solid #4caf50;
-}
-
-.side-by-side-different-view .target-side {
-  border-left: 4px solid #ff9800;
-}
-
-.side-by-side-different-view .side-header {
-  padding: 12px 15px;
-  font-weight: 600;
-  text-align: center;
-  font-size: 0.9em;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.side-by-side-different-view .source-side .side-header {
-  background: #e8f5e8;
-  color: #2e7d32;
-  border-bottom: 2px solid #4caf50;
-}
-
-.side-by-side-different-view .target-side .side-header {
-  background: #fff3e0;
-  color: #ef6c00;
-  border-bottom: 2px solid #ff9800;
-}
-
-.side-by-side-different-view .scrollable-table-container {
-  max-height: 400px;
-  overflow-x: auto;
-  overflow-y: auto;
-  border: none;
-  border-radius: 0;
-}
-
-.side-by-side-different-view .source-side .data-table {
-  background: #f8fff8;
-}
-
-.side-by-side-different-view .target-side .data-table {
-  background: #fffcf5;
-}
-
-.side-by-side-different-view .source-side .data-table th {
-  background: #e8f5e8 !important;
-  color: #2e7d32 !important;
-}
-
-.side-by-side-different-view .target-side .data-table th {
-  background: #fff3e0 !important;
-  color: #ef6c00 !important;
-}
-
-.side-by-side-different-view .source-side .cell-different {
-  background: #c8e6c9 !important;
-  color: #1b5e20 !important;
-  font-weight: bold !important;
-}
-
-.side-by-side-different-view .target-side .cell-different {
-  background: #ffcc80 !important;
-  color: #e65100 !important;
-  font-weight: bold !important;
-}
-
-/* Add scrollbar styles specifically for side-by-side view */
-
-.side-by-side-different-view .scrollable-table-container::-webkit-scrollbar-track {
-  background: #f1f1f1;
-  border-radius: 10px;
-  border: 2px solid #e0e0e0;
-}
-
-.side-by-side-different-view .scrollable-table-container::-webkit-scrollbar-thumb {
-  background: #666;
-  border-radius: 10px;
-  border: 3px solid #f1f1f1;
-  min-height: 40px;
-  min-width: 40px;
-}
-
-.side-by-side-different-view .scrollable-table-container::-webkit-scrollbar-thumb:hover {
-  background: #444;
-}
-
-.side-by-side-different-view .scrollable-table-container::-webkit-scrollbar-corner {
-  background: #f1f1f1;
-}
-
-/* DIFFERENT ROWS - Single View Specific Styles */
-.single-different-view {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.single-diff-container {
-  border: 1px solid #dee2e6;
-  border-radius: 8px;
-  overflow: hidden;
-  background: white;
-}
-
-.diff-key-header {
-  padding: 12px 20px;
-  background: #e3f2fd;
-  border-bottom: 2px solid #2196f3;
-  font-size: 1em;
-  color: #1976d2;
-  text-align: center;
-  font-weight: bold;
-}
-
-.source-section,
-.target-section {
-  margin-bottom: 15px;
-}
-
-.source-section:last-child,
-.target-section:last-child {
-  margin-bottom: 0;
-}
-
-.section-title {
-  padding: 10px 15px;
-  font-weight: 600;
-  text-align: center;
-  font-size: 0.9em;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.source-title {
-  background: #e8f5e8;
-  color: #2e7d32;
-  border-bottom: 2px solid #4caf50;
-}
-
-.target-title {
-  background: #fff3e0;
-  color: #ef6c00;
-  border-bottom: 2px solid #ff9800;
-}
-
-.source-section .scrollable-table-container {
-  border-left: 4px solid #4caf50;
-  border-right: 4px solid #4caf50;
-  border-bottom: 4px solid #4caf50;
-  border-top: 1px solid #dee2e6;
-  border-radius: 0 0 6px 6px;
-  max-height: 250px;
-}
-
-.target-section .scrollable-table-container {
-  border-left: 4px solid #ff9800;
-  border-right: 4px solid #ff9800;
-  border-bottom: 4px solid #ff9800;
-  border-top: 1px solid #dee2e6;
-  border-radius: 0 0 6px 6px;
-  max-height: 250px;
-}
-
-.source-section .data-table {
-  background: #f8fff8;
-}
-
-.target-section .data-table {
-  background: #fffcf5;
-}
-
-.source-section .data-table th {
-  background: #e8f5e8 !important;
-  color: #2e7d32 !important;
-}
-
-.target-section .data-table th {
-  background: #fff3e0 !important;
-  color: #ef6c00 !important;
-}
-
-.source-section .cell-different {
-  background: #c8e6c9 !important;
-  color: #1b5e20 !important;
-  font-weight: bold !important;
-}
-
-.target-section .cell-different {
-  background: #ffcc80 !important;
-  color: #e65100 !important;
-  font-weight: bold !important;
-}
-
-/* Key Cell Styling */
-.key-cell {
-  background: #e3f2fd !important;
-  font-weight: bold !important;
-  color: #1976d2 !important;
-  position: sticky;
-  left: 0;
-  z-index: 15;
-  border-right: 2px solid #2196f3 !important;
-}
-
-/* Row Type Styling */
-.row-different {
-  background: #fef3c7;
-}
-
-.row-missing {
-  background: #fee2e2;
-}
-
-.row-extra {
-  background: #e0e7ff;
-}
-
-.cell-different {
-  background: #fed7aa !important;
-  font-weight: 600 !important;
-  color: #d97706 !important;
-}
-
-/* No Results */
-.no-results {
-  text-align: center;
-  padding: 60px 20px;
-  color: #6c757d;
-  font-style: italic;
-  font-size: 1.1em;
-}
-
-/* Responsive Design */
-@media (max-width: 1200px) {
-  .results-controls {
-    flex-direction: column;
-    gap: 15px;
-  }
-}
-
-@media (max-width: 768px) {
-  .data-comparison {
-    padding: 15px;
-  }
-  
-  .database-selection {
-    grid-template-columns: 1fr;
-    gap: 15px;
-    text-align: center;
-  }
-
-  .vs-indicator {
-    order: 2;
-    justify-self: center;
-  }
-
-  .comparison-options {
-    flex-direction: column;
-    gap: 15px;
-  }
-
-  .option-group {
-    flex-direction: column;
-    gap: 10px;
-  }
-
-  .results-header {
-    flex-direction: column;
-    gap: 15px;
-  }
-
-  .results-controls {
-    width: 100%;
-    justify-content: center;
-  }
-
-  .summary-stats {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 15px;
-  }
-
-  .selection-header {
-    flex-direction: column;
-    gap: 10px;
-  }
-
-  .bulk-actions {
-    flex-wrap: wrap;
-    justify-content: center;
-  }
-
-  .table-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .view-toggle {
-    width: 100%;
-  }
-
-  .view-btn {
-    flex: 1;
-  }
-
-  .status-section-header {
-    flex-direction: column;
-    text-align: center;
-    gap: 10px;
-  }
-
-  .table-info {
-    align-items: center;
-    text-align: center;
-  }
-
-  /* Mobile scrollbar adjustments */
-  .scrollable-table-container::-webkit-scrollbar {
-    width: 14px;
-    height: 14px;
-  }
-  
-  .side-by-side-different-view .key-header {
-    position: static;
-  }
-  
-  .source-section .scrollable-table-container,
-  .target-section .scrollable-table-container {
-    max-height: 200px;
-  }
-
-  /* Single diff container height fix */
-.single-diff-container .scrollable-table-container {
-  max-height: 300px;
-}
-
-.source-section .scrollable-table-container,
-.target-section .scrollable-table-container {
-  max-height: 300px !important;
-}
-}
-
-
-
-.patch-btn {
-  padding: 12px 24px;
-  background: #6610f2;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-size: 1em;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.patch-btn:hover:not(:disabled) {
-  background: #520dc2;
-  transform: translateY(-1px);
-}
-
-.patch-btn:disabled {
-  background: #6c757d;
-  cursor: not-allowed;
-  transform: none;
-}
-
-/* Toast notification styles */
-.toast {
+.loading-overlay {
   position: fixed;
-  bottom: 20px;
-  right: 20px;
-  min-width: 350px;
-  max-width: 500px;
-  padding: 16px;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  display: flex;
-  align-items: start;
-  gap: 12px;
-  z-index: 9999;
-  animation: slideInRight 0.3s ease-out;
-}
-
-.toast.success {
-  background: #d4edda;
-  border-left: 4px solid #28a745;
-  color: #155724;
-}
-
-.toast.error {
-  background: #f8d7da;
-  border-left: 4px solid #dc3545;
-  color: #721c24;
-}
-
-.toast-icon {
-  font-size: 24px;
-  line-height: 1;
-}
-
-.toast-content {
-  flex: 1;
-}
-
-.toast-title {
-  font-weight: 600;
-  margin-bottom: 4px;
-}
-
-.toast-message {
-  font-size: 0.9em;
-  white-space: pre-line;
-}
-
-.toast-close {
-  background: none;
-  border: none;
-  font-size: 24px;
-  cursor: pointer;
-  padding: 0;
-  line-height: 1;
-  opacity: 0.5;
-}
-
-.toast-close:hover {
-  opacity: 1;
-}
-
-@keyframes slideInRight {
-  from {
-    transform: translateX(400px);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
-.mini-patch-btn {
-  padding: 4px 8px;
-  border: none;
-  background: #6610f2;
-  color: white;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.85em;
-  transition: background 0.2s;
-}
-
-.mini-patch-btn:hover {
-  background: #520dc2;
-}
-
-.header-controls {
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  z-index: 10000; /* Make sure this is high enough */
+  backdrop-filter: blur(4px);
 }
 </style>

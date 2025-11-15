@@ -70,8 +70,14 @@
       {{ error }}
     </div>
 
+    <!-- Loading indicator -->
+    <div v-if="isLoadingSchemas" class="loading-indicator">
+      <div class="spinner"></div>
+      <p>Loading detailed table schemas...</p>
+    </div>
+
     <!-- Comparison Results - Side by Side -->
-    <div v-if="comparisonResult" class="comparison-results">
+    <div v-if="comparisonResult && !isLoadingSchemas" class="comparison-results">
       <div class="results-summary">
         <h4>Comparison Summary</h4>
         <div class="summary-stats">
@@ -133,8 +139,27 @@
                   </span>
                 </div>
                 <div v-if="expandedTables.has(table.name)" class="table-details">
-                  <div class="empty-columns-message">
-                    Column details not available for added tables
+                  <div v-if="table.columns.length > 0" class="columns-list">
+                    <h6>Columns ({{ table.columns.length }}):</h6>
+                    <div 
+                      v-for="(column, index) in table.columns" 
+                      :key="'added_col_' + column.name"
+                      class="column-item added"
+                    >
+                      <div class="column-number">#{{ index + 1 }}</div>
+                      <div class="column-info">
+                        <span class="column-name">{{ column.name }}</span>
+                        <span class="column-type">{{ column.data_type }}</span>
+                        <div class="column-attributes">
+                          <span v-if="column.is_primary_key" class="attribute-badge pk">PK</span>
+                          <span v-if="!column.is_nullable" class="attribute-badge nn">NOT NULL</span>
+                          <span v-if="column.default_value" class="attribute-badge def">Default: {{ column.default_value }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div v-else class="empty-columns-message">
+                    No columns found
                   </div>
                 </div>
               </div>
@@ -170,8 +195,27 @@
                   </span>
                 </div>
                 <div v-if="expandedTables.has(table.name)" class="table-details">
-                  <div class="empty-columns-message">
-                    Column details not available for removed tables
+                  <div v-if="table.columns.length > 0" class="columns-list">
+                    <h6>Columns ({{ table.columns.length }}):</h6>
+                    <div 
+                      v-for="(column, index) in table.columns" 
+                      :key="'removed_col_' + column.name"
+                      class="column-item removed"
+                    >
+                      <div class="column-number">#{{ index + 1 }}</div>
+                      <div class="column-info">
+                        <span class="column-name">{{ column.name }}</span>
+                        <span class="column-type">{{ column.data_type }}</span>
+                        <div class="column-attributes">
+                          <span v-if="column.is_primary_key" class="attribute-badge pk">PK</span>
+                          <span v-if="!column.is_nullable" class="attribute-badge nn">NOT NULL</span>
+                          <span v-if="column.default_value" class="attribute-badge def">Default: {{ column.default_value }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div v-else class="empty-columns-message">
+                    No columns found
                   </div>
                 </div>
               </div>
@@ -190,204 +234,129 @@
         </div>
       </div>
 
-      <!-- Modified Tables Section
-      <div v-if="modifiedTables.source.length > 0" class="status-section">
-        <div class="status-section-header modified">
-          <span class="status-icon">🔄</span>
-          <h4>Modified Tables ({{ modifiedTables.source.length }})</h4>
-          <p>Tables that have structural differences between databases</p>
-        </div>
-        <div class="side-by-side-container">
-          <div class="database-column">
-            <div class="column-header">
-              <h4>{{ getDatabaseName(database1) }} (Source)</h4>
-            </div>
-            <div class="column-content">
-              <div v-for="table in modifiedTables.source" :key="'modified_source_' + table.name" class="table-card">
-                <div 
-                  class="table-header-card modified"
-                  @click="toggleTableDetails(table.name)"
-                >
-                  <div class="table-info">
-                    <span class="table-name">{{ table.name }}</span>
-                    <span class="table-status-badge modified">Modified</span>
-                  </div>
-                  <span class="toggle-icon">
-                    {{ expandedTables.has(table.name) ? '▼' : '▶' }}
-                  </span>
-                </div>
-                <div v-if="expandedTables.has(table.name)" class="table-details">
-                  <div v-if="table.columns.length > 0" class="columns-list">
-                    <h6>Columns (Before):</h6>
-                    <div 
-                      v-for="column in table.columns" 
-                      :key="'source_mod_col_' + column.name"
-                      class="column-item"
-                      :class="column.status"
-                    >
-                      <span class="column-name">{{ column.name }}</span>
-                      <span class="column-type">{{ column.data_type }}</span>
-                      <span v-if="column.changes" class="column-changes">
-                        {{ column.changes.join(', ') }}
-                      </span>
-                    </div>
-                  </div>
-                  <div v-else class="empty-columns-message">
-                    No column changes detected in source
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="database-column">
-            <div class="column-header">
-              <h4>{{ getDatabaseName(database2) }} (Target)</h4>
-            </div>
-            <div class="column-content">
-              <div v-for="table in modifiedTables.target" :key="'modified_target_' + table.name" class="table-card">
-                <div 
-                  class="table-header-card modified"
-                  @click="toggleTableDetails(table.name)"
-                >
-                  <div class="table-info">
-                    <span class="table-name">{{ table.name }}</span>
-                    <span class="table-status-badge modified">Modified</span>
-                  </div>
-                  <span class="toggle-icon">
-                    {{ expandedTables.has(table.name) ? '▼' : '▶' }}
-                  </span>
-                </div>
-                <div v-if="expandedTables.has(table.name)" class="table-details">
-                  <div v-if="table.columns.length > 0" class="columns-list">
-                    <h6>Columns (After):</h6>
-                    <div 
-                      v-for="column in table.columns" 
-                      :key="'target_mod_col_' + column.name"
-                      class="column-item"
-                      :class="column.status"
-                    >
-                      <span class="column-name">{{ column.name }}</span>
-                      <span class="column-type">{{ column.data_type }}</span>
-                      <span v-if="column.changes" class="column-changes">
-                        {{ column.changes.join(', ') }}
-                      </span>
-                    </div>
-                  </div>
-                  <div v-else class="empty-columns-message">
-                    No column changes detected in target
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div> -->
-
-  <!-- Replace the Modified Tables section -->
-  <div v-if="modifiedTables.source.length > 0" class="status-section">
+  <!-- Modified Tables Section with ALL columns side-by-side -->
+  <div v-if="modifiedTables.length > 0" class="status-section">
     <div class="status-section-header modified">
       <span class="status-icon">🔄</span>
-      <h4>Modified Tables ({{ modifiedTables.source.length }})</h4>
-      <p>Tables that have structural differences between databases</p>
+      <h4>Modified Tables ({{ modifiedTables.length }})</h4>
+      <p>Tables with structural differences - showing ALL columns with changes highlighted</p>
     </div>
   
-  <!-- SINGLE header row at the top -->
-  <div class="side-by-side-container header-only">
-    <div class="column-header">
-      <h4>{{ getDatabaseName(database1) }} (Source)</h4>
+    <!-- SINGLE header row at the top -->
+    <div class="side-by-side-container header-only">
+      <div class="column-header">
+        <h4>{{ getDatabaseName(database1) }} (Source)</h4>
+      </div>
+      <div class="column-header">
+        <h4>{{ getDatabaseName(database2) }} (Target)</h4>
+      </div>
     </div>
-    <div class="column-header">
-      <h4>{{ getDatabaseName(database2) }} (Target)</h4>
-    </div>
-  </div>
   
-  <!-- Table pairs WITHOUT headers -->
-  <div v-for="(sourceTable, index) in modifiedTables.source" :key="'modified_pair_' + sourceTable.name" class="table-pair-container">
-    <div class="side-by-side-container">
-      
-      <!-- Source Side - NO HEADER -->
-      <div class="database-column-no-header">
-        <div class="column-content">
-          <div class="table-card">
-            <div 
-              class="table-header-card modified"
-              @click="toggleTableDetails(sourceTable.name)"
-            >
-              <div class="table-info">
-                <span class="table-name">{{ sourceTable.name }}</span>
-                <span class="table-status-badge modified">Modified</span>
-              </div>
-              <span class="toggle-icon">
-                {{ expandedTables.has(sourceTable.name) ? '▼' : '▶' }}
-              </span>
-            </div>
-            <div v-if="expandedTables.has(sourceTable.name)" class="table-details">
-              <div v-if="sourceTable.columns.length > 0" class="columns-list">
-                <h6>Columns (Before):</h6>
-                <div 
-                  v-for="column in sourceTable.columns" 
-                  :key="'source_mod_col_' + column.name"
-                  class="column-item"
-                  :class="column.status"
-                >
-                  <span class="column-name">{{ column.name }}</span>
-                  <span class="column-type">{{ column.data_type }}</span>
-                  <span v-if="column.changes" class="column-changes">
-                    {{ column.changes.join(', ') }}
-                  </span>
+    <!-- Table pairs WITHOUT headers -->
+    <div v-for="modifiedTable in modifiedTables" :key="'modified_pair_' + modifiedTable.tableName" class="table-pair-container">
+      <div class="side-by-side-container">
+        
+        <!-- Source Side -->
+        <div class="database-column-no-header">
+          <div class="column-content">
+            <div class="table-card">
+              <div 
+                class="table-header-card modified"
+                @click="toggleTableDetails(modifiedTable.tableName)"
+              >
+                <div class="table-info">
+                  <span class="table-name">{{ modifiedTable.tableName }}</span>
+                  <span class="table-status-badge modified">Modified</span>
                 </div>
+                <span class="toggle-icon">
+                  {{ expandedTables.has(modifiedTable.tableName) ? '▼' : '▶' }}
+                </span>
               </div>
-              <div v-else class="empty-columns-message">
-                No column changes detected in source
+              <div v-if="expandedTables.has(modifiedTable.tableName)" class="table-details">
+                <div v-if="modifiedTable.sourceColumns.length > 0" class="columns-list">
+                  <h6>Columns ({{ modifiedTable.sourceColumns.length }}) - Before:</h6>
+                  <div 
+                    v-for="(column, index) in modifiedTable.sourceColumns" 
+                    :key="'source_mod_col_' + column.name"
+                    class="column-item"
+                    :class="column.status"
+                  >
+                    <div class="column-number">#{{ index + 1 }}</div>
+                    <div class="column-info">
+                      <span class="column-name">{{ column.name }}</span>
+                      <span class="column-type">{{ column.data_type }}</span>
+                      <div class="column-attributes">
+                        <span v-if="column.is_primary_key" class="attribute-badge pk">PK</span>
+                        <span v-if="!column.is_nullable" class="attribute-badge nn">NOT NULL</span>
+                        <span v-if="column.default_value" class="attribute-badge def">Default: {{ column.default_value }}</span>
+                      </div>
+                      <span v-if="column.changes && column.changes.length > 0" class="column-changes">
+                        Changes: {{ column.changes.join(', ') }}
+                      </span>
+                      <span v-if="column.status" class="status-label">{{ getStatusLabel(column.status) }}</span>
+                    </div>
+                  </div>
+                </div>
+                <div v-else class="empty-columns-message">
+                  No columns found
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
-      
-      <!-- Target Side - NO HEADER -->
-      <div class="database-column-no-header">
-        <div class="column-content">
-          <div class="table-card">
-            <div 
-              class="table-header-card modified"
-              @click="toggleTableDetails(modifiedTables.target[index].name)"
-            >
-              <div class="table-info">
-                <span class="table-name">{{ modifiedTables.target[index].name }}</span>
-                <span class="table-status-badge modified">Modified</span>
-              </div>
-              <span class="toggle-icon">
-                {{ expandedTables.has(modifiedTables.target[index].name) ? '▼' : '▶' }}
-              </span>
-            </div>
-            <div v-if="expandedTables.has(modifiedTables.target[index].name)" class="table-details">
-              <div v-if="modifiedTables.target[index].columns.length > 0" class="columns-list">
-                <h6>Columns (After):</h6>
-                <div 
-                  v-for="column in modifiedTables.target[index].columns" 
-                  :key="'target_mod_col_' + column.name"
-                  class="column-item"
-                  :class="column.status"
-                >
-                  <span class="column-name">{{ column.name }}</span>
-                  <span class="column-type">{{ column.data_type }}</span>
-                  <span v-if="column.changes" class="column-changes">
-                    {{ column.changes.join(', ') }}
-                  </span>
+        
+        <!-- Target Side -->
+        <div class="database-column-no-header">
+          <div class="column-content">
+            <div class="table-card">
+              <div 
+                class="table-header-card modified"
+                @click="toggleTableDetails(modifiedTable.tableName)"
+              >
+                <div class="table-info">
+                  <span class="table-name">{{ modifiedTable.tableName }}</span>
+                  <span class="table-status-badge modified">Modified</span>
                 </div>
+                <span class="toggle-icon">
+                  {{ expandedTables.has(modifiedTable.tableName) ? '▼' : '▶' }}
+                </span>
               </div>
-              <div v-else class="empty-columns-message">
-                No column changes detected in target
+              <div v-if="expandedTables.has(modifiedTable.tableName)" class="table-details">
+                <div v-if="modifiedTable.targetColumns.length > 0" class="columns-list">
+                  <h6>Columns ({{ modifiedTable.targetColumns.length }}) - After:</h6>
+                  <div 
+                    v-for="(column, index) in modifiedTable.targetColumns" 
+                    :key="'target_mod_col_' + column.name"
+                    class="column-item"
+                    :class="column.status"
+                  >
+                    <div class="column-number">#{{ index + 1 }}</div>
+                    <div class="column-info">
+                      <span class="column-name">{{ column.name }}</span>
+                      <span class="column-type">{{ column.data_type }}</span>
+                      <div class="column-attributes">
+                        <span v-if="column.is_primary_key" class="attribute-badge pk">PK</span>
+                        <span v-if="!column.is_nullable" class="attribute-badge nn">NOT NULL</span>
+                        <span v-if="column.default_value" class="attribute-badge def">Default: {{ column.default_value }}</span>
+                      </div>
+                      <span v-if="column.changes && column.changes.length > 0" class="column-changes">
+                        Changes: {{ column.changes.join(', ') }}
+                      </span>
+                      <span v-if="column.status" class="status-label">{{ getStatusLabel(column.status) }}</span>
+                    </div>
+                  </div>
+                </div>
+                <div v-else class="empty-columns-message">
+                  No columns found
+                </div>
               </div>
             </div>
           </div>
         </div>
+        
       </div>
-      
     </div>
   </div>
-</div>
 
       <!-- Unchanged Tables Section -->
       <div v-if="unchangedTables.length > 0" class="status-section">
@@ -416,8 +385,27 @@
                   </span>
                 </div>
                 <div v-if="expandedTables.has(table.name)" class="table-details">
-                  <div class="empty-columns-message">
-                    Column details not available for unchanged tables
+                  <div v-if="table.columns.length > 0" class="columns-list">
+                    <h6>Columns ({{ table.columns.length }}):</h6>
+                    <div 
+                      v-for="(column, index) in table.columns" 
+                      :key="'unchanged_col_' + column.name"
+                      class="column-item unchanged"
+                    >
+                      <div class="column-number">#{{ index + 1 }}</div>
+                      <div class="column-info">
+                        <span class="column-name">{{ column.name }}</span>
+                        <span class="column-type">{{ column.data_type }}</span>
+                        <div class="column-attributes">
+                          <span v-if="column.is_primary_key" class="attribute-badge pk">PK</span>
+                          <span v-if="!column.is_nullable" class="attribute-badge nn">NOT NULL</span>
+                          <span v-if="column.default_value" class="attribute-badge def">Default: {{ column.default_value }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div v-else class="empty-columns-message">
+                    No columns found
                   </div>
                 </div>
               </div>
@@ -442,8 +430,27 @@
                   </span>
                 </div>
                 <div v-if="expandedTables.has(table.name)" class="table-details">
-                  <div class="empty-columns-message">
-                    Column details not available for unchanged tables
+                  <div v-if="table.columns.length > 0" class="columns-list">
+                    <h6>Columns ({{ table.columns.length }}):</h6>
+                    <div 
+                      v-for="(column, index) in table.columns" 
+                      :key="'unchanged_col_' + column.name"
+                      class="column-item unchanged"
+                    >
+                      <div class="column-number">#{{ index + 1 }}</div>
+                      <div class="column-info">
+                        <span class="column-name">{{ column.name }}</span>
+                        <span class="column-type">{{ column.data_type }}</span>
+                        <div class="column-attributes">
+                          <span v-if="column.is_primary_key" class="attribute-badge pk">PK</span>
+                          <span v-if="!column.is_nullable" class="attribute-badge nn">NOT NULL</span>
+                          <span v-if="column.default_value" class="attribute-badge def">Default: {{ column.default_value }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div v-else class="empty-columns-message">
+                    No columns found
                   </div>
                 </div>
               </div>
@@ -452,13 +459,46 @@
         </div>
       </div>
     </div>
+    <!-- SQL Patch Modal -->
+    <div v-if="showPatchModal" class="modal-overlay" @click="closePatchModal">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h3>Generated SQL Patch</h3>
+          <button class="close-btn" @click="closePatchModal">✕</button>
+        </div>
+        
+        <div class="modal-body">
+          <div class="patch-info">
+            <span class="info-label">File:</span>
+            <span class="info-value">{{ patchFilename }}</span>
+          </div>
+          
+          <div class="patch-preview">
+            <pre>{{ generatedPatchSQL }}</pre>
+          </div>
+        </div>
+        
+        <div class="modal-footer">
+          <button class="copy-btn" @click="copyPatchToClipboard">
+            <span class="btn-icon">📋</span>
+            Copy to Clipboard
+          </button>
+          <button class="download-btn" @click="downloadPatchFromModal">
+            <span class="btn-icon">⬇️</span>
+            Download
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
+
+  
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount } from "vue"
 import { invoke } from '@tauri-apps/api/core'; 
-import { DatabaseService, type DatabaseInfo, type SchemaComparison } from '../services/databaseService';
+import { DatabaseService, type DatabaseInfo, type SchemaComparison, type ColumnInfo, type TableInfo } from '../services/databaseService';
 
 // Props
 const props = defineProps<{
@@ -474,9 +514,14 @@ const databaseService = new DatabaseService();
 const database1 = ref('');
 const database2 = ref('');
 const isComparing = ref(false);
+const isLoadingSchemas = ref(false);
 const error = ref('');
 const comparisonResult = ref<SchemaComparison | null>(null);
 const expandedTables = ref<Set<string>>(new Set());
+
+// Store full table schemas
+const db1FullSchemas = ref<Map<string, ColumnInfo[]>>(new Map());
+const db2FullSchemas = ref<Map<string, ColumnInfo[]>>(new Map());
 
 // Persistent state key for this component
 const STORAGE_KEY = 'schema_comparison_state';
@@ -485,112 +530,162 @@ const STORAGE_KEY = 'schema_comparison_state';
 interface TableDisplay {
   name: string;
   status: 'added' | 'removed' | 'modified' | 'unchanged';
-  columns: ColumnDisplay[];
+  columns: ColumnDisplayExtended[];
 }
 
-interface ColumnDisplay {
-  name: string;
-  data_type: string;
-  status: 'added' | 'removed' | 'modified' | 'unchanged';
+interface ColumnDisplayExtended extends ColumnInfo {
+  status?: 'added' | 'removed' | 'modified' | 'unchanged';
   changes?: string[];
 }
 
+interface ModifiedTableDisplay {
+  tableName: string;
+  sourceColumns: ColumnDisplayExtended[];
+  targetColumns: ColumnDisplayExtended[];
+}
+
+// Fetch full table schemas for both databases
+const fetchFullSchemas = async () => {
+  if (!database1.value || !database2.value) return;
+  
+  isLoadingSchemas.value = true;
+  try {
+    // Fetch all tables from both databases
+    const [db1Tables, db2Tables] = await Promise.all([
+      databaseService.getDatabaseTables(database1.value),
+      databaseService.getDatabaseTables(database2.value)
+    ]);
+    
+    // Store in maps for quick lookup
+    db1FullSchemas.value.clear();
+    db2FullSchemas.value.clear();
+    
+    db1Tables.forEach((table: TableInfo) => {
+      db1FullSchemas.value.set(table.name, table.columns);
+    });
+    
+    db2Tables.forEach((table: TableInfo) => {
+      db2FullSchemas.value.set(table.name, table.columns);
+    });
+    
+  //  error.value = ''; // Clear any previous errors on success
+    
+  } catch (err) {
+    console.error('Error fetching full schemas:', err);
+    // DON'T show error if databases aren't connected yet
+    // Only show error if we're actively comparing
+    // if (isComparing.value) {
+       error.value = `Failed to load full table schemas: ${err}`;
+    // }
+  } finally {
+    isLoadingSchemas.value = false;
+  }
+}
 
 // Computed properties for grouped display by status
 const addedTables = computed((): TableDisplay[] => {
   if (!comparisonResult.value) return [];
   
-  return comparisonResult.value.added_tables.map(tableName => ({
-    name: tableName,
-    status: 'added' as const,
-    columns: []
-  })).sort((a, b) => a.name.localeCompare(b.name));
+  return comparisonResult.value.added_tables.map(tableName => {
+    const columns = db2FullSchemas.value.get(tableName) || [];
+    return {
+      name: tableName,
+      status: 'added' as const,
+      columns: columns.map(col => ({
+        ...col,
+        status: 'added' as const
+      }))
+    };
+  }).sort((a, b) => a.name.localeCompare(b.name));
 });
 
 const removedTables = computed((): TableDisplay[] => {
   if (!comparisonResult.value) return [];
   
-  return comparisonResult.value.removed_tables.map(tableName => ({
-    name: tableName,
-    status: 'removed' as const,
-    columns: []
-  })).sort((a, b) => a.name.localeCompare(b.name));
+  return comparisonResult.value.removed_tables.map(tableName => {
+    const columns = db1FullSchemas.value.get(tableName) || [];
+    return {
+      name: tableName,
+      status: 'removed' as const,
+      columns: columns.map(col => ({
+        ...col,
+        status: 'removed' as const
+      }))
+    };
+  }).sort((a, b) => a.name.localeCompare(b.name));
 });
 
-const modifiedTables = computed(() => {
-  if (!comparisonResult.value) return { source: [], target: [] };
+const modifiedTables = computed((): ModifiedTableDisplay[] => {
+  if (!comparisonResult.value) return [];
   
-  const sourceModified: TableDisplay[] = [];
-  const targetModified: TableDisplay[] = [];
-  
-  comparisonResult.value.modified_tables.forEach(modifiedTable => {
-    // Source table (showing removed and old versions of modified columns)
-    const sourceColumns: ColumnDisplay[] = [];
+  return comparisonResult.value.modified_tables.map(modifiedTable => {
+    // Get full schemas for both databases
+    const sourceFullColumns = db1FullSchemas.value.get(modifiedTable.table_name) || [];
+    const targetFullColumns = db2FullSchemas.value.get(modifiedTable.table_name) || [];
     
-    modifiedTable.removed_columns.forEach(colName => {
-      sourceColumns.push({
-        name: colName,
-        data_type: 'Unknown',
-        status: 'removed' as const
-      });
+    // Create sets for quick lookup
+    const addedColumnNames = new Set(modifiedTable.added_columns.map(c => c.name));
+    const removedColumnNames = new Set(modifiedTable.removed_columns);
+    const modifiedColumnMap = new Map(
+      modifiedTable.modified_columns.map(c => [c.column_name, c])
+    );
+    
+    // Process source columns (mark removed and modified)
+    const sourceColumns: ColumnDisplayExtended[] = sourceFullColumns.map(col => {
+      if (removedColumnNames.has(col.name)) {
+        return { ...col, status: 'removed' as const };
+      } else if (modifiedColumnMap.has(col.name)) {
+        const modInfo = modifiedColumnMap.get(col.name)!;
+        return {
+          ...col,
+          data_type: modInfo.old_type,
+          status: 'modified' as const,
+          changes: modInfo.changes
+        };
+      } else {
+        return { ...col, status: 'unchanged' as const };
+      }
     });
     
-    modifiedTable.modified_columns.forEach(modCol => {
-      sourceColumns.push({
-        name: modCol.column_name,
-        data_type: modCol.old_type,
-        status: 'modified' as const,
-        changes: modCol.changes
-      });
+    // Process target columns (mark added and modified)
+    const targetColumns: ColumnDisplayExtended[] = targetFullColumns.map(col => {
+      if (addedColumnNames.has(col.name)) {
+        return { ...col, status: 'added' as const };
+      } else if (modifiedColumnMap.has(col.name)) {
+        const modInfo = modifiedColumnMap.get(col.name)!;
+        return {
+          ...col,
+          data_type: modInfo.new_type,
+          status: 'modified' as const,
+          changes: modInfo.changes
+        };
+      } else {
+        return { ...col, status: 'unchanged' as const };
+      }
     });
     
-    sourceModified.push({
-      name: modifiedTable.table_name,
-      status: 'modified' as const,
-      columns: sourceColumns
-    });
-    
-    // Target table (showing added and new versions of modified columns)
-    const targetColumns: ColumnDisplay[] = [];
-    
-    modifiedTable.added_columns.forEach(col => {
-      targetColumns.push({
-        name: col.name,
-        data_type: col.data_type,
-        status: 'added' as const
-      });
-    });
-    
-    modifiedTable.modified_columns.forEach(modCol => {
-      targetColumns.push({
-        name: modCol.column_name,
-        data_type: modCol.new_type,
-        status: 'modified' as const,
-        changes: modCol.changes
-      });
-    });
-    
-    targetModified.push({
-      name: modifiedTable.table_name,
-      status: 'modified' as const,
-      columns: targetColumns
-    });
-  });
-  
-  return {
-    source: sourceModified.sort((a, b) => a.name.localeCompare(b.name)),
-    target: targetModified.sort((a, b) => a.name.localeCompare(b.name))
-  };
+    return {
+      tableName: modifiedTable.table_name,
+      sourceColumns,
+      targetColumns
+    };
+  }).sort((a, b) => a.tableName.localeCompare(b.tableName));
 });
 
 const unchangedTables = computed((): TableDisplay[] => {
   if (!comparisonResult.value) return [];
   
-  return comparisonResult.value.identical_tables.map(tableName => ({
-    name: tableName,
-    status: 'unchanged' as const,
-    columns: []
-  })).sort((a, b) => a.name.localeCompare(b.name));
+  return comparisonResult.value.identical_tables.map(tableName => {
+    const columns = db1FullSchemas.value.get(tableName) || [];
+    return {
+      name: tableName,
+      status: 'unchanged' as const,
+      columns: columns.map(col => ({
+        ...col,
+        status: 'unchanged' as const
+      }))
+    };
+  }).sort((a, b) => a.name.localeCompare(b.name));
 });
 
 // Methods
@@ -608,6 +703,10 @@ const compareSchemas = async () => {
   try {
     const result = await databaseService.compareDatabaseSchemas(database1.value, database2.value);
     comparisonResult.value = result;
+    
+    // Fetch full schemas for all tables
+    await fetchFullSchemas();
+    
     emit('comparison-complete', result);
     saveState();
   } catch (err) {
@@ -633,14 +732,15 @@ const getDatabaseName = (path: string): string => {
   return db ? db.name : path;
 };
 
-
-
-// const exportComparison = () => {
-//   if (!comparisonResult.value) return;
-
-//   const report = generateComparisonReport(comparisonResult.value);
-//   downloadReport(report);
-// };
+const getStatusLabel = (status: string): string => {
+  switch (status) {
+    case 'added': return '✚ Added';
+    case 'removed': return '✖ Removed';
+    case 'modified': return '✎ Modified';
+    case 'unchanged': return '✓ Unchanged';
+    default: return '';
+  }
+};
 
 const exportComparison = () => {
   if (!comparisonResult.value) return;
@@ -658,6 +758,7 @@ const exportComparison = () => {
     successMessage.value = '';
   }, 5000);
 };
+
 const generateComparisonReport = (comparison: SchemaComparison): string => {
   let report = `Database Schema Comparison Report\n`;
   report += `=====================================\n\n`;
@@ -673,54 +774,107 @@ const generateComparisonReport = (comparison: SchemaComparison): string => {
   report += `Modified Tables: ${comparison.modified_tables.length}\n`;
   report += `Unchanged Tables: ${comparison.identical_tables.length}\n\n`;
 
-  // Added Tables
+  // Added Tables with columns
   if (comparison.added_tables.length > 0) {
     report += `ADDED TABLES\n`;
     report += `------------\n`;
-    comparison.added_tables.forEach(table => {
-      report += `+ ${table}\n`;
+    comparison.added_tables.forEach(tableName => {
+      report += `+ ${tableName}\n`;
+      const columns = db2FullSchemas.value.get(tableName) || [];
+      if (columns.length > 0) {
+        columns.forEach((col, idx) => {
+          report += `  ${idx + 1}. ${col.name} (${col.data_type})`;
+          if (col.is_primary_key) report += ` PK`;
+          if (!col.is_nullable) report += ` NOT NULL`;
+          report += `\n`;
+        });
+      }
+      report += `\n`;
     });
-    report += `\n`;
   }
 
-  // Removed Tables
+  // Removed Tables with columns
   if (comparison.removed_tables.length > 0) {
     report += `REMOVED TABLES\n`;
     report += `--------------\n`;
-    comparison.removed_tables.forEach(table => {
-      report += `- ${table}\n`;
+    comparison.removed_tables.forEach(tableName => {
+      report += `- ${tableName}\n`;
+      const columns = db1FullSchemas.value.get(tableName) || [];
+      if (columns.length > 0) {
+        columns.forEach((col, idx) => {
+          report += `  ${idx + 1}. ${col.name} (${col.data_type})`;
+          if (col.is_primary_key) report += ` PK`;
+          if (!col.is_nullable) report += ` NOT NULL`;
+          report += `\n`;
+        });
+      }
+      report += `\n`;
     });
-    report += `\n`;
   }
 
-  // Modified Tables
+  // Modified Tables with full column details
   if (comparison.modified_tables.length > 0) {
     report += `MODIFIED TABLES\n`;
     report += `---------------\n`;
     comparison.modified_tables.forEach(table => {
       report += `~ ${table.table_name}\n`;
       
-      if (table.added_columns.length > 0) {
-        report += `  Added Columns:\n`;
-        table.added_columns.forEach(col => {
-          report += `    + ${col.name} (${col.data_type})\n`;
-        });
-      }
-
-      if (table.removed_columns.length > 0) {
-        report += `  Removed Columns:\n`;
-        table.removed_columns.forEach(col => {
-          report += `    - ${col}\n`;
-        });
-      }
+      const sourceColumns = db1FullSchemas.value.get(table.table_name) || [];
+      const targetColumns = db2FullSchemas.value.get(table.table_name) || [];
+      
+      report += `  Source Columns (${sourceColumns.length}):\n`;
+      sourceColumns.forEach((col, idx) => {
+        const isRemoved = table.removed_columns.includes(col.name);
+        const isModified = table.modified_columns.find(m => m.column_name === col.name);
+        let status = '  ';
+        if (isRemoved) status = '- ';
+        if (isModified) status = '~ ';
+        report += `    ${status}${idx + 1}. ${col.name} (${col.data_type})`;
+        if (col.is_primary_key) report += ` PK`;
+        if (!col.is_nullable) report += ` NOT NULL`;
+        report += `\n`;
+      });
+      
+      report += `  Target Columns (${targetColumns.length}):\n`;
+      targetColumns.forEach((col, idx) => {
+        const isAdded = table.added_columns.find(a => a.name === col.name);
+        const isModified = table.modified_columns.find(m => m.column_name === col.name);
+        let status = '  ';
+        if (isAdded) status = '+ ';
+        if (isModified) status = '~ ';
+        report += `    ${status}${idx + 1}. ${col.name} (${col.data_type})`;
+        if (col.is_primary_key) report += ` PK`;
+        if (!col.is_nullable) report += ` NOT NULL`;
+        report += `\n`;
+      });
 
       if (table.modified_columns.length > 0) {
-        report += `  Modified Columns:\n`;
+        report += `  Changes:\n`;
         table.modified_columns.forEach(col => {
           report += `    ~ ${col.column_name}: ${col.old_type} → ${col.new_type}\n`;
           if (col.changes.length > 0) {
-            report += `      Changes: ${col.changes.join(', ')}\n`;
+            report += `      ${col.changes.join(', ')}\n`;
           }
+        });
+      }
+      report += `\n`;
+    });
+  }
+
+  // Unchanged Tables
+  if (comparison.identical_tables.length > 0) {
+    report += `UNCHANGED TABLES\n`;
+    report += `----------------\n`;
+    comparison.identical_tables.forEach(tableName => {
+      report += `✓ ${tableName}\n`;
+      const columns = db1FullSchemas.value.get(tableName) || [];
+      if (columns.length > 0) {
+        report += `  Columns (${columns.length}):\n`;
+        columns.forEach((col, idx) => {
+          report += `    ${idx + 1}. ${col.name} (${col.data_type})`;
+          if (col.is_primary_key) report += ` PK`;
+          if (!col.is_nullable) report += ` NOT NULL`;
+          report += `\n`;
         });
       }
       report += `\n`;
@@ -729,18 +883,6 @@ const generateComparisonReport = (comparison: SchemaComparison): string => {
 
   return report;
 };
-
-// const downloadReport = (content: string) => {
-//   const blob = new Blob([content], { type: 'text/plain' });
-//   const url = URL.createObjectURL(blob);
-//   const a = document.createElement('a');
-//   a.href = url;
-//   a.download = `schema-comparison-${new Date().toISOString().slice(0, 10)}.txt`;
-//   document.body.appendChild(a);
-//   a.click();
-//   document.body.removeChild(a);
-//   URL.revokeObjectURL(url);
-// };
 
 const downloadReport = (content: string, filename: string) => {
   const blob = new Blob([content], { type: 'text/plain' });
@@ -783,105 +925,102 @@ const loadState = () => {
         database2.value = state.database2 || '';
         comparisonResult.value = state.comparisonResult || null;
         expandedTables.value = new Set(state.expandedTables || []);
+        
+        // // Reload full schemas if we have a comparison result
+        // if (comparisonResult.value && database1.value && database2.value) {
+        //   fetchFullSchemas();
+        // }
       }
     }
   } catch (e) {
     console.warn('Failed to load schema comparison state:', e);
   }
 };
+
 const successMessage = ref('');
-const generatePatch = async () => {
-  if (!database1.value || !database2.value) return;
-  
-   error.value = ''; // Clear previous errors
-  successMessage.value = ''; // Clear previous success
-
-  try {
-    const patchSql = await invoke<string>('generate_schema_patch', {
-      db1Path: database1.value,
-      db2Path: database2.value,
-      // db2Password: db2Password,
-    });
-    
-   // const filename = `schema-patch-${new Date().toISOString().slice(0, 10)}.sql`;
-    // const now = new Date();
-    // const timestamp = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}-${String(now.getMinutes()).padStart(2,'0')}-${String(now.getSeconds()).padStart(2,'0')}`;
-    // const filename = `schema-patch-${timestamp}.sql`;
-
-    const db1Name = getDatabaseName(database1.value).replace(/[^a-z0-9]/gi, '_');
-    const db2Name = getDatabaseName(database2.value).replace(/[^a-z0-9]/gi, '_');
-    const timestamp = new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
-    const filename = `patch_${db1Name}_to_${db2Name}_${timestamp}.sql`;
-
-    downloadPatch(patchSql, filename);
-    
-    //downloadPatch(patchSql);
-     // Show success message
-    successMessage.value = `✅ SQL patch generated successfully!\nFile: ${filename}\nLocation:Downloads folder`;
-    
-    // Auto-clear after 5 seconds
-    setTimeout(() => {
-      successMessage.value = '';
-    }, 5000);
-  } catch (err) {
-    error.value = `Failed to generate patch: ${err}`;
-  }
-};
-
+const showPatchModal = ref(false);
+const generatedPatchSQL = ref('');
+const patchFilename = ref('');
 
 // const generatePatch = async () => {
 //   if (!database1.value || !database2.value) return;
   
-//   // Find the database info to get the password
-//   const db2Info = props.databases.find(db => db.path === database2.value);
-  
-//   if (!db2Info) {
-//     error.value = 'Target database information not found. Please reconnect the database.';
-//     return;
-//   }
-
-//   // Get the password - use the stored password or prompt user if not available
-//   let db2Password = db2Info.password || '';
-  
-//   // If password is not stored, you might want to prompt the user
-//   if (!db2Password) {
-//     // Option 1: Use a prompt (simple but not secure)
-//     db2Password = prompt(`Please enter the password for database: ${db2Info.name}`) || '';
-    
-//     // Option 2: Or show an error and return
-//     // error.value = `Password not available for ${db2Info.name}. Please reconnect the database with the password.`;
-//     // return;
-//   }
-
-//   if (!db2Password) {
-//     error.value = 'Password is required to generate the patch.';
-//     return;
-//   }
+//   error.value = '';
+//   successMessage.value = '';
 
 //   try {
 //     const patchSql = await invoke<string>('generate_schema_patch', {
 //       db1Path: database1.value,
 //       db2Path: database2.value,
-//       db2Password: db2Password, // Pass the password from frontend
 //     });
     
-//     downloadPatch(patchSql);
-//     error.value = ''; // Clear any previous errors
+//     const db1Name = getDatabaseName(database1.value).replace(/[^a-z0-9]/gi, '_');
+//     const db2Name = getDatabaseName(database2.value).replace(/[^a-z0-9]/gi, '_');
+//     const timestamp = new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
+//     const filename = `patch_${db1Name}_to_${db2Name}_${timestamp}.sql`;
+
+//     downloadPatch(patchSql, filename);
+    
+//     successMessage.value = `✅ SQL patch generated successfully!\nFile: ${filename}\nLocation:Downloads folder`;
+    
+//     setTimeout(() => {
+//       successMessage.value = '';
+//     }, 5000);
 //   } catch (err) {
 //     error.value = `Failed to generate patch: ${err}`;
 //   }
 // };
-// const downloadPatch = (sql: string) => {
-//   const blob = new Blob([sql], { type: 'text/plain' });
-//   const url = URL.createObjectURL(blob);
-//   const a = document.createElement('a');
-//   a.href = url;
-//   a.download = `schema-patch-${new Date().toISOString().slice(0, 10)}.sql`;
-//   document.body.appendChild(a);
-//   a.click();
-//   document.body.removeChild(a);
-//   URL.revokeObjectURL(url);
-// };
+
+const generatePatch = async () => {
+  if (!database1.value || !database2.value) return;
+  
+  error.value = '';
+  successMessage.value = '';
+
+  try {
+    const patchSql = await invoke<string>('generate_schema_patch', {
+      db1Path: database1.value,
+      db2Path: database2.value,
+    });
+    
+    const db1Name = getDatabaseName(database1.value).replace(/[^a-z0-9]/gi, '_');
+    const db2Name = getDatabaseName(database2.value).replace(/[^a-z0-9]/gi, '_');
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
+    const filename = `patch_${db1Name}_to_${db2Name}_${timestamp}.sql`;
+
+    // Store patch and show modal
+    generatedPatchSQL.value = patchSql;
+    patchFilename.value = filename;
+    showPatchModal.value = true;
+    
+  } catch (err) {
+    error.value = `Failed to generate patch: ${err}`;
+  }
+};
+const copyPatchToClipboard = async () => {
+  try {
+    await navigator.clipboard.writeText(generatedPatchSQL.value);
+    successMessage.value = '✅ SQL patch copied to clipboard!';
+    setTimeout(() => {
+      successMessage.value = '';
+    }, 3000);
+  } catch (err) {
+    error.value = `Failed to copy to clipboard: ${err}`;
+  }
+};
+
+const downloadPatchFromModal = () => {
+  downloadPatch(generatedPatchSQL.value, patchFilename.value);
+  successMessage.value = `✅ SQL patch downloaded successfully!\nFile: ${patchFilename.value}`;
+  setTimeout(() => {
+    successMessage.value = '';
+  }, 3000);
+};
+
+const closePatchModal = () => {
+  showPatchModal.value = false;
+};
+
 const downloadPatch = (sql: string, filename: string) => {
   const blob = new Blob([sql], { type: 'text/plain' });
   const url = URL.createObjectURL(blob);
@@ -907,8 +1046,886 @@ onBeforeUnmount(() => {
   saveState();
 });
 </script>
-
 <style scoped>
+/* Add dark mode CSS variables that preserve the original styling */
+:root {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8f9fa;
+  --bg-tertiary: #e9ecef;
+  --text-primary: #000000;
+  --text-secondary: #1d252e;
+  --text-muted: #adb5bd;
+  --border-color: #dee2e6;
+  --border-light: #e9ecef;
+}
+
+.dark {
+  --bg-primary: #1a1d21;
+  --bg-secondary: #24292e;
+  --bg-tertiary: #2d333b;
+  --text-primary: #000000;
+  --text-secondary: #1d252e;
+  --text-muted: #8b949e;
+  --border-color: #30363d;
+  --border-light: #3c444d;
+}
+
+.schema-comparison {
+  max-width: 100%;
+  height: 100%;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.comparison-header {
+  margin-bottom: 30px;
+  text-align: center;
+}
+
+.comparison-header h3 {
+  margin: 0 0 10px 0;
+  color: var(--text-primary);
+}
+
+.comparison-header p {
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.database-selection {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 20px;
+  align-items: end;
+  margin-bottom: 30px;
+  padding: 20px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.db-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.db-selector label {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.db-selector select {
+  padding: 10px 15px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 1em;
+}
+
+.vs-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: #007bff;
+  color: white;
+  border-radius: 50%;
+  font-weight: bold;
+  font-size: 0.9em;
+}
+
+.comparison-actions {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  margin-bottom: 30px;
+}
+
+.compare-btn {
+  padding: 12px 30px;
+  background: #28a745;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 1em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.compare-btn:hover:not(:disabled) {
+  background: #218838;
+}
+
+.compare-btn:disabled {
+  background: #6c757d;
+  cursor: not-allowed;
+}
+
+.export-btn {
+  padding: 12px 30px;
+  background: #17a2b8;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 1em;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.export-btn:hover {
+  background: #138496;
+}
+
+.error-message {
+  padding: 15px;
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+  border-radius: 4px;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.success-message {
+  padding: 15px;
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+  border-radius: 4px;
+  margin-bottom: 20px;
+  text-align: center;
+  animation: slideIn 0.3s ease-out;
+}
+
+.success-message pre {
+  margin: 0;
+  font-family: inherit;
+  white-space: pre-line;
+  font-size: 0.95em;
+}
+
+.loading-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  margin: 20px 0;
+  border: 1px solid var(--border-color);
+}
+
+.spinner {
+  border: 4px solid var(--border-light);
+  border-top: 4px solid #007bff;
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  animation: spin 1s linear infinite;
+  margin-bottom: 20px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.loading-indicator p {
+  color: var(--text-secondary);
+  font-size: 1.1em;
+  margin: 0;
+}
+
+.comparison-results {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.results-summary {
+  padding: 25px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.results-summary h4 {
+  margin: 0 0 20px 0;
+  color: var(--text-primary);
+  text-align: center;
+}
+
+.summary-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 15px;
+}
+
+.stat-item {
+  text-align: center;
+  padding: 15px;
+  border-radius: 6px;
+  background: white;
+  border: 1px solid #dee2e6;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.dark .stat-item {
+  background: #2d333b;
+  border: 1px solid #444c56;
+}
+
+.stat-item.added {
+  border-left: 4px solid #28a745;
+}
+
+.stat-item.removed {
+  border-left: 4px solid #dc3545;
+}
+
+.stat-item.modified {
+  border-left: 4px solid #ffc107;
+}
+
+.stat-item.unchanged {
+  border-left: 4px solid #6c757d;
+}
+
+.stat-item .count {
+  display: block;
+  font-size: 2em;
+  font-weight: bold;
+  line-height: 1;
+  margin-bottom: 5px;
+  color: #343a40;
+}
+
+.dark .stat-item .count {
+  color: #f0f6fc;
+}
+.stat-item .label {
+  font-size: 0.9em;
+  color: #6c757d;
+}
+
+.dark .stat-item .label {
+  color: #8b949e;
+}
+/* Status Sections */
+.status-section {
+  margin-bottom: 30px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.status-section-header {
+  padding: 20px 25px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  font-weight: 600;
+}
+
+.status-section-header.added {
+  background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+  color: #155724;
+  border-bottom: 1px solid #c3e6cb;
+}
+
+.status-section-header.removed {
+  background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+  color: #721c24;
+  border-bottom: 1px solid #f5c6cb;
+}
+
+.status-section-header.modified {
+  background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+  color: #856404;
+  border-bottom: 1px solid #ffeaa7;
+}
+
+.status-section-header.unchanged {
+  background: linear-gradient(135deg, #e2e3e5 0%, #d6d8db 100%);
+  color: #495057;
+  border-bottom: 1px solid #d6d8db;
+}
+
+.status-section-header h4 {
+  margin: 0;
+  font-size: 1.2em;
+}
+
+.status-section-header p {
+  margin: 0;
+  font-size: 0.9em;
+  opacity: 0.8;
+  font-weight: normal;
+}
+
+.status-icon {
+  font-size: 1.5em;
+  width: 30px;
+  text-align: center;
+}
+
+/* Table Pair Container - For Modified Tables */
+.table-pair-container {
+  background: var(--border-color);
+}
+
+/* Side by Side Layout - Equal Heights */
+.side-by-side-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--border-color);
+  align-items: stretch;
+}
+
+.database-column {
+  background: var(--bg-primary);
+  display: flex;
+  flex-direction: column;
+}
+
+.column-header {
+  padding: 15px 20px;
+  background: #343a40;
+  color: white;
+  text-align: center;
+}
+
+.column-header h4 {
+  margin: 0;
+  font-size: 1em;
+}
+
+.column-content {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.column-content.empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-secondary);
+}
+
+.empty-state .empty-message {
+  text-align: center;
+  color: var(--text-secondary);
+  font-style: italic;
+  padding: 40px 20px;
+}
+
+.empty-columns-message {
+  text-align: center;
+  color: var(--text-secondary);
+  font-style: italic;
+  padding: 15px;
+  background: var(--bg-secondary);
+  border-radius: 4px;
+}
+
+.table-card {
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--bg-primary);
+}
+
+.table-header-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.2s;
+}
+
+.table-header-card:hover {
+  background-color: var(--bg-secondary);
+}
+
+.table-header-card.added {
+  background: #d4edda;
+  border-left: 4px solid #28a745;
+}
+
+.table-header-card.removed {
+  background: #f8d7da;
+  border-left: 4px solid #dc3545;
+}
+
+.table-header-card.modified {
+  background: #fff3cd;
+  border-left: 4px solid #ffc107;
+}
+
+.table-header-card.unchanged {
+  background: #e2e3e5;
+  border-left: 4px solid #6c757d;
+}
+
+.table-info {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.table-name {
+  font-family: monospace;
+  font-weight: 600;
+  font-size: 1em;
+  color: #000000;
+}
+
+.table-status-badge {
+  font-size: 0.75em;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.table-status-badge.added {
+  background: #28a745;
+  color: white;
+}
+
+.table-status-badge.removed {
+  background: #dc3545;
+  color: white;
+}
+
+.table-status-badge.modified {
+  background: #ffc107;
+  color: #212529;
+}
+
+.table-status-badge.unchanged {
+  background: #6c757d;
+  color: white;
+}
+
+.toggle-icon {
+  font-size: 0.8em;
+  color: #000000;
+}
+
+.table-details {
+  padding: 15px;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border-color);
+}
+
+.columns-list h6 {
+  margin: 0 0 10px 0;
+  color: var(--text-primary);
+  font-size: 0.9em;
+}
+
+.column-item {
+  display: flex;
+  gap: 12px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border-radius: 4px;
+  border-left: 3px solid transparent;
+  align-items: flex-start;
+}
+
+.column-item.added {
+  background: #d4edda;
+  border-left-color: #28a745;
+}
+
+.column-item.removed {
+  background: #f8d7da;
+  border-left-color: #dc3545;
+}
+
+.column-item.modified {
+  background: #fff3cd;
+  border-left-color: #ffc107;
+}
+
+.column-item.unchanged {
+  background: #e2e3e5;
+  border-left-color: #6c757d;
+}
+
+.column-number {
+  font-family: monospace;
+  font-weight: bold;
+  font-size: 0.85em;
+  color: var(--text-secondary);
+  min-width: 30px;
+  flex-shrink: 0;
+}
+
+.column-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.column-name {
+  font-family: monospace;
+  font-weight: 600;
+  font-size: 0.9em;
+  color: #000000;
+}
+
+.column-type {
+  font-family: monospace;
+  font-size: 0.8em;
+  color: var(--text-secondary);
+}
+
+.column-attributes {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.attribute-badge {
+  font-size: 0.7em;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.attribute-badge.pk {
+  background: #007bff;
+  color: white;
+}
+
+.attribute-badge.nn {
+  background: #6c757d;
+  color: white;
+}
+
+.attribute-badge.def {
+  background: #17a2b8;
+  color: white;
+}
+
+.column-changes {
+  font-size: 0.75em;
+  color: #856404;
+  font-style: italic;
+  padding: 4px 0;
+}
+
+.status-label {
+  font-size: 0.75em;
+  font-weight: 600;
+  padding: 2px 0;
+  color: var(--text-primary);
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.side-by-side-container.header-only {
+  margin-bottom: 0;
+}
+
+.side-by-side-container.header-only .column-header {
+  padding: 15px 20px;
+  background: #343a40;
+  color: white;
+  text-align: center;
+}
+
+/* Column without header */
+.database-column-no-header {
+  background: var(--bg-primary);
+  display: flex;
+  flex-direction: column;
+}
+
+.patch-btn {
+  padding: 12px 30px;
+  background: #6610f2;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 1em;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.patch-btn:hover {
+  background: #520dc2;
+}
+
+@media (max-width: 768px) {
+  .database-selection {
+    grid-template-columns: 1fr;
+    gap: 15px;
+    text-align: center;
+  }
+
+  .vs-indicator {
+    justify-self: center;
+    order: 2;
+  }
+
+  .summary-stats {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .side-by-side-container {
+    grid-template-columns: 1fr;
+  }
+
+  .status-section-header {
+    flex-direction: column;
+    text-align: center;
+    gap: 10px;
+  }
+
+  .status-section-header h4 {
+    font-size: 1.1em;
+  }
+}
+
+/* Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 20px;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 12px;
+  max-width: 800px;
+  width: 100%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+@media (prefers-color-scheme: dark) {
+  .modal-content {
+    background: #2d2d2d;
+    border: 1px solid #555555;
+  }
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 25px;
+  border-bottom: 1px solid #dee2e6;
+}
+
+@media (prefers-color-scheme: dark) {
+  .modal-header {
+    border-bottom: 1px solid #444444;
+  }
+}
+
+.modal-header h3 {
+  margin: 0;
+  color: #343a40;
+  font-size: 1.3em;
+}
+
+@media (prefers-color-scheme: dark) {
+  .modal-header h3 {
+    color: #e9ecef;
+  }
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 1.5em;
+  color: #6c757d;
+  cursor: pointer;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.close-btn:hover {
+  background: #f8f9fa;
+  color: #343a40;
+}
+
+@media (prefers-color-scheme: dark) {
+  .close-btn {
+    color: #adb5bd;
+  }
+  
+  .close-btn:hover {
+    background: #3a3a3a;
+    color: #e9ecef;
+  }
+}
+
+.modal-body {
+  padding: 20px 25px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.patch-info {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 15px;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border-left: 3px solid #6610f2;
+}
+
+@media (prefers-color-scheme: dark) {
+  .patch-info {
+    background: #3a3a3a;
+  }
+}
+
+.info-label {
+  font-weight: 600;
+  color: #495057;
+}
+
+@media (prefers-color-scheme: dark) {
+  .info-label {
+    color: #dee2e6;
+  }
+}
+
+.info-value {
+  font-family: monospace;
+  color: #6610f2;
+  word-break: break-all;
+}
+
+.patch-preview {
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  padding: 15px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+@media (prefers-color-scheme: dark) {
+  .patch-preview {
+    background: #1a1a1a;
+    border: 1px solid #555555;
+  }
+}
+
+.patch-preview pre {
+  margin: 0;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9em;
+  color: #212529;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+@media (prefers-color-scheme: dark) {
+  .patch-preview pre {
+    color: #e9ecef;
+  }
+}
+
+.modal-footer {
+  display: flex;
+  gap: 12px;
+  padding: 20px 25px;
+  border-top: 1px solid #dee2e6;
+  justify-content: flex-end;
+}
+
+@media (prefers-color-scheme: dark) {
+  .modal-footer {
+    border-top: 1px solid #444444;
+  }
+}
+
+.copy-btn,
+.download-btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 1em;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s;
+}
+
+.copy-btn {
+  background: #17a2b8;
+  color: white;
+}
+
+.copy-btn:hover {
+  background: #138496;
+  transform: translateY(-1px);
+}
+
+.download-btn {
+  background: #6610f2;
+  color: white;
+}
+
+.download-btn:hover {
+  background: #520dc2;
+  transform: translateY(-1px);
+}
+
+.btn-icon {
+  font-size: 1.1em;
+}
+</style>
+<!-- <style scoped>
 .patch-btn {
   padding: 12px 30px;
   background: #6610f2;
@@ -1058,6 +2075,38 @@ onBeforeUnmount(() => {
   font-size: 0.95em;
 }
 
+.loading-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  margin: 20px 0;
+}
+
+.spinner {
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #007bff;
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  animation: spin 1s linear infinite;
+  margin-bottom: 20px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.loading-indicator p {
+  color: #6c757d;
+  font-size: 1.1em;
+  margin: 0;
+}
+
 .comparison-results {
   background: white;
   border: 1px solid #dee2e6;
@@ -1180,7 +2229,6 @@ onBeforeUnmount(() => {
 
 /* Table Pair Container - For Modified Tables */
 .table-pair-container {
-  /* margin-bottom: 1px; */
   background: #dee2e6;
 }
 
@@ -1197,7 +2245,6 @@ onBeforeUnmount(() => {
   background: white;
   display: flex;
   flex-direction: column;
-  /* min-height: 100%; */
 }
 
 .column-header {
@@ -1213,7 +2260,6 @@ onBeforeUnmount(() => {
 }
 
 .column-content {
-  /* flex: 1; */
   padding: 20px;
   display: flex;
   flex-direction: column;
@@ -1243,7 +2289,6 @@ onBeforeUnmount(() => {
 }
 
 .table-card {
-  /* flex: 1; */
   border: 1px solid #dee2e6;
   border-radius: 6px;
   overflow: hidden;
@@ -1332,7 +2377,6 @@ onBeforeUnmount(() => {
   padding: 15px;
   background: #f8f9fa;
   border-top: 1px solid #dee2e6;
-  /* min-height: 100px; */
 }
 
 .columns-list h6 {
@@ -1343,12 +2387,12 @@ onBeforeUnmount(() => {
 
 .column-item {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 8px 12px;
+  gap: 12px;
+  padding: 10px 12px;
   margin-bottom: 8px;
   border-radius: 4px;
   border-left: 3px solid transparent;
+  align-items: flex-start;
 }
 
 .column-item.added {
@@ -1371,6 +2415,22 @@ onBeforeUnmount(() => {
   border-left-color: #6c757d;
 }
 
+.column-number {
+  font-family: monospace;
+  font-weight: bold;
+  font-size: 0.85em;
+  color: #6c757d;
+  min-width: 30px;
+  flex-shrink: 0;
+}
+
+.column-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
 .column-name {
   font-family: monospace;
   font-weight: 600;
@@ -1383,10 +2443,46 @@ onBeforeUnmount(() => {
   color: #6c757d;
 }
 
+.column-attributes {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.attribute-badge {
+  font-size: 0.7em;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.attribute-badge.pk {
+  background: #007bff;
+  color: white;
+}
+
+.attribute-badge.nn {
+  background: #6c757d;
+  color: white;
+}
+
+.attribute-badge.def {
+  background: #17a2b8;
+  color: white;
+}
+
 .column-changes {
   font-size: 0.75em;
   color: #856404;
   font-style: italic;
+  padding: 4px 0;
+}
+
+.status-label {
+  font-size: 0.75em;
+  font-weight: 600;
+  padding: 2px 0;
 }
 
 @keyframes slideIn {
@@ -1398,6 +2494,24 @@ onBeforeUnmount(() => {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+.side-by-side-container.header-only {
+  margin-bottom: 0;
+}
+
+.side-by-side-container.header-only .column-header {
+  padding: 15px 20px;
+  background: #343a40;
+  color: white;
+  text-align: center;
+}
+
+/* Column without header */
+.database-column-no-header {
+  background: white;
+  display: flex;
+  flex-direction: column;
 }
 
 @media (max-width: 768px) {
@@ -1431,23 +2545,4 @@ onBeforeUnmount(() => {
     font-size: 1.1em;
   }
 }
-
-
-side-by-side-container.header-only {
-  margin-bottom: 0;
-}
-
-.side-by-side-container.header-only .column-header {
-  padding: 15px 20px;
-  background: #343a40;
-  color: white;
-  text-align: center;
-}
-
-/* Column without header */
-.database-column-no-header {
-  background: white;
-  display: flex;
-  flex-direction: column;
-}
-</style>
+</style> -->

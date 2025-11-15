@@ -1,6 +1,18 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DataComparisonResult {
+    pub table_name: String,
+    pub total_rows_db1: i64,
+    pub total_rows_db2: i64,
+    pub rows_inserted: i64,
+    pub rows_deleted: i64,
+    pub rows_potentially_modified: i64,
+    pub identical: bool,
+}
+
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DatabaseInfo {
     pub path: String,
     pub name: String,
@@ -67,4 +79,20 @@ pub struct ColumnDiff {
     pub old_type: String,
     pub new_type: String,
     pub changes: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MigrationSettings {
+    pub page_size: String,
+    pub kdf_iterations: String,
+    pub hmac_algorithm: String,
+    pub kdf_algorithm: String,
+    pub cipher: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MigrationResult {
+    pub output_path: String,
+    pub message: String,
+    pub success: bool,
 }

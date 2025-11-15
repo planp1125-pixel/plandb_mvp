@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "functions": {
+    "api/verify.js": {
+      "maxDuration": 10
+    },
+    "api/paddle-webhook.js": {
+      "maxDuration": 10
+    }
+  }
+}
+
