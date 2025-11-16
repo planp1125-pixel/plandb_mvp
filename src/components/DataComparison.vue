@@ -493,7 +493,11 @@
                   <div class="section-title source-title">
                     <h6>{{ getDatabaseName(database1) }} (Source)</h6>
                   </div>
-                  <div class="scrollable-table-container">
+                  <div
+                    class="scrollable-table-container"
+                    :ref="el => setScrollRef(el, result.tableName, 'source', 'sideBySide')"
+                    @scroll="handleSyncScroll($event, result.tableName, 'source', 'sideBySide')"
+                  >
                     <table class="data-table">
                       <thead>
                         <tr>
@@ -519,7 +523,11 @@
                   <div class="section-title target-title">
                     <h6>{{ getDatabaseName(database2) }} (Target)</h6>
                   </div>
-                  <div class="scrollable-table-container">
+                  <div
+                    class="scrollable-table-container"
+                    :ref="el => setScrollRef(el, result.tableName, 'target', 'sideBySide')"
+                    @scroll="handleSyncScroll($event, result.tableName, 'target', 'sideBySide')"
+                  >
                     <table class="data-table">
                       <thead>
                         <tr>
@@ -580,7 +588,11 @@
                     <div class="section-title source-title">
                       <h6>{{ getDatabaseName(database1) }} (Source)</h6>
                     </div>
-                    <div class="scrollable-table-container">
+                    <div
+                      class="scrollable-table-container"
+                      :ref="el => setScrollRef(el, result.tableName, 'source', 'single', diffIndex)"
+                      @scroll="handleSyncScroll($event, result.tableName, 'source', 'single', diffIndex)"
+                    >
                       <table class="data-table">
                         <thead>
                           <tr>
@@ -606,7 +618,11 @@
                     <div class="section-title target-title">
                       <h6>{{ getDatabaseName(database2) }} (Target)</h6>
                     </div>
-                    <div class="scrollable-table-container">
+                    <div
+                      class="scrollable-table-container"
+                      :ref="el => setScrollRef(el, result.tableName, 'target', 'single', diffIndex)"
+                      @scroll="handleSyncScroll($event, result.tableName, 'target', 'single', diffIndex)"
+                    >
                       <table class="data-table">
                         <thead>
                           <tr>
@@ -712,7 +728,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue';
+import { ref, computed, watch, nextTick, type ComponentPublicInstance } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
 import type { DatabaseInfo } from '../services/databaseService';
 
@@ -781,6 +797,10 @@ const options = ref({
   ignoreWhitespace: false,
   chunkSize: 10000
 });
+
+// Refs for synchronized scrolling
+const scrollRefs = ref<Record<string, HTMLElement>>({});
+const isScrolling = ref<Record<string, boolean>>({});
 
 const currentFilter = ref<'all' | 'identical' | 'different' | 'missing' | 'extra'>('all');
 const isGeneratingPatch = ref(false);
@@ -1413,12 +1433,56 @@ const getDatabaseName = (path: string): string => {
 
 // Helper function to get view mode for a specific table
 const getTableViewMode = (tableName: string): 'sideBySide' | 'single' => {
-  return perTableViewMode.value[tableName] || 'sideBySide';
+  // Use per-table mode if set, otherwise use global viewMode
+  return perTableViewMode.value[tableName] || viewMode.value;
 };
 
 // Helper function to set view mode for a specific table
 const setTableViewMode = (tableName: string, mode: 'sideBySide' | 'single') => {
   perTableViewMode.value[tableName] = mode;
+};
+
+// Synchronized scrolling functions
+const setScrollRef = (el: Element | ComponentPublicInstance | null, tableName: string, section: 'source' | 'target', mode: 'sideBySide' | 'single', rowIndex?: number) => {
+  if (el && el instanceof HTMLElement) {
+    // For single view, include rowIndex to make each pair unique
+    const key = mode === 'single' && rowIndex !== undefined
+      ? `${tableName}_${section}_${mode}_${rowIndex}`
+      : `${tableName}_${section}_${mode}`;
+    scrollRefs.value[key] = el;
+  }
+};
+
+const handleSyncScroll = (event: Event, tableName: string, section: 'source' | 'target', mode: 'sideBySide' | 'single', rowIndex?: number) => {
+  // For single view, include rowIndex to make each pair unique
+  const key = mode === 'single' && rowIndex !== undefined
+    ? `${tableName}_${section}_${mode}_${rowIndex}`
+    : `${tableName}_${section}_${mode}`;
+
+  // Prevent infinite loop
+  if (isScrolling.value[key]) {
+    return;
+  }
+
+  const sourceEl = event.target as HTMLElement;
+  const scrollLeft = sourceEl.scrollLeft;
+
+  // Determine the other section to sync with
+  const otherSection = section === 'source' ? 'target' : 'source';
+  const otherKey = mode === 'single' && rowIndex !== undefined
+    ? `${tableName}_${otherSection}_${mode}_${rowIndex}`
+    : `${tableName}_${otherSection}_${mode}`;
+  const otherEl = scrollRefs.value[otherKey];
+
+  if (otherEl) {
+    isScrolling.value[otherKey] = true;
+    otherEl.scrollLeft = scrollLeft;
+
+    // Reset the flag after a short delay
+    setTimeout(() => {
+      isScrolling.value[otherKey] = false;
+    }, 10);
+  }
 };
 
 const exportAllDifferences = async () => {
@@ -2482,7 +2546,10 @@ const generateSingleTablePatch = async (tableName: string) => {
   /* background: white; */
   background: var(--bg-card);
   border-radius: 8px;
-  overflow: hidden;
+  /* Don't hide overflow on the section itself - let the scrollable container handle it */
+  overflow: visible;
+  /* Ensure proper width calculation */
+  min-width: 0;
 }
 
 .section-title {
@@ -2516,14 +2583,20 @@ const generateSingleTablePatch = async (tableName: string) => {
   -webkit-overflow-scrolling: touch;
   scrollbar-color: var(--border-color) var(--bg-secondary);
   scrollbar-width: auto;
+  /* Ensure consistent layout and force proper width calculation */
+  position: relative;
+  /* Critical: width must be constrained to enable horizontal scroll */
+  width: 100%;
+  /* Force browser to recalculate layout */
+  display: block;
 }
 
 .data-table {
-  width: max-content;
-  min-width: 100%;  /* Ensure table takes full width but allows horizontal scroll when wide */
+  /* Let table size naturally based on column content */
+  min-width: 100%;
   border-collapse: collapse;
   font-size: 0.95em;
-  /* Prevent table from shrinking below content width */
+  /* Use auto layout so columns size based on content */
   table-layout: auto;
   color: var(--text-primary);
 }
@@ -2542,18 +2615,19 @@ const generateSingleTablePatch = async (tableName: string) => {
   font-weight: 600;
   border-bottom: 2px solid var(--border-color);
   white-space: nowrap;
-  /* Ensure headers don't wrap */
-  min-width: 100px;
+  /* Minimum width to ensure horizontal scroll with multiple columns */
+  min-width: 120px;
 }
 
 .data-table td {
   padding: 12px 14px;
   border-bottom: 1px solid var(--border-color);
-  /* Prevent cell content from wrapping too early */
+  /* Prevent cell content from wrapping */
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 300px;
+  min-width: 120px;
+  max-width: 400px;
   color: var(--text-primary);
 }
 

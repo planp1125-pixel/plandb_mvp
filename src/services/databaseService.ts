@@ -109,16 +109,24 @@ async getTableColumns(databasePath: string, tableName: string): Promise<any[]> {
 async getTableData(
   dbPath: string, 
   tableName: string, 
-  limit?: number, 
-  offset?: number  // ← NEW PARAMETER
+  limit?: number | null, 
+  offset?: number | null  // ← NEW PARAMETER
 ): Promise<TableData> {
   console.log('Getting table data:', tableName, 'from', dbPath, 'limit:', limit, 'offset:', offset);
-  return await invoke('get_table_data', { 
-    dbPath, 
-    tableName, 
-    limit: limit || 100,
-    offset: offset || 0  // ← Pass offset
-  });
+  const hasLimit = limit !== null && limit !== undefined;
+  const limitParam = hasLimit ? limit : null;
+  const offsetParam = hasLimit ? (offset === null || offset === undefined ? 0 : offset) : undefined;
+
+  const payload: Record<string, any> = {
+    dbPath,
+    tableName,
+    limit: limitParam
+  };
+  if (hasLimit) {
+    payload.offset = offsetParam;
+  }
+
+  return await invoke('get_table_data', payload);
 }
 // async getTableData(
 //   dbPath: string, 
@@ -156,6 +164,4 @@ async getTableData(
   });
 }
 }
-
-
 
