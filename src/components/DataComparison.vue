@@ -1403,6 +1403,11 @@ const generateSingleTablePatch = async (tableName: string) => {
   --bg-primary: #ffffff;
   --bg-secondary: #f8f9fa;
   --bg-tertiary: #e9ecef;
+  --bg-card: #ffffff;
+  --bg-surface: #f6f8fa;
+  --bg-muted: #ecf0f1;
+  --bg-hover: #e0e0e0;
+  --table-row-hover: #f8f9fa;
   --text-primary: #343a40;
   --text-secondary: #6c757d;
   --border-color: #dee2e6;
@@ -1413,8 +1418,13 @@ const generateSingleTablePatch = async (tableName: string) => {
   --bg-primary: #1a1d21;
   --bg-secondary: #24292e;
   --bg-tertiary: #2d333b;
-  --text-primary: #f0f6fc;
-  --text-secondary: #c9d1d9;
+  --bg-card: #161b22;
+  --bg-surface: #1f2933;
+  --bg-muted: #2d333b;
+  --bg-hover: #323b44;
+  --table-row-hover: #1e2630;
+  --text-primary: #d7dde5;
+  --text-secondary: #a8b2bf;
   --border-color: #30363d;
   --border-light: #3c444d;
 }
@@ -1550,6 +1560,7 @@ const generateSingleTablePatch = async (tableName: string) => {
   /* background: #f5f7fa; */
   background: var(--bg-secondary);
   min-height: 100vh;
+  color: var(--text-primary);
 }
 
 .comparison-header {
@@ -1688,7 +1699,7 @@ const generateSingleTablePatch = async (tableName: string) => {
 }
 
 .limit-options small {
-  color: #666;
+  color: var(--text-secondary);
   font-size: 0.85em;
 }
 
@@ -1748,14 +1759,14 @@ const generateSingleTablePatch = async (tableName: string) => {
 
 .selection-count {
   font-size: 0.9em;
-  color: #666;
+  color: var(--text-secondary);
   font-weight: 500;
 }
 
 .table-grid-container {
   max-height: 500px;
   overflow-y: auto;
-  border: 2px solid #ecf0f1;
+  border: 2px solid var(--border-color);
   border-radius: 8px;
   padding: 15px;
 }
@@ -1771,7 +1782,7 @@ const generateSingleTablePatch = async (tableName: string) => {
   flex-direction: column;
   gap: 8px;
   padding: 15px;
-  background: #f8f9fa;
+  background: var(--bg-surface);
   border-radius: 8px;
   border: 2px solid var(--border-color);
   /* border: 2px solid #e0e0e0; */
@@ -2066,7 +2077,7 @@ const generateSingleTablePatch = async (tableName: string) => {
 
 .view-btn {
   padding: 8px 16px;
-  background: #ecf0f1;
+  background: var(--bg-muted);
   border: 2px solid var(--border-color);
   /* border: 2px solid #e0e0e0; */
   border-radius: 6px;
@@ -2078,7 +2089,7 @@ const generateSingleTablePatch = async (tableName: string) => {
 }
 
 .view-btn:hover {
-  background: #e0e0e0;
+  background: var(--bg-hover);
 }
 
 .view-btn.active {
@@ -2089,7 +2100,7 @@ const generateSingleTablePatch = async (tableName: string) => {
 
 /* Results Summary */
 .results-summary {
-  background: #f8f9fa;
+  background: var(--bg-surface);
   padding: 25px;
   border-radius: 8px;
   margin-bottom: 30px;
@@ -2264,20 +2275,20 @@ const generateSingleTablePatch = async (tableName: string) => {
 
 .table-status-badge {
   font-size: 0.9em;
-  color: #666;
+  color: var(--text-secondary);
   font-weight: 500;
 }
 
 .toggle-icon {
   font-size: 1.4em;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 /* Table Details */
 .table-details {
   padding: 25px;
-  border-top: 2px solid #e0e0e0;
-  background: #fafbfc;
+  border-top: 2px solid var(--border-color);
+  background: var(--bg-surface);
 }
 
 .side-by-side-view {
@@ -2317,7 +2328,7 @@ const generateSingleTablePatch = async (tableName: string) => {
   overflow-x: auto !important;
   overflow-y: auto;
   max-height: 500px;
-  border: 1px solid #dee2e6;
+  border: 1px solid var(--border-color);
   border-radius: 6px;
   /* background: white; */
   background: var(--bg-card);
@@ -2354,7 +2365,7 @@ const generateSingleTablePatch = async (tableName: string) => {
 
 .data-table td {
   padding: 12px 14px;
-  border-bottom: 1px solid #dee2e6;
+  border-bottom: 1px solid var(--border-color);
   /* Prevent cell content from wrapping too early */
   white-space: nowrap;
   overflow: hidden;
@@ -2363,7 +2374,7 @@ const generateSingleTablePatch = async (tableName: string) => {
 }
 
 .data-table tbody tr:hover {
-  background: #f8f9fa;
+  background: var(--table-row-hover);
 }
 
 .row-different {
@@ -2409,7 +2420,7 @@ const generateSingleTablePatch = async (tableName: string) => {
 .no-results {
   text-align: center;
   padding: 80px 20px;
-  color: #6c757d;
+  color: var(--text-secondary);
   font-style: italic;
   font-size: 1.2em;
 }
@@ -2508,7 +2519,7 @@ const generateSingleTablePatch = async (tableName: string) => {
 
 .per-table-view-toggle {
   display: flex;
-  border: 1px solid #ced4da;
+  border: 1px solid var(--border-color);
   border-radius: 4px;
   overflow: hidden;
   /* background: white; */
@@ -2520,7 +2531,7 @@ const generateSingleTablePatch = async (tableName: string) => {
   border: none;
   /* background: white; */
   background: var(--bg-card);
-  color: #495057;
+  color: var(--text-primary);
   cursor: pointer;
   font-size: 0.75em;
   transition: all 0.2s;
@@ -2528,7 +2539,7 @@ const generateSingleTablePatch = async (tableName: string) => {
 }
 
 .mini-view-btn:hover {
-  background: #f8f9fa;
+  background: var(--bg-surface);
 }
 
 .mini-view-btn.active {

@@ -160,6 +160,7 @@ const isDark = ref(false)
 function applyTheme(dark: boolean) {
   const root = document.documentElement
   root.classList.toggle('dark', dark)
+  root.setAttribute('data-theme', dark ? 'dark' : 'light')
   localStorage.setItem('theme', dark ? 'dark' : 'light')
   isDark.value = dark
 }
@@ -244,7 +245,7 @@ const handleTableSelected = (tableName: string) => {
 
 /* Sidebar */
 .sidebar {
-  @apply w-80 flex-shrink-0 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 overflow-y-auto h-full transition-all duration-300 relative z-20 shadow-lg;
+  @apply w-80 flex-shrink-0 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 overflow-y-auto h-full transition-transform duration-200 relative z-20 shadow-lg;
 }
 
 .sidebar-visible {
@@ -257,7 +258,7 @@ const handleTableSelected = (tableName: string) => {
 
 /* Main Content */
 .main-content {
-  @apply flex-1 flex flex-col overflow-auto bg-white dark:bg-gray-800 transition-all duration-300 min-h-full;
+  @apply flex-1 flex flex-col overflow-auto bg-white dark:bg-gray-800 min-h-full;
 }
 
 .main-content-with-sidebar {
