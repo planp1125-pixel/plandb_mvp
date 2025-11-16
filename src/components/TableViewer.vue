@@ -1,10 +1,5 @@
 <template>
   <div class="table-viewer">
-    <div class="viewer-header">
-      <h3>Table Data Viewer</h3>
-      <p>Browse and inspect table contents from your SQLCipher databases</p>
-    </div>
-
     <div class="table-selection">
       <div class="selection-controls">
         <div class="database-selector">
@@ -19,7 +14,7 @@
 
         <div class="table-selector" v-if="availableTables.length > 0">
           <label>Table:</label>
-          <select v-model="selectedTable" @change="loadTableData">
+          <select v-model="selectedTable" @change="handleTableChange">
             <option value="">Select table...</option>
             <option v-for="table in availableTables" :key="table.name" :value="table.name">
               {{ table.name }} ({{ table.row_count.toLocaleString() }} rows)
@@ -29,11 +24,13 @@
 
         <div class="limit-selector" v-if="selectedTable">
           <label>Rows to show:</label>
-          <select v-model="rowLimit" @change="loadTableData">
-            <option :value="50">50 rows</option>
+          <select v-model="rowLimit" @change="handleLimitChange">
             <option :value="100">100 rows</option>
             <option :value="500">500 rows</option>
-            <option :value="1000">1000 rows</option>
+            <option :value="1000">1,000 rows</option>
+            <option :value="5000">5,000 rows</option>
+            <option :value="10000">10,000 rows</option>
+            <option :value="50000">50,000 rows</option>
             <option :value="null">All rows</option>
           </select>
         </div>
@@ -171,6 +168,12 @@ import { DatabaseService, type DatabaseInfo, type TableInfo, type TableData } fr
 const props = defineProps<{
   databases: DatabaseInfo[];
   selectedDatabase?: DatabaseInfo | null;
+  initialTable?: string;
+  initialDbPath?: string;
+}>();
+
+const emit = defineEmits<{
+  'table-opened': [tableName: string, dbPath: string];
 }>();
 
 // State
@@ -186,7 +189,6 @@ const error = ref('');
 // Pagination and filtering
 const searchTerm = ref('');
 const currentPage = ref(1);
-const pageSize = ref(25);
 
 // Computed
 const filteredRows = computed(() => {
@@ -194,11 +196,18 @@ const filteredRows = computed(() => {
     return tableData.value?.rows || [];
   }
 
-  return tableData.value.rows.filter(row => 
-    row.some(cell => 
+  return tableData.value.rows.filter(row =>
+    row.some(cell =>
       String(cell || '').toLowerCase().includes(searchTerm.value.toLowerCase())
     )
   );
+});
+
+// Dynamic page size based on row limit selection
+const pageSize = computed(() => {
+  // If "All rows" is selected (rowLimit is null), show 10,000 rows per page for better performance
+  // Otherwise show 100 rows per page
+  return rowLimit.value === null ? 10000 : 100;
 });
 
 const totalPages = computed(() => {
@@ -236,7 +245,7 @@ const loadDatabaseTables = async () => {
   }
 };
 
-const loadTableData = async () => {
+const loadTableData = async (shouldEmit: boolean = true) => {
   if (!selectedDbPath.value || !selectedTable.value) {
     tableData.value = null;
     return;
@@ -253,6 +262,12 @@ const loadTableData = async () => {
       rowLimit.value || undefined
     );
     tableData.value = data;
+
+    // Emit event when table is loaded manually in the main Browse Data tab
+    // Don't emit if this is a dynamic tab (has initialTable prop) or if explicitly disabled
+    if (!props.initialTable && shouldEmit) {
+      emit('table-opened', selectedTable.value, selectedDbPath.value);
+    }
   } catch (err) {
     error.value = `Failed to load table data: ${err}`;
     tableData.value = null;
@@ -261,8 +276,18 @@ const loadTableData = async () => {
   }
 };
 
+const handleTableChange = () => {
+  // When user manually selects a table, load it and emit event
+  loadTableData(true);
+};
+
+const handleLimitChange = () => {
+  // When changing row limit, reload data but don't create new tab
+  loadTableData(false);
+};
+
 const refreshData = () => {
-  loadTableData();
+  loadTableData(false);
 };
 
 const exportData = () => {
@@ -314,9 +339,20 @@ const downloadCSV = (content: string, filename: string) => {
 
 // Watchers
 watch(() => props.selectedDatabase, (newDb) => {
-  if (newDb) {
+  if (newDb && !props.initialDbPath) {
     selectedDbPath.value = newDb.path;
     loadDatabaseTables();
+  }
+}, { immediate: true });
+
+// Watch for initialDbPath and initialTable props changes
+watch(() => [props.initialDbPath, props.initialTable] as const, ([dbPath, tableName]) => {
+  if (dbPath && tableName) {
+    selectedDbPath.value = dbPath;
+    loadDatabaseTables().then(() => {
+      selectedTable.value = tableName;
+      loadTableData();
+    });
   }
 }, { immediate: true });
 

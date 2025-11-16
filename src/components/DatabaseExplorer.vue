@@ -162,7 +162,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  'table-selected': [tableName: string];
+  'table-selected': [tableName: string, dbPath: string];
   'view-data': [table: TableInfo];
 }>();
 
@@ -233,7 +233,7 @@ const collapseAll = () => {
 
 const viewTableData = (table: TableInfo) => {
   console.log('View data for table:', table.name);
-  emit('table-selected', table.name);
+  emit('table-selected', table.name, currentDbPath.value);
   emit('view-data', table);
 };
 

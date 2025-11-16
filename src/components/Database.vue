@@ -16,20 +16,29 @@
     <!-- Tabs for different functionalities -->
     <div v-else class="tabs-container">
       <div class="tabs">
-        <button 
-          v-for="tab in tabs" 
+        <button
+          v-for="tab in allTabs"
           :key="tab.id"
           @click="activeTab = tab.id"
           :class="['tab', { 'tab-active': activeTab === tab.id }]"
         >
-          {{ tab.name }}
+          <span class="tab-label">{{ tab.name }}</span>
+          <!-- Close button for table tabs -->
+          <button
+            v-if="tab.id.startsWith('table_')"
+            @click="closeTableTab(tab.id, $event)"
+            class="tab-close-btn"
+            title="Close tab"
+          >
+            ×
+          </button>
         </button>
       </div>
 
       <div class="tab-content">
         <!-- Keep all components mounted but hide/show them -->
         <div v-show="activeTab === 'explorer'" class="tab-panel">
-          <DatabaseExplorer 
+          <DatabaseExplorer
             :databases="connectedDatabases"
             :selected-database="selectedDatabase"
             @table-selected="handleTableSelected"
@@ -37,22 +46,38 @@
         </div>
 
         <div v-show="activeTab === 'comparison'" class="tab-panel">
-          <SchemaComparison 
+          <SchemaComparison
             :databases="connectedDatabases"
             @comparison-complete="handleComparisonComplete"
           />
         </div>
 
         <div v-show="activeTab === 'data-comparison'" class="tab-panel">
-          <DataComparison 
+          <DataComparison
             :databases="connectedDatabases"
           />
         </div>
 
         <div v-show="activeTab === 'viewer'" class="tab-panel">
-          <TableViewer 
+          <TableViewer
             :databases="connectedDatabases"
             :selected-database="selectedDatabase"
+            @table-opened="handleTableSelected"
+          />
+        </div>
+
+        <!-- Render TableViewer for each opened table tab -->
+        <div
+          v-for="tableTab in openedTableTabs"
+          :key="tableTab.id"
+          v-show="activeTab === tableTab.id"
+          class="tab-panel"
+        >
+          <TableViewer
+            :databases="connectedDatabases"
+            :selected-database="connectedDatabases.find(d => d.path === tableTab.dbPath) || null"
+            :initial-table="tableTab.tableName"
+            :initial-db-path="tableTab.dbPath"
           />
         </div>
       </div>
@@ -61,7 +86,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import DatabaseExplorer from './DatabaseExplorer.vue';
 import SchemaComparison from './SchemaComparison.vue';
 import DataComparison from './DataComparison.vue';
@@ -73,8 +98,7 @@ interface Props {
   selectedDatabase: DatabaseInfo | null;
 }
 
-// const props = defineProps<Props>();
-defineProps<Props>();
+const props = defineProps<Props>();
 
 const emit = defineEmits<{
   'table-selected': [tableName: string];
@@ -83,16 +107,87 @@ const emit = defineEmits<{
 
 const activeTab = ref('explorer');
 
-const tabs = [
-  { id: 'explorer', name: 'Database Explorer' },
+// Manage opened table tabs
+interface TableTab {
+  id: string;
+  tableName: string;
+  dbPath: string;
+  dbName: string;
+}
+
+const openedTableTabs = ref<TableTab[]>([]);
+const activeTableTabId = ref<string | null>(null);
+
+const staticTabs = [
+  { id: 'explorer', name: 'Database Structure' },
   { id: 'comparison', name: 'Schema Comparison' },
   { id: 'data-comparison', name: 'Data Comparison' },
-  { id: 'viewer', name: 'Table Viewer' },
+  { id: 'viewer', name: 'Browse Data' },
 ];
 
-const handleTableSelected = (tableName: string) => {
-  activeTab.value = 'viewer';
+// Combine static tabs with dynamic table tabs
+const allTabs = computed(() => {
+  const tabs = [...staticTabs];
+
+  // Add opened table tabs
+  openedTableTabs.value.forEach(tableTab => {
+    tabs.push({
+      id: tableTab.id,
+      name: `${tableTab.tableName} (${tableTab.dbName})`
+    });
+  });
+
+  return tabs;
+});
+
+const handleTableSelected = (tableName: string, dbPath: string) => {
+  // Find the database name
+  const db = props.connectedDatabases.find(d => d.path === dbPath);
+  const dbName = db?.name || dbPath.split('/').pop() || 'Unknown DB';
+
+  // Create unique ID for this table tab (encode to handle special characters)
+  // Use a simpler approach: hash the path and table name
+  const pathHash = btoa(dbPath).replace(/[^a-zA-Z0-9]/g, '').substring(0, 20);
+  const tabId = `table_${pathHash}_${tableName.replace(/[^a-zA-Z0-9]/g, '_')}`;
+
+  // Check if tab already exists
+  const existingTab = openedTableTabs.value.find(t => t.id === tabId);
+
+  if (!existingTab) {
+    // Add new table tab
+    openedTableTabs.value.push({
+      id: tabId,
+      tableName,
+      dbPath,
+      dbName
+    });
+  }
+
+  // Switch to this table tab
+  activeTab.value = tabId;
+  activeTableTabId.value = tabId;
+
   emit('table-selected', tableName);
+};
+
+const closeTableTab = (tabId: string, event: Event) => {
+  event.stopPropagation();
+
+  const index = openedTableTabs.value.findIndex(t => t.id === tabId);
+  if (index === -1) return;
+
+  openedTableTabs.value.splice(index, 1);
+
+  // If closing the active tab, switch to another tab
+  if (activeTab.value === tabId) {
+    if (openedTableTabs.value.length > 0) {
+      // Switch to the previous table tab or the last one
+      const newIndex = Math.max(0, index - 1);
+      activeTab.value = openedTableTabs.value[newIndex]?.id || 'explorer';
+    } else {
+      activeTab.value = 'explorer';
+    }
+  }
 };
 
 const handleComparisonComplete = (comparison: SchemaComparisonType) => {
@@ -165,6 +260,26 @@ const handleComparisonComplete = (comparison: SchemaComparisonType) => {
   flex-shrink: 0;
   padding: 0 1.25rem;
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* Custom scrollbar for tabs */
+.tabs::-webkit-scrollbar {
+  height: 6px;
+}
+
+.tabs::-webkit-scrollbar-track {
+  background: var(--gray-100);
+}
+
+.tabs::-webkit-scrollbar-thumb {
+  background: var(--gray-300);
+  border-radius: 3px;
+}
+
+.tabs::-webkit-scrollbar-thumb:hover {
+  background: var(--primary-500);
 }
 
 .tab {
@@ -181,6 +296,35 @@ const handleComparisonComplete = (comparison: SchemaComparisonType) => {
   border-radius: 0.5rem 0.5rem 0 0;
   position: relative;
   margin: 0 0.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tab-label {
+  flex: 1;
+}
+
+.tab-close-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.25rem;
+  line-height: 1;
+  padding: 0 0.25rem;
+  color: var(--gray-400);
+  transition: all 0.2s;
+  border-radius: 0.25rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tab-close-btn:hover {
+  background: var(--gray-200);
+  color: var(--gray-700);
 }
 
 .tab:hover {
