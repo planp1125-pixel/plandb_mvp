@@ -1,89 +1,264 @@
-/* Global theme variables */
+/* ===================================
+   UNIFIED DARK MODE THEME SYSTEM
+   Single source of truth for all colors
+   =================================== */
+
+/* Light Mode (Default) */
 :root {
+  /* Brand Colors */
   --primary-500: #6366f1;
   --primary-600: #4f46e5;
   --primary-700: #3730a3;
+  --blue-500: #3b82f6;
+  --blue-600: #2563eb;
+  --blue-700: #1d4ed8;
+
+  /* Gray Scale */
   --gray-50: #f8fafc;
   --gray-100: #f1f5f9;
   --gray-200: #e2e8f0;
   --gray-300: #cbd5e1;
+  --gray-400: #94a3b8;
   --gray-500: #64748b;
+  --gray-600: #475569;
   --gray-700: #334155;
   --gray-800: #1e293b;
   --gray-900: #0f172a;
   --white: #ffffff;
-  --blue-500: #3b82f6;
-  --blue-600: #2563eb;
-  --blue-700: #1d4ed8;
+
+  /* Semantic Background Colors */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8fafc;
+  --bg-tertiary: #f1f5f9;
+  --bg-hover: #f8fafc;
+  --bg-card: #ffffff;
+  --bg-sidebar: #ffffff;
+  --bg-nav: #1e293b;
+  --bg-header-from: #3b82f6;
+  --bg-header-to: #2563eb;
+
+  /* Semantic Text Colors */
+  --text-primary: #0f172a;
+  --text-secondary: #64748b;
+  --text-tertiary: #94a3b8;
+  --text-inverse: #ffffff;
+
+  /* Semantic Border Colors */
+  --border-primary: #e2e8f0;
+  --border-secondary: #cbd5e1;
+  --border-focus: #6366f1;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+
+  /* Status Colors */
+  --success-bg: #f0fdf4;
+  --success-border: #86efac;
+  --success-text: #166534;
+  --error-bg: #fef2f2;
+  --error-border: #fca5a5;
+  --error-text: #991b1b;
+  --warning-bg: #fef3c7;
+  --warning-border: #fcd34d;
+  --warning-text: #92400e;
+
+  /* Comparison Status Colors - Unified for Schema & Data Comparison */
+  --status-added-bg: #d4edda;
+  --status-added-border: #28a745;
+  --status-added-text: #155724;
+  --status-added-badge-bg: #28a745;
+  --status-added-badge-text: #ffffff;
+
+  --status-removed-bg: #f8d7da;
+  --status-removed-border: #dc3545;
+  --status-removed-text: #721c24;
+  --status-removed-badge-bg: #dc3545;
+  --status-removed-badge-text: #ffffff;
+
+  --status-modified-bg: #fff3cd;
+  --status-modified-border: #ffc107;
+  --status-modified-text: #856404;
+  --status-modified-badge-bg: #ffc107;
+  --status-modified-badge-text: #212529;
+
+  --status-unchanged-bg: #e2e3e5;
+  --status-unchanged-border: #6c757d;
+  --status-unchanged-text: #495057;
+  --status-unchanged-badge-bg: #6c757d;
+  --status-unchanged-badge-text: #ffffff;
+
+  /* Toast Messages */
+  --toast-success-bg: #f0fdf4;
+  --toast-success-text: #166534;
+  --toast-success-border: #22c55e;
+  --toast-error-bg: #fef2f2;
+  --toast-error-text: #991b1b;
+  --toast-error-border: #ef4444;
+
+  /* Gradients */
+  --gradient-primary: linear-gradient(135deg, #6366f1, #4f46e5);
+  --gradient-header: linear-gradient(to right, #3b82f6, #2563eb);
+  --gradient-success: linear-gradient(135deg, #10b981, #059669);
+  --gradient-warning: linear-gradient(135deg, #f59e0b, #d97706);
 }
 
-:root.dark {
+/* Dark Mode - Using html.dark for consistency with Tailwind */
+html.dark {
+  color-scheme: dark;
+
+  /* Brand Colors (brighter in dark mode) */
   --primary-500: #818cf8;
   --primary-600: #6366f1;
   --primary-700: #4338ca;
+  --blue-500: #60a5fa;
+  --blue-600: #3b82f6;
+  --blue-700: #2563eb;
+
+  /* Gray Scale (inverted) */
   --gray-50: #0f172a;
   --gray-100: #1e293b;
   --gray-200: #334155;
   --gray-300: #475569;
+  --gray-400: #64748b;
   --gray-500: #94a3b8;
-  --gray-700: #cbd5e1;
+  --gray-600: #cbd5e1;
+  --gray-700: #e2e8f0;
   --gray-800: #f1f5f9;
   --gray-900: #f8fafc;
   --white: #1e293b;
-  --blue-500: #60a5fa;
-  --blue-600: #3b82f6;
-  --blue-700: #2563eb;
+
+  /* Semantic Background Colors */
+  --bg-primary: #0f172a;
+  --bg-secondary: #1e293b;
+  --bg-tertiary: #334155;
+  --bg-hover: #1e293b;
+  --bg-card: #1e293b;
+  --bg-sidebar: #1e293b;
+  --bg-nav: #0f172a;
+  --bg-header-from: #2563eb;
+  --bg-header-to: #1d4ed8;
+
+  /* Semantic Text Colors */
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-tertiary: #64748b;
+  --text-inverse: #0f172a;
+
+  /* Semantic Border Colors */
+  --border-primary: #334155;
+  --border-secondary: #475569;
+  --border-focus: #6366f1;
+
+  /* Shadows (stronger in dark mode) */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+
+  /* Status Colors (dark mode versions) */
+  --success-bg: #064e3b;
+  --success-border: #059669;
+  --success-text: #86efac;
+  --error-bg: #7f1d1d;
+  --error-border: #dc2626;
+  --error-text: #fca5a5;
+  --warning-bg: #78350f;
+  --warning-border: #d97706;
+  --warning-text: #fcd34d;
+
+  /* Comparison Status Colors - Dark Mode */
+  --status-added-bg: #064e3b;
+  --status-added-border: #10b981;
+  --status-added-text: #86efac;
+  --status-added-badge-bg: #10b981;
+  --status-added-badge-text: #ffffff;
+
+  --status-removed-bg: #7f1d1d;
+  --status-removed-border: #ef4444;
+  --status-removed-text: #fca5a5;
+  --status-removed-badge-bg: #ef4444;
+  --status-removed-badge-text: #ffffff;
+
+  --status-modified-bg: #78350f;
+  --status-modified-border: #f59e0b;
+  --status-modified-text: #fcd34d;
+  --status-modified-badge-bg: #f59e0b;
+  --status-modified-badge-text: #1e293b;
+
+  --status-unchanged-bg: #334155;
+  --status-unchanged-border: #64748b;
+  --status-unchanged-text: #cbd5e1;
+  --status-unchanged-badge-bg: #64748b;
+  --status-unchanged-badge-text: #ffffff;
+
+  /* Toast Messages (dark mode) */
+  --toast-success-bg: #052e16;
+  --toast-success-text: #86efac;
+  --toast-success-border: #22c55e;
+  --toast-error-bg: #450a0a;
+  --toast-error-text: #fca5a5;
+  --toast-error-border: #ef4444;
+
+  /* Gradients (adjusted for dark mode) */
+  --gradient-primary: linear-gradient(135deg, #818cf8, #6366f1);
+  --gradient-header: linear-gradient(to right, #2563eb, #1d4ed8);
 }
 
-/* Apply color scheme */
-html.dark {
-  color-scheme: dark;
-}
-
+/* Global Application Styles */
 body,
 #app {
-  background-color: var(--gray-50);
-  color: var(--gray-900);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-/* Dark mode: Only target body and app, let components inherit */
-html.dark body,
-html.dark #app {
-  background-color: var(--gray-50); /* becomes #0f172a */
-  color: var(--gray-900); /* becomes #f8fafc */
+/* Form Elements */
+input,
+textarea,
+select {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  border-color: var(--border-primary);
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
 
-/* Inputs and form elements */
-html.dark input,
-html.dark textarea,
-html.dark select {
-  background-color: var(--gray-100);
-  color: var(--gray-900);
-  border-color: var(--gray-300);
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--border-focus);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
 }
 
-
-/* Messages */
-html.dark .error-message {
-  background: #450a0a;
-  color: #fca5a5;
-  border-color: #7f1d1d;
+/* Message Components */
+.error-message {
+  background: var(--error-bg);
+  color: var(--error-text);
+  border-color: var(--error-border);
 }
 
-html.dark .success-message {
-  background: #052e16;
-  color: #86efac;
-  border-color: #14532d;
+.success-message {
+  background: var(--success-bg);
+  color: var(--success-text);
+  border-color: var(--success-border);
 }
 
-html.dark .toast.success {
-  background: #052e16;
-  color: #86efac;
-  border-left-color: #22c55e;
+.warning-message {
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  border-color: var(--warning-border);
 }
 
-html.dark .toast.error {
-  background: #450a0a;
-  color: #fca5a5;
-  border-left-color: #ef4444;
+/* Toast Notifications */
+.toast.success {
+  background: var(--toast-success-bg);
+  color: var(--toast-success-text);
+  border-left-color: var(--toast-success-border);
+}
+
+.toast.error {
+  background: var(--toast-error-bg);
+  color: var(--toast-error-text);
+  border-left-color: var(--toast-error-border);
 }

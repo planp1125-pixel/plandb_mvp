@@ -267,7 +267,7 @@ defineExpose({
   color: #1e40af;
 }
 
-[data-theme="dark"] .info-banner {
+html.dark .info-banner {
   background: #1e3a8a;
   border-color: #3730a3;
   color: #93c5fd;

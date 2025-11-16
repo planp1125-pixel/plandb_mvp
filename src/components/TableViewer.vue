@@ -327,30 +327,9 @@ watch(searchTerm, () => {
 
 <style scoped>
 
-:root {
-  --bg-primary: #ffffff;
-  --bg-secondary: #f8f9fa;
-  --bg-tertiary: #f1f3f4;
-  --text-primary: #343a40;
-  --text-secondary: #6c757d;
-  --text-label: #495057;
-  --border-color: #dee2e6;
-  --border-secondary: #ced4da;
-}
-
-/* Dark mode CSS variables */
-:global(html.dark) .table-viewer {
-  --bg-primary: #1a1d21;
-  --bg-secondary: #24292e;
-  --bg-tertiary: #2d333b;
-  --text-primary: #f0f6fc;
-  --text-secondary: #c9d1d9;
-  --text-label: #e6edf3;
-  --border-color: #30363d;
-  --border-secondary: #3c444d;
-}
-
+/* Component uses global CSS variables from theme.css */
 .table-viewer {
+  --text-label: var(--text-primary);
   height: 100%;
   display: flex;
   flex-direction: column;

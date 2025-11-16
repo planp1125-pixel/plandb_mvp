@@ -1,16 +1,16 @@
 <template>
-  <div id="app" class="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 font-sans overflow-hidden">
+  <div id="app" class="app-container">
     <!-- Header -->
-    <header class="bg-gradient-to-r from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700 text-white shadow-lg border-b border-white/10 relative z-50">
-      <div class="px-6 py-4 flex items-center justify-between">
+    <header class="app-header">
+      <div class="header-content">
         <div>
-          <h1 class="text-xl font-semibold mb-1 tracking-tight">SQLCipher Schema Comparison Tool</h1>
-          <div class="text-sm opacity-80 font-normal">Desktop application for SQLCipher database management</div>
+          <h1>SQLCipher Schema Comparison Tool</h1>
+          <div class="subtitle">Desktop application for SQLCipher database management</div>
         </div>
 
         <!-- Theme toggle -->
         <button
-          class="px-3 py-1.5 text-sm rounded-lg border border-black/10 dark:border-white/10 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all duration-200"
+          class="theme-toggle-btn"
           @click="toggleTheme"
           :title="isDark ? 'Switch to Light' : 'Switch to Dark'"
         >
@@ -20,11 +20,11 @@
     </header>
 
     <!-- Main Content -->
-    <main class="flex-1 flex overflow-hidden">
-      <div class="flex w-full h-full relative">
+    <main class="main-wrapper">
+      <div class="content-container">
         <!-- Left Navigation Sidebar -->
-        <nav class="w-30 bg-gray-800 dark:bg-gray-900 flex flex-col items-center py-4 shadow-lg z-40 flex-shrink-0">
-          <div class="flex flex-col gap-2 w-full">
+        <nav class="nav-sidebar">
+          <div class="nav-buttons-container">
             <button 
               class="nav-icon"
               :class="{
@@ -225,48 +225,203 @@ const handleTableSelected = (tableName: string) => {
 </script>
 
 <style scoped>
+/* App Container */
+.app-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  font-family: sans-serif;
+  overflow: hidden;
+}
+
+/* Header */
+.app-header {
+  background: var(--gradient-header);
+  color: var(--text-inverse);
+  box-shadow: var(--shadow-lg);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  position: relative;
+  z-index: 50;
+}
+
+.header-content {
+  padding: 1rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.app-header h1 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+  letter-spacing: -0.025em;
+}
+
+.app-header .subtitle {
+  font-size: 0.875rem;
+  opacity: 0.8;
+  font-weight: 400;
+}
+
+/* Main Layout */
+.main-wrapper {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.content-container {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+/* Navigation Sidebar */
+.nav-sidebar {
+  width: 3.5rem;
+  background-color: var(--bg-nav);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1rem 0;
+  box-shadow: var(--shadow-lg);
+  z-index: 40;
+  flex-shrink: 0;
+}
+
+.nav-buttons-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+/* Theme Toggle Button */
+.theme-toggle-btn {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.875rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: white;
+  color: var(--gray-800);
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.theme-toggle-btn:hover {
+  background: var(--gray-50);
+}
+
 /* Navigation Icons */
 .nav-icon {
-  @apply w-12 h-12 flex items-center justify-center bg-transparent border-none cursor-pointer rounded-xl transition-all duration-200 mx-2;
+  width: 2.5rem;
+  height: 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: transparent;
+  border: none;
+  cursor: pointer;
+  border-radius: 0.5rem;
+  transition: all 0.2s;
+  margin: 0 0.25rem;
 }
 
 .nav-icon-inactive {
-  @apply text-gray-300 hover:bg-gray-700 hover:text-white hover:translate-x-0.5;
+  color: var(--gray-300);
+}
+
+.nav-icon-inactive:hover {
+  background-color: var(--gray-700);
+  color: white;
+  transform: translateX(0.125rem);
 }
 
 .nav-icon-active {
-  @apply bg-blue-500 text-white hover:bg-blue-600 hover:translate-x-0.5;
+  background-color: var(--blue-500);
+  color: white;
+}
+
+.nav-icon-active:hover {
+  background-color: var(--blue-600);
+  transform: translateX(0.125rem);
 }
 
 /* Sidebar Toggle Button */
 .sidebar-toggle {
-  @apply absolute top-2 left-[4.5rem] z-30 bg-blue-500 text-white border-none rounded-lg w-10 h-10 cursor-pointer text-sm flex items-center justify-center shadow-lg transition-all duration-200 hover:bg-blue-600 hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0;
+  position: absolute;
+  top: 0.5rem;
+  left: 4.75rem;
+  z-index: 30;
+  background-color: var(--blue-500);
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-lg);
+  transition: all 0.2s;
+}
+
+.sidebar-toggle:hover {
+  background-color: var(--blue-600);
+  transform: translateY(-0.125rem);
+  box-shadow: var(--shadow-xl);
+}
+
+.sidebar-toggle:active {
+  transform: translateY(0);
 }
 
 /* Sidebar */
 .sidebar {
-  @apply w-80 flex-shrink-0 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 overflow-y-auto h-full transition-transform duration-200 relative z-20 shadow-lg;
+  width: 24rem;
+  flex-shrink: 0;
+  background-color: var(--bg-sidebar);
+  border-right: 1px solid var(--border-primary);
+  overflow-y: auto;
+  height: 100%;
+  transition: transform 0.2s;
+  position: relative;
+  z-index: 20;
+  box-shadow: var(--shadow-lg);
 }
 
 .sidebar-visible {
-  @apply translate-x-0;
+  transform: translateX(0);
 }
 
 .sidebar-hidden {
-  @apply -translate-x-full w-0 border-r-0;
+  transform: translateX(-100%);
+  width: 0;
+  border-right: 0;
 }
 
 /* Main Content */
 .main-content {
-  @apply flex-1 flex flex-col overflow-auto bg-white dark:bg-gray-800 min-h-full;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+  background-color: var(--bg-card);
+  min-height: 100%;
 }
 
 .main-content-with-sidebar {
-  @apply ml-0;
+  margin-left: 0;
 }
 
 .main-content-full {
-  @apply ml-0;
+  margin-left: 0;
 }
 
 /* Custom scrollbar for sidebar */
@@ -275,59 +430,72 @@ const handleTableSelected = (tableName: string) => {
 }
 
 .sidebar::-webkit-scrollbar-track {
-  @apply bg-gray-100 dark:bg-gray-700;
+  background-color: var(--gray-100);
 }
 
 .sidebar::-webkit-scrollbar-thumb {
-  @apply bg-gray-300 dark:bg-gray-600 rounded;
+  background-color: var(--gray-300);
+  border-radius: 3px;
 }
 
 .sidebar::-webkit-scrollbar-thumb:hover {
-  @apply bg-blue-500;
+  background-color: var(--blue-500);
 }
 
 /* Responsive Design */
 @media (max-width: 1024px) {
   .nav-sidebar {
-    width: 3rem;
+    width: 4rem;
   }
-  
+
   .nav-icon {
-    @apply w-10 h-10;
+    width: 2.25rem;
+    height: 2.25rem;
   }
-  
+
   .sidebar-toggle {
-    @apply left-[3.5rem];
+    left: 4.25rem;
   }
-  
+
   .sidebar {
-    @apply w-72 absolute z-30 bg-white dark:bg-gray-800 shadow-xl h-full;
+    width: 22rem;
+    position: absolute;
+    z-index: 30;
+    background-color: var(--bg-sidebar);
+    box-shadow: var(--shadow-xl);
+    height: 100%;
   }
 }
 
 @media (max-width: 768px) {
   .nav-sidebar {
-    @apply w-12 py-3;
+    width: 3.5rem;
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
   }
-  
+
   .nav-icon {
-    @apply w-9 h-9;
+    width: 2rem;
+    height: 2rem;
   }
-  
+
   .sidebar-toggle {
-    @apply left-[3.5rem] w-8 h-8 text-xs;
+    left: 3.75rem;
+    width: 2rem;
+    height: 2rem;
+    font-size: 0.75rem;
   }
-  
+
   .sidebar {
-    @apply w-64;
+    width: 18rem;
   }
-  
+
   .app-header h1 {
-    @apply text-lg;
+    font-size: 1.125rem;
   }
-  
+
   .app-header .subtitle {
-    @apply text-xs;
+    font-size: 0.75rem;
   }
 }
 
@@ -356,20 +524,25 @@ const handleTableSelected = (tableName: string) => {
   .nav-sidebar,
   .sidebar-toggle,
   .sidebar {
-    @apply hidden;
+    display: none;
   }
-  
+
   .main-content {
-    @apply w-full m-0;
+    width: 100%;
+    margin: 0;
   }
-  
+
   .app-header {
-    @apply bg-white text-gray-900 shadow-none;
+    background: white;
+    color: var(--gray-900);
+    box-shadow: none;
   }
 }
 
 /* Ensure child components use full height */
 .main-content > div {
-  @apply h-full flex flex-col;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 </style>

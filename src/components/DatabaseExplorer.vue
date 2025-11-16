@@ -282,29 +282,9 @@ watch(currentDbPath, () => {
 
 <style scoped>
 
-:root {
-  --bg-primary: #ffffff;
-  --bg-secondary: #f8f9fa;
-  --bg-tertiary: #e9ecef;
-  --text-primary: #343a40;
-  --text-secondary: #6c757d;
-  --border-color: #dee2e6;
-  --border-light: #f1f3f4;
-}
-
-/* Dark mode CSS variables */
-:global(html.dark) .database-explorer {
-  --bg-primary: #1a1d21;
-  --bg-secondary: #24292e;
-  --bg-tertiary: #2d333b;
-  --text-primary: #f0f6fc;
-  --text-secondary: #c9d1d9;
-  --border-color: #30363d;
-  --border-light: #3c444d;
-}
-
-
+/* Component uses global CSS variables from theme.css */
 .database-explorer {
+  --border-light: var(--border-secondary);
   height: 100%;
   display: flex;
   flex-direction: column;

@@ -835,13 +835,13 @@ h3 {
 }
 
 /* Dark mode badges */
-[data-theme="dark"] .badge-sqlite {
+html.dark .badge-sqlite {
   background: #1e3a8a;
   color: #93c5fd;
   border-color: #3730a3;
 }
 
-[data-theme="dark"] .badge-sqlcipher {
+html.dark .badge-sqlcipher {
   background: #064e3b;
   color: #86efac;
   border-color: #065f46;

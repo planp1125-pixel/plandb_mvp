@@ -184,10 +184,10 @@
             <label>Filter:</label>
             <select v-model="currentFilter">
               <option value="all">All Tables</option>
-              <option value="identical">✅ Identical Only</option>
+              <option value="identical">✅ Unchanged Only</option>
               <option value="different">⚠️ With Differences</option>
-              <option value="missing">🔴 Missing Rows</option>
-              <option value="extra">🟢 Extra Rows</option>
+              <option value="missing">🔴 Removed Rows</option>
+              <option value="extra">🟢 Added Rows</option>
             </select>
           </div>
           <div class="view-mode-controls">
@@ -213,21 +213,21 @@
       <div class="results-summary">
         <h4>Summary ({{ currentFilterDisplay }})</h4>
         <div class="summary-stats">
-          <div class="stat-item unchanged" v-if="filteredTotalIdentical > 0">
-            <span class="count">{{ filteredTotalIdentical.toLocaleString() }}</span>
-            <span class="label">Identical Rows</span>
-          </div>
-          <div class="stat-item modified" v-if="filteredTotalDifferent > 0">
-            <span class="count">{{ filteredTotalDifferent.toLocaleString() }}</span>
-            <span class="label">Different Rows</span>
+          <div class="stat-item added" v-if="filteredTotalExtra > 0">
+            <span class="count">{{ filteredTotalExtra.toLocaleString() }}</span>
+            <span class="label">Added to Target</span>
           </div>
           <div class="stat-item removed" v-if="filteredTotalMissing > 0">
             <span class="count">{{ filteredTotalMissing.toLocaleString() }}</span>
-            <span class="label">Missing in Target</span>
+            <span class="label">Removed from Target</span>
           </div>
-          <div class="stat-item added" v-if="filteredTotalExtra > 0">
-            <span class="count">{{ filteredTotalExtra.toLocaleString() }}</span>
-            <span class="label">Extra in Target</span>
+          <div class="stat-item modified" v-if="filteredTotalDifferent > 0">
+            <span class="count">{{ filteredTotalDifferent.toLocaleString() }}</span>
+            <span class="label">Modified Rows</span>
+          </div>
+          <div class="stat-item unchanged" v-if="filteredTotalIdentical > 0">
+            <span class="count">{{ filteredTotalIdentical.toLocaleString() }}</span>
+            <span class="label">Unchanged Rows</span>
           </div>
         </div>
       </div>
@@ -236,60 +236,204 @@
         No results matching the current filter.
       </div>
 
-      <!-- Identical Tables Section -->
-      <div v-if="showIdenticalSection" class="status-section">
-        <div class="status-section-header unchanged">
-          <span class="status-icon">✓</span>
-          <h4>Identical Tables ({{ filteredTotalIdentical }})</h4>
-          <p>Tables with no differences</p>
+      <!-- Added Rows Section -->
+      <div v-if="showExtraSection" class="status-section">
+        <div class="status-section-header added">
+          <span class="status-icon">+</span>
+          <h4>Added Rows ({{ filteredTotalExtra }})</h4>
+          <p>Rows that exist only in the target database</p>
         </div>
-        
-        <div v-for="result in filteredIdenticalTables" :key="'identical_' + result.tableName" class="table-card">
-          <div 
-            class="table-header-card unchanged"
-            @click="toggleCard('identical', result.tableName)"
+
+        <div v-for="result in filteredExtraTables" :key="'extra_' + result.tableName" class="table-card">
+          <div
+            class="table-header-card added"
+            @click="toggleCard('extra', result.tableName)"
           >
             <div class="table-info">
               <span class="table-name">{{ result.tableName }}</span>
-              <span class="table-status-badge unchanged">{{ result.summary.identicalRows }} identical rows</span>
+              <span class="table-status-badge added">{{ result.summary.extraInTarget }} added rows</span>
             </div>
-            <span class="toggle-icon">
-              {{ expandedCards.has(`identical_${result.tableName}`) ? '▼' : '▶' }}
-            </span>
+            <div class="header-controls">
+              <button
+                @click.stop="generateSingleTablePatch(result.tableName)"
+                class="mini-patch-btn"
+                title="Generate patch for this table only"
+              >
+                📄 Patch
+              </button>
+
+              <span class="toggle-icon">
+                {{ expandedCards.has(`extra_${result.tableName}`) ? '▼' : '▶' }}
+              </span>
+            </div>
+          </div>
+          <div v-if="expandedCards.has(`extra_${result.tableName}`)" class="table-details">
+            <div class="table-view-container">
+              <!-- Pagination info and controls -->
+              <div v-if="result.comparison.extraInTarget.length > ROWS_PER_PAGE" class="pagination-info">
+                <span class="pagination-text">
+                  Showing {{ ((getCurrentPage(`extra_${result.tableName}`) - 1) * ROWS_PER_PAGE) + 1 }}
+                  to {{ Math.min(getCurrentPage(`extra_${result.tableName}`) * ROWS_PER_PAGE, result.comparison.extraInTarget.length) }}
+                  of {{ result.comparison.extraInTarget.length.toLocaleString() }} rows
+                </span>
+                <div class="pagination-controls">
+                  <button
+                    @click="setPage(`extra_${result.tableName}`, getCurrentPage(`extra_${result.tableName}`) - 1)"
+                    :disabled="getCurrentPage(`extra_${result.tableName}`) === 1"
+                    class="pagination-btn"
+                  >
+                    ← Previous
+                  </button>
+                  <span class="page-indicator">
+                    Page {{ getCurrentPage(`extra_${result.tableName}`) }} of {{ getTotalPages(result.comparison.extraInTarget.length) }}
+                  </span>
+                  <button
+                    @click="setPage(`extra_${result.tableName}`, getCurrentPage(`extra_${result.tableName}`) + 1)"
+                    :disabled="getCurrentPage(`extra_${result.tableName}`) >= getTotalPages(result.comparison.extraInTarget.length)"
+                    class="pagination-btn"
+                  >
+                    Next →
+                  </button>
+                </div>
+              </div>
+
+              <div class="scrollable-table-container">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th v-for="column in result.comparison.commonColumns" :key="'extra_' + column">
+                        {{ column }}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(row, index) in getPaginatedRows(result.comparison.extraInTarget, `extra_${result.tableName}`)" :key="'extra_row_' + index" class="row-extra">
+                      <td v-for="column in result.comparison.commonColumns" :key="'extra_' + column">
+                        {{ formatCellValue(row[column]) }}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- Different Rows Section -->
+      <!-- Removed Rows Section -->
+      <div v-if="showMissingSection" class="status-section">
+        <div class="status-section-header removed">
+          <span class="status-icon">−</span>
+          <h4>Removed Rows ({{ filteredTotalMissing }})</h4>
+          <p>Rows that exist only in the source database</p>
+        </div>
+
+        <div v-for="result in filteredMissingTables" :key="'missing_' + result.tableName" class="table-card">
+          <div
+            class="table-header-card removed"
+            @click="toggleCard('missing', result.tableName)"
+          >
+            <div class="table-info">
+              <span class="table-name">{{ result.tableName }}</span>
+              <span class="table-status-badge removed">{{ result.summary.missingInTarget }} removed rows</span>
+            </div>
+            <div class="header-controls">
+              <button
+                @click.stop="generateSingleTablePatch(result.tableName)"
+                class="mini-patch-btn"
+                title="Generate patch for this table only"
+              >
+                📄 Patch
+              </button>
+
+              <span class="toggle-icon">
+                {{ expandedCards.has(`missing_${result.tableName}`) ? '▼' : '▶' }}
+              </span>
+            </div>
+          </div>
+          <div v-if="expandedCards.has(`missing_${result.tableName}`)" class="table-details">
+            <div class="table-view-container">
+              <!-- Pagination info and controls -->
+              <div v-if="result.comparison.missingInTarget.length > ROWS_PER_PAGE" class="pagination-info">
+                <span class="pagination-text">
+                  Showing {{ ((getCurrentPage(`missing_${result.tableName}`) - 1) * ROWS_PER_PAGE) + 1 }}
+                  to {{ Math.min(getCurrentPage(`missing_${result.tableName}`) * ROWS_PER_PAGE, result.comparison.missingInTarget.length) }}
+                  of {{ result.comparison.missingInTarget.length.toLocaleString() }} rows
+                </span>
+                <div class="pagination-controls">
+                  <button
+                    @click="setPage(`missing_${result.tableName}`, getCurrentPage(`missing_${result.tableName}`) - 1)"
+                    :disabled="getCurrentPage(`missing_${result.tableName}`) === 1"
+                    class="pagination-btn"
+                  >
+                    ← Previous
+                  </button>
+                  <span class="page-indicator">
+                    Page {{ getCurrentPage(`missing_${result.tableName}`) }} of {{ getTotalPages(result.comparison.missingInTarget.length) }}
+                  </span>
+                  <button
+                    @click="setPage(`missing_${result.tableName}`, getCurrentPage(`missing_${result.tableName}`) + 1)"
+                    :disabled="getCurrentPage(`missing_${result.tableName}`) >= getTotalPages(result.comparison.missingInTarget.length)"
+                    class="pagination-btn"
+                  >
+                    Next →
+                  </button>
+                </div>
+              </div>
+
+              <div class="scrollable-table-container">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th v-for="column in result.comparison.commonColumns" :key="'miss_' + column">
+                        {{ column }}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(row, index) in getPaginatedRows(result.comparison.missingInTarget, `missing_${result.tableName}`)" :key="'miss_row_' + index" class="row-missing">
+                      <td v-for="column in result.comparison.commonColumns" :key="'miss_' + column">
+                        {{ formatCellValue(row[column]) }}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modified Rows Section -->
       <div v-if="showDifferentSection" class="status-section">
         <div class="status-section-header modified">
           <span class="status-icon">≠</span>
-          <h4>Tables with Different Rows ({{ filteredTotalDifferent }})</h4>
+          <h4>Tables with Modified Rows ({{ filteredTotalDifferent }})</h4>
           <p>Rows exist in both but have different values</p>
         </div>
-        
+
         <div v-for="result in filteredDifferentTables" :key="'different_' + result.tableName" class="table-card">
-          <div 
+          <div
             class="table-header-card modified"
             @click="toggleCard('different', result.tableName)"
           >
             <div class="table-info">
               <span class="table-name">{{ result.tableName }}</span>
-              <span class="table-status-badge modified">{{ result.summary.differentRows }} different rows</span>
+              <span class="table-status-badge modified">{{ result.summary.differentRows }} modified rows</span>
             </div>
             <div class="header-controls">
               <!-- Per-table view toggle -->
               <div class="per-table-view-toggle" @click.stop>
-                <button 
-                  @click="setTableViewMode(result.tableName, 'sideBySide')" 
+                <button
+                  @click="setTableViewMode(result.tableName, 'sideBySide')"
                   :class="{ active: getTableViewMode(result.tableName) === 'sideBySide' }"
                   class="mini-view-btn"
                   title="Side by Side View"
                 >
                   ⚏
                 </button>
-                <button 
-                  @click="setTableViewMode(result.tableName, 'single')" 
+                <button
+                  @click="setTableViewMode(result.tableName, 'single')"
                   :class="{ active: getTableViewMode(result.tableName) === 'single' }"
                   class="mini-view-btn"
                   title="Single Row View"
@@ -297,24 +441,52 @@
                   ☰
                 </button>
               </div>
-              
+
               <!-- Per-table patch button -->
-              <button 
+              <button
                 @click.stop="generateSingleTablePatch(result.tableName)"
                 class="mini-patch-btn"
                 title="Generate patch for this table only"
               >
                 📄 Patch
               </button>
-              
+
               <span class="toggle-icon">
                 {{ expandedCards.has(`different_${result.tableName}`) ? '▼' : '▶' }}
               </span>
             </div>
           </div>
-          
+
           <div v-if="expandedCards.has(`different_${result.tableName}`)" class="table-details">
             <div class="table-view-container">
+              <!-- Pagination info and controls for Modified rows -->
+              <div v-if="result.comparison.differentRows.length > ROWS_PER_PAGE && getTableViewMode(result.tableName) === 'sideBySide'" class="pagination-info">
+                <span class="pagination-text">
+                  Showing {{ ((getCurrentPage(`different_${result.tableName}`) - 1) * ROWS_PER_PAGE) + 1 }}
+                  to {{ Math.min(getCurrentPage(`different_${result.tableName}`) * ROWS_PER_PAGE, result.comparison.differentRows.length) }}
+                  of {{ result.comparison.differentRows.length.toLocaleString() }} rows
+                </span>
+                <div class="pagination-controls">
+                  <button
+                    @click="setPage(`different_${result.tableName}`, getCurrentPage(`different_${result.tableName}`) - 1)"
+                    :disabled="getCurrentPage(`different_${result.tableName}`) === 1"
+                    class="pagination-btn"
+                  >
+                    ← Previous
+                  </button>
+                  <span class="page-indicator">
+                    Page {{ getCurrentPage(`different_${result.tableName}`) }} of {{ getTotalPages(result.comparison.differentRows.length) }}
+                  </span>
+                  <button
+                    @click="setPage(`different_${result.tableName}`, getCurrentPage(`different_${result.tableName}`) + 1)"
+                    :disabled="getCurrentPage(`different_${result.tableName}`) >= getTotalPages(result.comparison.differentRows.length)"
+                    class="pagination-btn"
+                  >
+                    Next →
+                  </button>
+                </div>
+              </div>
+
               <div v-if="getTableViewMode(result.tableName) === 'sideBySide'" class="side-by-side-view">
                 <!-- Source Table -->
                 <div class="source-section">
@@ -331,7 +503,7 @@
                         </tr>
                       </thead>
                       <tbody>
-                        <tr v-for="(diff, index) in result.comparison.differentRows" :key="'src_row_' + index" class="row-different">
+                        <tr v-for="(diff, index) in getPaginatedRows(result.comparison.differentRows, `different_${result.tableName}`)" :key="'src_row_' + index" class="row-different">
                           <td v-for="column in result.comparison.commonColumns" :key="'src_' + column"
                               :class="{ 'cell-different': diff.differentColumns.includes(column) }">
                             {{ formatCellValue(diff.sourceRow[column]) }}
@@ -341,7 +513,7 @@
                     </table>
                   </div>
                 </div>
-                
+
                 <!-- Target Table -->
                 <div class="target-section">
                   <div class="section-title target-title">
@@ -357,7 +529,7 @@
                         </tr>
                       </thead>
                       <tbody>
-                        <tr v-for="(diff, index) in result.comparison.differentRows" :key="'tgt_row_' + index" class="row-different">
+                        <tr v-for="(diff, index) in getPaginatedRows(result.comparison.differentRows, `different_${result.tableName}`)" :key="'tgt_row_' + index" class="row-different">
                           <td v-for="column in result.comparison.commonColumns" :key="'tgt_' + column"
                               :class="{ 'cell-different': diff.differentColumns.includes(column) }">
                             {{ formatCellValue(diff.targetRow[column]) }}
@@ -368,13 +540,41 @@
                   </div>
                 </div>
               </div>
-              
+
               <div v-else class="single-view">
-                <div v-for="(diff, diffIndex) in result.comparison.differentRows" :key="'single_diff_' + diffIndex" class="diff-comparison">
+                <!-- Pagination for single view -->
+                <div v-if="result.comparison.differentRows.length > ROWS_PER_PAGE" class="pagination-info">
+                  <span class="pagination-text">
+                    Showing {{ ((getCurrentPage(`different_${result.tableName}`) - 1) * ROWS_PER_PAGE) + 1 }}
+                    to {{ Math.min(getCurrentPage(`different_${result.tableName}`) * ROWS_PER_PAGE, result.comparison.differentRows.length) }}
+                    of {{ result.comparison.differentRows.length.toLocaleString() }} rows
+                  </span>
+                  <div class="pagination-controls">
+                    <button
+                      @click="setPage(`different_${result.tableName}`, getCurrentPage(`different_${result.tableName}`) - 1)"
+                      :disabled="getCurrentPage(`different_${result.tableName}`) === 1"
+                      class="pagination-btn"
+                    >
+                      ← Previous
+                    </button>
+                    <span class="page-indicator">
+                      Page {{ getCurrentPage(`different_${result.tableName}`) }} of {{ getTotalPages(result.comparison.differentRows.length) }}
+                    </span>
+                    <button
+                      @click="setPage(`different_${result.tableName}`, getCurrentPage(`different_${result.tableName}`) + 1)"
+                      :disabled="getCurrentPage(`different_${result.tableName}`) >= getTotalPages(result.comparison.differentRows.length)"
+                      class="pagination-btn"
+                    >
+                      Next →
+                    </button>
+                  </div>
+                </div>
+
+                <div v-for="(diff, diffIndex) in getPaginatedRows(result.comparison.differentRows, `different_${result.tableName}`)" :key="'single_diff_' + diffIndex" class="diff-comparison">
                   <div class="diff-key">
                     <strong>{{ result.keyColumn }}:</strong> {{ formatCellValue(diff.sourceRow[result.keyColumn]) }}
                   </div>
-                  
+
                   <!-- Source Table -->
                   <div class="source-section">
                     <div class="section-title source-title">
@@ -400,7 +600,7 @@
                       </table>
                     </div>
                   </div>
-                  
+
                   <!-- Target Table -->
                   <div class="target-section">
                     <div class="section-title target-title">
@@ -428,113 +628,75 @@
                   </div>
                 </div>
               </div>
-              
+
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Missing Rows Section -->
-      <div v-if="showMissingSection" class="status-section">
-        <div class="status-section-header removed">
-          <span class="status-icon">−</span>
-          <h4>Missing Rows ({{ filteredTotalMissing }})</h4>
-          <p>Rows that exist only in the source database</p>
+      <!-- Unchanged Tables Section -->
+      <div v-if="showIdenticalSection" class="status-section">
+        <div class="status-section-header unchanged">
+          <span class="status-icon">✓</span>
+          <h4>Unchanged Tables ({{ filteredTotalIdentical }})</h4>
+          <p>Tables with no differences</p>
         </div>
-        
-        <div v-for="result in filteredMissingTables" :key="'missing_' + result.tableName" class="table-card">
-          <div 
-            class="table-header-card removed"
-            @click="toggleCard('missing', result.tableName)"
+
+        <div v-for="result in filteredIdenticalTables" :key="'identical_' + result.tableName" class="table-card">
+          <div
+            class="table-header-card unchanged"
+            @click="toggleCard('identical', result.tableName)"
           >
             <div class="table-info">
               <span class="table-name">{{ result.tableName }}</span>
-              <span class="table-status-badge removed">{{ result.summary.missingInTarget }} missing rows</span>
+              <span class="table-status-badge unchanged">{{ result.summary.identicalRows }} unchanged rows</span>
             </div>
-            <div class="header-controls">
-              <button 
-                @click.stop="generateSingleTablePatch(result.tableName)"
-                class="mini-patch-btn"
-                title="Generate patch for this table only"
-              >
-                📄 Patch
-              </button>
-              
-              <span class="toggle-icon">
-                {{ expandedCards.has(`missing_${result.tableName}`) ? '▼' : '▶' }}
-              </span>
-            </div>
+            <span class="toggle-icon">
+              {{ expandedCards.has(`identical_${result.tableName}`) ? '▼' : '▶' }}
+            </span>
           </div>
-          <div v-if="expandedCards.has(`missing_${result.tableName}`)" class="table-details">
+          <div v-if="expandedCards.has(`identical_${result.tableName}`)" class="table-details">
             <div class="table-view-container">
-              <div class="scrollable-table-container">
-                <table class="data-table">
-                  <thead>
-                    <tr>
-                      <th v-for="column in result.comparison.commonColumns" :key="'miss_' + column">
-                        {{ column }}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr v-for="(row, index) in result.comparison.missingInTarget" :key="'miss_row_' + index" class="row-missing">
-                      <td v-for="column in result.comparison.commonColumns" :key="'miss_' + column">
-                        {{ formatCellValue(row[column]) }}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+              <!-- Pagination info and controls -->
+              <div v-if="result.comparison.identicalRows.length > ROWS_PER_PAGE" class="pagination-info">
+                <span class="pagination-text">
+                  Showing {{ ((getCurrentPage(`identical_${result.tableName}`) - 1) * ROWS_PER_PAGE) + 1 }}
+                  to {{ Math.min(getCurrentPage(`identical_${result.tableName}`) * ROWS_PER_PAGE, result.comparison.identicalRows.length) }}
+                  of {{ result.comparison.identicalRows.length.toLocaleString() }} rows
+                </span>
+                <div class="pagination-controls">
+                  <button
+                    @click="setPage(`identical_${result.tableName}`, getCurrentPage(`identical_${result.tableName}`) - 1)"
+                    :disabled="getCurrentPage(`identical_${result.tableName}`) === 1"
+                    class="pagination-btn"
+                  >
+                    ← Previous
+                  </button>
+                  <span class="page-indicator">
+                    Page {{ getCurrentPage(`identical_${result.tableName}`) }} of {{ getTotalPages(result.comparison.identicalRows.length) }}
+                  </span>
+                  <button
+                    @click="setPage(`identical_${result.tableName}`, getCurrentPage(`identical_${result.tableName}`) + 1)"
+                    :disabled="getCurrentPage(`identical_${result.tableName}`) >= getTotalPages(result.comparison.identicalRows.length)"
+                    class="pagination-btn"
+                  >
+                    Next →
+                  </button>
+                </div>
               </div>
-            </div>
-          </div>
-        </div>
-      </div>
 
-      <!-- Extra Rows Section -->
-      <div v-if="showExtraSection" class="status-section">
-        <div class="status-section-header added">
-          <span class="status-icon">+</span>
-          <h4>Extra Rows ({{ filteredTotalExtra }})</h4>
-          <p>Rows that exist only in the target database</p>
-        </div>
-        
-        <div v-for="result in filteredExtraTables" :key="'extra_' + result.tableName" class="table-card">
-          <div 
-            class="table-header-card added"
-            @click="toggleCard('extra', result.tableName)"
-          >
-            <div class="table-info">
-              <span class="table-name">{{ result.tableName }}</span>
-              <span class="table-status-badge added">{{ result.summary.extraInTarget }} extra rows</span>
-            </div>
-            <div class="header-controls">
-              <button 
-                @click.stop="generateSingleTablePatch(result.tableName)"
-                class="mini-patch-btn"
-                title="Generate patch for this table only"
-              >
-                📄 Patch
-              </button>
-              
-              <span class="toggle-icon">
-                {{ expandedCards.has(`extra_${result.tableName}`) ? '▼' : '▶' }}
-              </span>
-            </div>
-          </div>
-          <div v-if="expandedCards.has(`extra_${result.tableName}`)" class="table-details">
-            <div class="table-view-container">
               <div class="scrollable-table-container">
                 <table class="data-table">
                   <thead>
                     <tr>
-                      <th v-for="column in result.comparison.commonColumns" :key="'extra_' + column">
+                      <th v-for="column in result.comparison.commonColumns" :key="'identical_' + column">
                         {{ column }}
                       </th>
                     </tr>
                   </thead>
                   <tbody>
-                    <tr v-for="(row, index) in result.comparison.extraInTarget" :key="'extra_row_' + index" class="row-extra">
-                      <td v-for="column in result.comparison.commonColumns" :key="'extra_' + column">
+                    <tr v-for="(row, index) in getPaginatedRows(result.comparison.identicalRows, `identical_${result.tableName}`)" :key="'identical_row_' + index">
+                      <td v-for="column in result.comparison.commonColumns" :key="'identical_' + column">
                         {{ formatCellValue(row[column]) }}
                       </td>
                     </tr>
@@ -639,6 +801,33 @@ const comparisonProgress = ref({
   speed: 0
 });
 
+// Pagination for large datasets
+const ROWS_PER_PAGE = 1000; // Show 1000 rows per page max
+const pagination = ref<Record<string, number>>({}); // Track current page for each expanded section
+
+// Helper to get current page for a section
+const getCurrentPage = (key: string): number => {
+  return pagination.value[key] || 1;
+};
+
+// Helper to set page for a section
+const setPage = (key: string, page: number) => {
+  pagination.value[key] = page;
+};
+
+// Helper to get paginated rows
+const getPaginatedRows = (rows: any[], key: string): any[] => {
+  const currentPage = getCurrentPage(key);
+  const startIndex = (currentPage - 1) * ROWS_PER_PAGE;
+  const endIndex = startIndex + ROWS_PER_PAGE;
+  return rows.slice(startIndex, endIndex);
+};
+
+// Helper to get total pages
+const getTotalPages = (totalRows: number): number => {
+  return Math.ceil(totalRows / ROWS_PER_PAGE);
+};
+
 // Toast helper
 const showToast = (type: 'success' | 'error' | 'info', title: string, message: string) => {
   toast.value = { show: true, type, title, message };
@@ -662,10 +851,10 @@ const hasResults = computed(() => tableComparisons.value.length > 0);
 const currentFilterDisplay = computed(() => {
   const map: Record<string, string> = {
     all: 'All Tables',
-    identical: 'Identical Only',
+    identical: 'Unchanged Only',
     different: 'With Differences',
-    missing: 'Missing Rows',
-    extra: 'Extra Rows'
+    missing: 'Removed Rows',
+    extra: 'Added Rows'
   };
   return map[currentFilter.value] || 'All Tables';
 });
@@ -1396,37 +1585,13 @@ const generateSingleTablePatch = async (tableName: string) => {
 /* Same styles as the original file - keeping all existing CSS */
 /* I'm preserving all your existing styles to maintain the same look and feel */
 
-/* Loading Overlay */
-
-:root {
-
-  --bg-primary: #ffffff;
-  --bg-secondary: #f8f9fa;
-  --bg-tertiary: #e9ecef;
-  --bg-card: #ffffff;
-  --bg-surface: #f6f8fa;
-  --bg-muted: #ecf0f1;
-  --bg-hover: #e0e0e0;
-  --table-row-hover: #f8f9fa;
-  --text-primary: #343a40;
-  --text-secondary: #6c757d;
-  --border-color: #dee2e6;
-  --border-light: #f1f3f4;
-}
-
-:global(html.dark) .data-comparison {
-  --bg-primary: #1a1d21;
-  --bg-secondary: #24292e;
-  --bg-tertiary: #2d333b;
-  --bg-card: #161b22;
-  --bg-surface: #1f2933;
-  --bg-muted: #2d333b;
-  --bg-hover: #323b44;
-  --table-row-hover: #1e2630;
-  --text-primary: #d7dde5;
-  --text-secondary: #a8b2bf;
-  --border-color: #30363d;
-  --border-light: #3c444d;
+/* Component uses global CSS variables from theme.css */
+.data-comparison {
+  /* Map local variable names to global theme variables */
+  --bg-surface: var(--bg-tertiary);
+  --bg-muted: var(--bg-tertiary);
+  --table-row-hover: var(--bg-hover);
+  --border-light: var(--border-secondary);
 }
 .loading-overlay {
   position: fixed;
@@ -1513,7 +1678,7 @@ const generateSingleTablePatch = async (tableName: string) => {
 
 /* Loading Message for Patch Generation */
 .loading-message {
-  color: #666;
+  color: var(--text-secondary);
   font-size: 1.1em;
   margin: 15px 0 25px 0;
 }
@@ -1817,7 +1982,7 @@ const generateSingleTablePatch = async (tableName: string) => {
 }
 
 .row-info {
-  color: #7f8c8d;
+  color: var(--text-secondary);
   font-weight: normal;
   font-size: 0.85em;
 }
@@ -2006,7 +2171,7 @@ const generateSingleTablePatch = async (tableName: string) => {
   border: none;
   font-size: 1.5em;
   cursor: pointer;
-  color: #7f8c8d;
+  color: var(--text-secondary);
   padding: 0;
 }
 
@@ -2120,47 +2285,62 @@ const generateSingleTablePatch = async (tableName: string) => {
 }
 
 .stat-item {
-  padding: 20px;
-  border-radius: 10px;
+  padding: 15px;
+  border-radius: 6px;
   text-align: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-}
-
-.stat-item.unchanged {
-  background: #d4edda;
-  border-left: 4px solid #28a745;
-}
-
-.stat-item.modified {
-  background: #fff3cd;
-  border-left: 4px solid #ffc107;
-}
-
-.stat-item.removed {
-  background: #f8d7da;
-  border-left: 4px solid #dc3545;
+  /* box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05); */
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .stat-item.added {
-  background: #d1ecf1;
-  border-left: 4px solid #17a2b8;
+  background: var(--status-added-bg);
+  border-left: 4px solid var(--status-added-border);
 }
 
-.stat-item .count {
+.stat-item.removed {
+  background: var(--status-removed-bg);
+  border-left: 4px solid var(--status-removed-border);
+}
+
+.stat-item.modified {
+  background: var(--status-modified-bg);
+  border-left: 4px solid var(--status-modified-border);
+}
+
+.stat-item.unchanged {
+  background: var(--status-unchanged-bg);
+  border-left: 4px solid var(--status-unchanged-border);
+}
+
+/* .stat-item .count {
   display: block;
   font-size: 2.5em;
   font-weight: bold;
   margin-bottom: 8px;
   color: var(--text-primary);
-  /* color: #2c3e50; */
+ 
 }
 
 .stat-item .label {
   display: block;
   font-size: 1em;
   color: var(--text-secondary);
-  /* color: #555; */
+  
   font-weight: 500;
+} */
+
+.stat-item .count {
+  display: block;
+  font-size: 2em;
+  font-weight: bold;
+  line-height: 1;
+  margin-bottom: 5px;
+  color: var(--text-primary);
+}
+
+.stat-item .label {
+  font-size: 0.9em;
+  color: var(--text-secondary);
 }
 
 /* Status Sections */
@@ -2177,24 +2357,24 @@ const generateSingleTablePatch = async (tableName: string) => {
   margin-bottom: 15px;
 }
 
-.status-section-header.unchanged {
-  background: #d4edda;
-  border-left: 4px solid #28a745;
-}
-
-.status-section-header.modified {
-  background: #fff3cd;
-  border-left: 4px solid #ffc107;
+.status-section-header.added {
+  background: var(--status-added-bg);
+  border-left: 4px solid var(--status-added-border);
 }
 
 .status-section-header.removed {
-  background: #f8d7da;
-  border-left: 4px solid #dc3545;
+  background: var(--status-removed-bg);
+  border-left: 4px solid var(--status-removed-border);
 }
 
-.status-section-header.added {
-  background: #d1ecf1;
-  border-left: 4px solid #17a2b8;
+.status-section-header.modified {
+  background: var(--status-modified-bg);
+  border-left: 4px solid var(--status-modified-border);
+}
+
+.status-section-header.unchanged {
+  background: var(--status-unchanged-bg);
+  border-left: 4px solid var(--status-unchanged-border);
 }
 
 .status-icon {
@@ -2211,7 +2391,7 @@ const generateSingleTablePatch = async (tableName: string) => {
 
 .status-section-header p {
   margin: 5px 0 0 0;
-  color: #666;
+  color: var(--text-secondary);
   font-size: 0.95em;
 }
 
@@ -2244,20 +2424,20 @@ const generateSingleTablePatch = async (tableName: string) => {
   background: #f8f9fa;
 }
 
-.table-header-card.unchanged {
-  background: #d4edda;
-}
-
-.table-header-card.modified {
-  background: #fff3cd;
+.table-header-card.added {
+  background: var(--status-added-bg);
 }
 
 .table-header-card.removed {
-  background: #f8d7da;
+  background: var(--status-removed-bg);
 }
 
-.table-header-card.added {
-  background: #d1ecf1;
+.table-header-card.modified {
+  background: var(--status-modified-bg);
+}
+
+.table-header-card.unchanged {
+  background: var(--status-unchanged-bg);
 }
 
 .table-info {
@@ -2308,15 +2488,15 @@ const generateSingleTablePatch = async (tableName: string) => {
 .section-title {
   padding: 12px 15px;
   font-weight: 600;
-  color: white;
+  color: var(--text-primary);
 }
 
 .source-title {
-  background: #3498db;
+  background: var(--bg-muted);
 }
 
 .target-title {
-  background: #e67e22;
+  background: var(--bg-muted);
 }
 
 .section-title h6 {
@@ -2334,30 +2514,33 @@ const generateSingleTablePatch = async (tableName: string) => {
   background: var(--bg-card);
   /* Force horizontal scroll to appear when needed */
   -webkit-overflow-scrolling: touch;
+  scrollbar-color: var(--border-color) var(--bg-secondary);
+  scrollbar-width: auto;
 }
 
 .data-table {
-  width: 100%;
-  min-width: 100%;  /* Ensure table takes full width */
+  width: max-content;
+  min-width: 100%;  /* Ensure table takes full width but allows horizontal scroll when wide */
   border-collapse: collapse;
   font-size: 0.95em;
   /* Prevent table from shrinking below content width */
   table-layout: auto;
+  color: var(--text-primary);
 }
 
 .data-table thead {
   position: sticky;
   top: 0;
   z-index: 10;
-  background: #2c3e50;
+  background: var(--bg-surface);
 }
 
 .data-table th {
   padding: 14px;
   text-align: left;
-  color: white;
+  color: var(--text-primary);
   font-weight: 600;
-  border-bottom: 2px solid #34495e;
+  border-bottom: 2px solid var(--border-color);
   white-space: nowrap;
   /* Ensure headers don't wrap */
   min-width: 100px;
@@ -2371,22 +2554,35 @@ const generateSingleTablePatch = async (tableName: string) => {
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 300px;
+  color: var(--text-primary);
+}
+
+.data-table tbody tr {
+  background: var(--bg-card);
+}
+
+.data-table tbody tr:nth-child(even) {
+  background: var(--bg-surface);
 }
 
 .data-table tbody tr:hover {
-  background: var(--table-row-hover);
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .row-different {
-  background: #fff3cd;
+  background: rgba(255, 181, 71, 0.15);
+  color: var(--text-primary);
 }
 
 .row-missing {
-  background: #f8d7da;
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--text-primary);
 }
 
 .row-extra {
-  background: #d1ecf1;
+  background: rgba(59, 130, 246, 0.12);
+  color: var(--text-primary);
 }
 
 .cell-different {
@@ -2561,5 +2757,75 @@ const generateSingleTablePatch = async (tableName: string) => {
   justify-content: center;
   z-index: 10000; /* Make sure this is high enough */
   backdrop-filter: blur(4px);
+}
+
+/* Pagination Styles */
+.pagination-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  background: var(--bg-surface);
+  border-radius: 8px;
+  margin-bottom: 15px;
+  border: 1px solid var(--border-primary);
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.pagination-text {
+  font-size: 0.95em;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.pagination-btn {
+  padding: 8px 16px;
+  background: var(--primary-500);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9em;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.pagination-btn:hover:not(:disabled) {
+  background: var(--primary-600);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(99, 102, 241, 0.3);
+}
+
+.pagination-btn:disabled {
+  background: var(--gray-400);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.page-indicator {
+  font-size: 0.9em;
+  color: var(--text-primary);
+  font-weight: 600;
+  padding: 0 8px;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .pagination-info {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .pagination-controls {
+    justify-content: center;
+  }
 }
 </style>

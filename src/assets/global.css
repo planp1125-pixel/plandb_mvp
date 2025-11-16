@@ -1,86 +1,8 @@
-/* Global Styles with Dark Mode Support */
-
-/* Light Mode (Default) */
-:root {
-  /* Brand Colors */
-  --primary-500: #6366f1;
-  --primary-600: #4f46e5;
-  --primary-700: #3730a3;
-  
-  /* Backgrounds */
-  --bg-primary: #ffffff;
-  --bg-secondary: #f8fafc;
-  --bg-tertiary: #f1f5f9;
-  --bg-hover: #f8fafc;
-  --bg-card: #ffffff;
-  
-  /* Text Colors */
-  --text-primary: #0f172a;
-  --text-secondary: #64748b;
-  --text-tertiary: #94a3b8;
-  
-  /* Borders */
-  --border-primary: #e2e8f0;
-  --border-secondary: #cbd5e1;
-  --border-focus: #6366f1;
-  
-  /* Shadows */
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-  
-  /* Status Colors */
-  --success-bg: #f0fdf4;
-  --success-border: #86efac;
-  --success-text: #166534;
-  --error-bg: #fef2f2;
-  --error-border: #fca5a5;
-  --error-text: #991b1b;
-  --warning-bg: #fef3c7;
-  --warning-border: #fcd34d;
-  --warning-text: #92400e;
-  
-  /* Gradients */
-  --gradient-primary: linear-gradient(135deg, #6366f1, #4f46e5);
-  --gradient-success: linear-gradient(135deg, #10b981, #059669);
-  --gradient-warning: linear-gradient(135deg, #f59e0b, #d97706);
-}
-
-/* Dark Mode */
-[data-theme="dark"] {
-  /* Backgrounds */
-  --bg-primary: #0f172a;
-  --bg-secondary: #1e293b;
-  --bg-tertiary: #334155;
-  --bg-hover: #1e293b;
-  --bg-card: #1e293b;
-  
-  /* Text Colors */
-  --text-primary: #f1f5f9;
-  --text-secondary: #94a3b8;
-  --text-tertiary: #64748b;
-  
-  /* Borders */
-  --border-primary: #334155;
-  --border-secondary: #475569;
-  --border-focus: #6366f1;
-  
-  /* Shadows */
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
-  
-  /* Status Colors */
-  --success-bg: #064e3b;
-  --success-border: #059669;
-  --success-text: #86efac;
-  --error-bg: #7f1d1d;
-  --error-border: #dc2626;
-  --error-text: #fca5a5;
-  --warning-bg: #78350f;
-  --warning-border: #d97706;
-  --warning-text: #fcd34d;
-}
+/* ===================================
+   GLOBAL UTILITY STYLES
+   All CSS variables are now in theme.css
+   This file contains only reusable utility classes
+   =================================== */
 
 /* Base Styles */
 * {
@@ -92,8 +14,6 @@
 body {
   font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
   line-height: 1.6;
-  background: var(--bg-primary);
-  color: var(--text-primary);
 }
 
 /* Utility Classes */
@@ -210,27 +130,12 @@ body {
   animation: spin 1s linear infinite;
 }
 
-/* Success/Error Messages */
-.success-message {
-  padding: 1rem;
-  background: var(--success-bg);
-  border: 1px solid var(--success-border);
-  border-radius: 0.5rem;
-  color: var(--success-text);
-}
-
-.error-message {
-  padding: 1rem;
-  background: var(--error-bg);
-  border: 1px solid var(--error-border);
-  border-radius: 0.5rem;
-  color: var(--error-text);
-}
-
+/* Success/Error/Warning Messages - Add padding and border-radius */
+.success-message,
+.error-message,
 .warning-message {
   padding: 1rem;
-  background: var(--warning-bg);
-  border: 1px solid var(--warning-border);
   border-radius: 0.5rem;
-  color: var(--warning-text);
+  border-width: 1px;
+  border-style: solid;
 }
