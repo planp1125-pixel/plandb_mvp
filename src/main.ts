@@ -1,8 +1,9 @@
 import { createApp } from 'vue'
 import './assets/global.css'
 import App from './App.vue'
-import './style.css' 
+import './style.css'
 import './assets/theme.css'
+import 'vue3-virtual-scroller/dist/vue3-virtual-scroller.css'
 
 // Set initial theme before the app mounts to avoid flicker/flash
 const savedTheme = localStorage.getItem('theme')

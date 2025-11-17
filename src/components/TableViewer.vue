@@ -30,6 +30,8 @@
             <option :value="1000">1,000 rows</option>
             <option :value="2000">2,000 rows</option>
             <option :value="5000">5,000 rows</option>
+            <option :value="10000">10,000 rows</option>
+            <option :value="50000">50,000 rows</option>
           </select>
         </div>
       </div>
@@ -87,27 +89,52 @@
         </div>
       </div>
 
-      <div class="table-container" v-if="filteredRows.length > 0">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th class="row-number">#</th>
-              <th v-for="column in tableData.columns" :key="column" class="data-header">
+      <div class="table-container" v-if="tableData && tableData.columns.length > 0">
+        <div class="table-wrapper">
+          <!-- Fixed Header -->
+          <div class="table-header-wrapper" ref="headerWrapper">
+            <div class="header-row" :style="{ width: totalRowWidth + 'px' }">
+              <div class="header-cell row-number">#</div>
+              <div
+                v-for="column in tableData.columns"
+                :key="column"
+                class="header-cell data-header"
+              >
                 {{ column }}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(row, index) in filteredRows" :key="index">
-              <td class="row-number">{{ index + 1 }}</td>
-              <td v-for="(cell, cellIndex) in row" :key="cellIndex" class="data-cell">
+              </div>
+            </div>
+          </div>
+
+          <!-- Virtual Scrolling Body -->
+          <RecycleScroller
+            v-if="filteredRows.length > 0"
+            ref="scrollerWrapper"
+            class="virtual-scroller"
+            :items="virtualScrollerItems"
+            :item-size="40"
+            :buffer="100"
+            key-field="id"
+            v-slot="{ item }"
+          >
+            <div class="virtual-row" :style="{ width: totalRowWidth + 'px' }">
+              <div class="virtual-cell row-number">{{ item.id + 1 }}</div>
+              <div
+                v-for="(cell, cellIndex) in item.data"
+                :key="cellIndex"
+                class="virtual-cell data-cell"
+              >
                 <div class="cell-content" :title="formatCellValue(cell)">
                   {{ formatCellValue(cell) }}
                 </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+              </div>
+            </div>
+          </RecycleScroller>
+
+          <!-- Empty state when no rows -->
+          <div v-else class="empty-table-state">
+            <p>No data rows in this table</p>
+          </div>
+        </div>
       </div>
 
       <div v-if="filteredRows.length === 0 && searchTerm" class="no-results">
@@ -173,7 +200,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted, nextTick } from 'vue';
+import { RecycleScroller } from 'vue3-virtual-scroller';
 import { DatabaseService, type DatabaseInfo, type TableInfo, type TableData } from '../services/databaseService';
 
 const props = defineProps<{
@@ -202,6 +230,10 @@ const error = ref('');
 const currentPage = ref(1);
 const searchTerm = ref('');
 
+// Scroll sync refs
+const headerWrapper = ref<HTMLElement | null>(null);
+const scrollerWrapper = ref<InstanceType<typeof RecycleScroller> | null>(null);
+
 // Computed
 const pageSize = computed(() => (rowLimit.value === null ? 1000 : rowLimit.value || 1000));
 const totalCount = computed(() => tableData.value?.total_count || 0);
@@ -219,6 +251,51 @@ const filteredRows = computed(() => {
       String(cell || '').toLowerCase().includes(search)
     )
   );
+});
+
+// Virtual scroller needs items with unique IDs
+const virtualScrollerItems = computed(() => {
+  return filteredRows.value.map((row, index) => ({
+    id: index,
+    data: row
+  }));
+});
+
+// Calculate total row width to force horizontal scroll
+const totalRowWidth = computed(() => {
+  const columnCount = tableData.value?.columns.length || 0;
+  return 60 + (columnCount * 200); // 60px for row number + 200px per column
+});
+
+// Sync header horizontal scroll with body scroll
+const syncHeaderScroll = () => {
+  if (scrollerWrapper.value && headerWrapper.value) {
+    const scrollerEl = scrollerWrapper.value.$el as HTMLElement;
+    if (scrollerEl) {
+      headerWrapper.value.scrollLeft = scrollerEl.scrollLeft;
+    }
+  }
+};
+
+// Setup scroll sync after component mounts
+const setupScrollSync = () => {
+  nextTick(() => {
+    if (scrollerWrapper.value && headerWrapper.value) {
+      const scrollerEl = scrollerWrapper.value.$el as HTMLElement;
+      if (scrollerEl) {
+        scrollerEl.addEventListener('scroll', syncHeaderScroll, { passive: true });
+      }
+    }
+  });
+};
+
+onMounted(() => {
+  setupScrollSync();
+});
+
+// Re-setup scroll sync when table data changes
+watch(tableData, () => {
+  setupScrollSync();
 });
 
 // Methods
@@ -598,7 +675,7 @@ watch(() => [props.initialDbPath, props.initialTable] as const, ([dbPath, tableN
 
 .table-container {
   flex: 1;
-  overflow: auto;
+  overflow: visible;
   max-height: 600px;
   /* Enable hardware acceleration for smoother scrolling */
   transform: translateZ(0);
@@ -665,6 +742,178 @@ watch(() => [props.initialDbPath, props.initialTable] as const, ([dbPath, tableN
 .data-cell:hover .cell-content {
   background: var(--bg-secondary);
   /* background: #f8f9fa; */
+}
+
+/* Virtual Scroller Styles */
+.table-wrapper {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  overflow: visible;
+  background: var(--bg-primary);
+}
+
+.table-header-wrapper {
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: var(--bg-secondary);
+  border-bottom: 2px solid var(--border-color);
+  /* Hide scrollbar but keep functionality */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.table-header-wrapper::-webkit-scrollbar {
+  display: none;
+}
+
+.header-row {
+  display: flex;
+  min-width: fit-content;
+}
+
+.header-cell {
+  padding: 12px 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  border-right: 1px solid #dee2e6;
+  flex-shrink: 0;
+  white-space: nowrap;
+  background: var(--bg-secondary);
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+}
+
+.header-cell.row-number {
+  width: 60px;
+  min-width: 60px;
+  max-width: 60px;
+  text-align: center;
+  background: var(--bg-secondary);
+  font-size: 0.9em;
+  justify-content: center;
+}
+
+.header-cell.data-header {
+  width: 200px;
+  min-width: 200px;
+  max-width: 200px;
+}
+
+.virtual-scroller {
+  height: 500px;
+  overflow-x: auto !important;
+  overflow-y: auto !important;
+  background: var(--bg-primary);
+  /* Force scrollbar to always show */
+  scrollbar-width: thin;
+  scrollbar-color: #888 var(--bg-secondary);
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Force scrollbar to always be visible */
+.virtual-scroller::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+  -webkit-appearance: none;
+}
+
+.virtual-scroller::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+  border-radius: 0;
+}
+
+.virtual-scroller::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 6px;
+  border: 2px solid var(--bg-secondary);
+}
+
+.virtual-scroller::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+.virtual-scroller::-webkit-scrollbar-corner {
+  background: var(--bg-secondary);
+}
+
+/* Override vue-recycle-scroller internal styles for horizontal scroll */
+.virtual-scroller :deep(.vue-recycle-scroller__item-wrapper) {
+  overflow: visible !important;
+  width: auto !important;
+  height: 100% !important;
+}
+
+.virtual-scroller :deep(.vue-recycle-scroller__item-view) {
+  width: auto !important;
+}
+
+/* Empty table state */
+.empty-table-state {
+  padding: 60px 20px;
+  text-align: center;
+  color: var(--text-secondary);
+  background: var(--bg-primary);
+  border: 1px dashed var(--border-color);
+  border-radius: 6px;
+  margin: 10px;
+}
+
+.empty-table-state p {
+  margin: 0;
+  font-size: 1em;
+}
+
+.virtual-row {
+  display: flex;
+  border-bottom: 1px solid #dee2e6;
+  height: 40px;
+  min-height: 40px;
+  align-items: stretch;
+}
+
+.virtual-row:hover {
+  background: var(--bg-hover);
+}
+
+.virtual-cell {
+  padding: 10px 14px;
+  border-right: 1px solid #dee2e6;
+  flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
+.virtual-cell.row-number {
+  width: 60px;
+  min-width: 60px;
+  max-width: 60px;
+  font-weight: 600;
+  text-align: center;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 0.85em;
+  justify-content: center;
+}
+
+.virtual-cell.data-cell {
+  width: 200px;
+  min-width: 200px;
+  max-width: 200px;
+}
+
+.virtual-cell .cell-content {
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .no-results {
