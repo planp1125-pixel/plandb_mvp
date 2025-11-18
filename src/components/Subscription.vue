@@ -1,250 +1,249 @@
 <template>
-  <div class="content-panel">
-    <div class="content-header">
-      <h2>License & Activation</h2>
-      <p>Manage your SQLCipher Tool license</p>
-    </div>
-    
-    <div class="license-content">
-      <!-- License Status Card -->
-      <div class="license-status-card" :class="licenseStatus?.is_valid ? 'valid' : 'expired'">
-        <div class="status-icon">
-          {{ licenseStatus?.is_valid ? '✅' : '⚠️' }}
+  <div class="subscription-container">
+    <!-- License Status Section -->
+    <div class="settings-section">
+      <div class="section-header">
+        <h2>License & Subscription</h2>
+        <p class="section-description">Manage your SQLCipher Tool license</p>
+      </div>
+
+      <div class="license-status-row">
+        <div class="status-label">
+          <span class="label-text">Status</span>
         </div>
-        <div class="status-info">
-          <h3>{{ licenseStatus?.message || 'Loading...' }}</h3>
-          <p v-if="licenseStatus?.license_type === 'Trial' && licenseStatus?.days_remaining !== undefined">
-            {{ licenseStatus.days_remaining }} days remaining in trial
-          </p>
-          <p v-else-if="licenseStatus?.license_type === 'Lifetime'">
-            Thank you for your purchase! 🎉
-          </p>
-          <p v-else-if="licenseStatus?.is_valid && licenseStatus?.days_remaining !== undefined">
-            Renews in {{ licenseStatus.days_remaining }} days
-          </p>
-        </div>
-        <div class="status-actions" v-if="licenseStatus?.is_valid && licenseStatus?.license_type !== 'Trial'">
-          <button @click="refreshLicense" class="btn btn-outline" :disabled="refreshing">
-            {{ refreshing ? 'Refreshing...' : '🔄 Refresh' }}
-          </button>
-          <button @click="showDeactivate = true" class="btn btn-outline-danger">
-            Deactivate
-          </button>
+        <div class="status-value">
+          <span class="status-badge" :class="licenseStatus?.is_valid ? 'active' : 'inactive'">
+            {{ licenseStatus?.is_valid ? '● Active' : '● Inactive' }}
+          </span>
+          <span class="status-text">{{ licenseStatus?.message || 'Checking...' }}</span>
         </div>
       </div>
 
-      <!-- Activation Form -->
-      <div v-if="!licenseStatus?.is_valid || showActivation" class="activation-section"></div>
-      <!-- disabled for testing  -->
-      <!-- <div v-if="(!licenseStatus?.is_valid || showActivation) && licenseStatus?.license_type !== 'Trial'" class="activation-section"> -->
+      <div class="license-status-row" v-if="licenseStatus?.license_type">
+        <div class="status-label">
+          <span class="label-text">Plan</span>
+        </div>
+        <div class="status-value">
+          <span class="plan-name">{{ licenseStatus.license_type }}</span>
+          <span v-if="licenseStatus.days_remaining !== undefined" class="expires-text">
+            {{ licenseStatus.license_type === 'Trial' ? `${licenseStatus.days_remaining} days remaining` :
+               licenseStatus.license_type === 'Lifetime' ? 'Never expires' :
+               `Renews in ${licenseStatus.days_remaining} days` }}
+          </span>
+        </div>
+      </div>
+
+      <div class="license-actions" v-if="licenseStatus?.is_valid">
+        <button @click="refreshLicense" class="action-button secondary" :disabled="refreshing">
+          {{ refreshing ? 'Checking...' : 'Refresh License' }}
+        </button>
+        <button @click="showDeactivate = true" class="action-button danger">
+          Deactivate License
+        </button>
+      </div>
+    </div>
+
+    <!-- Activation Section -->
+    <div class="settings-section" v-if="!licenseStatus?.is_valid || showActivation">
+      <div class="section-header">
         <h3>Activate License</h3>
-        <div v-if="activationError" class="error-message">
-          {{ activationError }}
-        </div>
-        <div v-if="activationSuccess" class="success-message">
-          {{ activationSuccess }}
-        </div>
-        <div class="activation-form">
-          <div class="form-group">
-            <label>Email Address</label>
-            <input 
-              v-model="email" 
-              type="email" 
-              placeholder="your@email.com"
-              class="input-field"
-              :disabled="activating"
-            />
-          </div>
-          <div class="form-group">
-            <label>License Key</label>
-            <input 
-              v-model="licenseKey" 
-              type="text" 
-              placeholder="XXXX-XXXX-XXXX-XXXX"
-              class="input-field"
-              :disabled="activating"
-              @input="formatLicenseKey"
-            />
-            <small class="help-text">Format: XXXX-XXXX-XXXX-XXXX</small>
-          </div>
-          <button 
-            @click="activateLicense" 
-            class="btn btn-primary" 
-            :disabled="!email || !licenseKey || activating"
-          >
-            {{ activating ? 'Activating...' : 'Activate License' }}
-          </button>
-          <p class="help-text">
-            Don't have a license key? <a @click="scrollToPricing">Purchase below</a>
-          </p>
-          <p class="help-text">
-            Lost your license? <a @click="openSupport">Contact Support</a>
-          </p>
-        </div>
+        <p class="section-description">Enter your license details to activate</p>
       </div>
 
-      <!-- Pricing Options -->
-      <div class="pricing-section" ref="pricingSection">
-        <div class="pricing-header">
-          <h3>Choose Your Plan</h3>
-          <p>Start with 14-day free trial • No credit card required</p>
-        </div>
-        
-        <div class="pricing-grid">
-          <!-- Free Trial (Always shown first) -->
-          <div class="pricing-card" :class="{ 'current-plan': licenseStatus?.license_type === 'Trial' }">
-            <div v-if="licenseStatus?.license_type === 'Trial'" class="badge current">CURRENT PLAN</div>
-            <h4>Free Trial</h4>
-            <div class="price">
-              <span class="amount">$0</span>
-              <span class="period">/14 days</span>
-            </div>
-            <ul class="features">
-              <li>✅ All features included</li>
-              <li>✅ Unlimited comparisons</li>
-              <li>✅ Schema & data patches</li>
-              <li>✅ Export to SQL/JSON/Excel</li>
-              <li>✅ No credit card needed</li>
-            </ul>
-            <button 
-              v-if="licenseStatus?.license_type !== 'Trial'" 
-              @click="startTrial" 
-              class="btn btn-outline"
-              disabled
-            >
-              Auto-Started
-            </button>
-            <button 
-              v-else 
-              class="btn btn-outline" 
-              disabled
-            >
-              Active ({{ licenseStatus.days_remaining }} days left)
-            </button>
-            <p class="pricing-note">Perfect for trying out</p>
-          </div>
-
-          <!-- Monthly Plan -->
-          <div class="pricing-card" :class="{ 'current-plan': licenseStatus?.license_type === 'Monthly' }">
-            <div v-if="licenseStatus?.license_type === 'Monthly'" class="badge current">CURRENT PLAN</div>
-            <h4>Monthly</h4>
-            <div class="price">
-              <span class="amount">$5</span>
-              <span class="period">/month</span>
-            </div>
-            <ul class="features">
-              <li>✅ Everything in Free Trial</li>
-              <li>✅ Continued access</li>
-              <li>✅ Email support</li>
-              <li>✅ Cancel anytime</li>
-            </ul>
-            <button 
-              @click="openPurchase('monthly')" 
-              class="btn btn-outline"
-              :disabled="licenseStatus?.license_type === 'Monthly'"
-            >
-              {{ licenseStatus?.license_type === 'Monthly' ? 'Current Plan' : 'Subscribe Monthly' }}
-            </button>
-            <p class="pricing-note">Cancel anytime</p>
-          </div>
-
-          <!-- Yearly Plan (Most Popular) -->
-          <div class="pricing-card featured" :class="{ 'current-plan': licenseStatus?.license_type === 'Yearly' }">
-            <div v-if="licenseStatus?.license_type === 'Yearly'" class="badge current">CURRENT PLAN</div>
-            <div v-else class="badge">MOST POPULAR</div>
-            <h4>Yearly</h4>
-            <div class="price">
-              <span class="amount">$39</span>
-              <span class="period">/year</span>
-            </div>
-            <div class="savings">Save $21 (35% off)</div>
-            <ul class="features">
-              <li>✅ Everything in Monthly</li>
-              <li>✅ Priority support</li>
-              <li>✅ Early access to features</li>
-              <li>✅ Just $3.25 per month</li>
-            </ul>
-            <button 
-              @click="openPurchase('yearly')" 
-              class="btn btn-primary"
-              :disabled="licenseStatus?.license_type === 'Yearly'"
-            >
-              {{ licenseStatus?.license_type === 'Yearly' ? 'Current Plan' : 'Subscribe Yearly' }}
-            </button>
-            <p class="pricing-note">Best value for regular use</p>
-          </div>
-
-          <!-- Lifetime Plan -->
-          <div class="pricing-card" :class="{ 'current-plan': licenseStatus?.license_type === 'Lifetime' }">
-            <div v-if="licenseStatus?.license_type === 'Lifetime'" class="badge current">CURRENT PLAN</div>
-            <div v-else class="badge special">BEST DEAL</div>
-            <h4>Lifetime</h4>
-            <div class="price">
-              <span class="amount">$69</span>
-              <span class="period">one-time</span>
-            </div>
-            <div class="savings">Early Adopter Price 🎉</div>
-            <ul class="features">
-              <li>✅ Everything in Yearly</li>
-              <li>✅ Pay once, use forever</li>
-              <li>✅ All future updates</li>
-              <li>✅ No recurring fees ever</li>
-            </ul>
-            <button 
-              @click="openPurchase('lifetime')" 
-              class="btn btn-primary"
-              :disabled="licenseStatus?.license_type === 'Lifetime'"
-            >
-              {{ licenseStatus?.license_type === 'Lifetime' ? 'Current Plan' : 'Buy Lifetime Access' }}
-            </button>
-            <p class="pricing-note">Limited time offer</p>
-          </div>
-        </div>
-
-        <div class="guarantee-badge">
-          <span class="guarantee-icon">🛡️</span>
-          <strong>30-Day Money-Back Guarantee</strong>
-          <span>Try risk-free. Full refund if not satisfied.</span>
-        </div>
+      <div v-if="activationError" class="message-box error">
+        {{ activationError }}
+      </div>
+      <div v-if="activationSuccess" class="message-box success">
+        {{ activationSuccess }}
       </div>
 
-      <!-- FAQ Section -->
-      <div class="faq-section">
-        <h3>Frequently Asked Questions</h3>
-        <div class="faq-list">
-          <div class="faq-item" v-for="faq in faqs" :key="faq.id" @click="toggleFaq(faq.id)">
-            <div class="faq-question">
-              <span>{{ faq.question }}</span>
-              <span class="faq-icon">{{ expandedFaqs.has(faq.id) ? '−' : '+' }}</span>
-            </div>
-            <div v-if="expandedFaqs.has(faq.id)" class="faq-answer">
-              {{ faq.answer }}
-            </div>
-          </div>
-        </div>
+      <div class="form-row">
+        <label class="form-label">Email Address</label>
+        <input
+          v-model="email"
+          type="email"
+          placeholder="your@email.com"
+          class="form-input"
+          :disabled="activating"
+        />
       </div>
 
-      <div class="support-section">
-        <p>Need help? <a @click="openSupport">Contact Support</a></p>
+      <div class="form-row">
+        <label class="form-label">License Key</label>
+        <input
+          v-model="licenseKey"
+          type="text"
+          placeholder="XXXX-XXXX-XXXX-XXXX"
+          class="form-input"
+          :disabled="activating"
+          @input="formatLicenseKey"
+        />
+        <span class="form-help">Format: XXXX-XXXX-XXXX-XXXX</span>
+      </div>
+
+      <div class="form-actions">
+        <button
+          @click="activateLicense"
+          class="action-button primary"
+          :disabled="!email || !licenseKey || activating"
+        >
+          {{ activating ? 'Activating...' : 'Activate License' }}
+        </button>
+      </div>
+
+      <div class="help-links">
+        <a @click="scrollToPricing" class="text-link">Don't have a license? Purchase below</a>
+        <span class="separator">•</span>
+        <a @click="openSupport" class="text-link">Lost your key? Contact support</a>
       </div>
     </div>
 
-    <!-- <button @click="forceReset" class="btn btn-outline">Force Reset Trial</button> -->
+    <!-- Plans Section -->
+    <div class="settings-section" ref="pricingSection">
+      <div class="section-header">
+        <h3>Available Plans</h3>
+        <p class="section-description">Choose the plan that works best for you</p>
+      </div>
+
+      <div class="plans-list">
+        <!-- Free Trial -->
+        <div class="plan-item" :class="{ 'current': licenseStatus?.license_type === 'Trial' }">
+          <div class="plan-header">
+            <div class="plan-title">
+              <h4>Free Trial</h4>
+              <span v-if="licenseStatus?.license_type === 'Trial'" class="current-badge">CURRENT</span>
+            </div>
+            <div class="plan-price">
+              <span class="price-amount">$0</span>
+              <span class="price-period">/14 days</span>
+            </div>
+          </div>
+          <p class="plan-description">Try all features for free, no credit card required</p>
+          <button class="plan-button" disabled>
+            {{ licenseStatus?.license_type === 'Trial' ? `Active (${licenseStatus.days_remaining} days left)` : 'Auto-started' }}
+          </button>
+        </div>
+
+        <!-- Monthly -->
+        <div class="plan-item" :class="{ 'current': licenseStatus?.license_type === 'Monthly' }">
+          <div class="plan-header">
+            <div class="plan-title">
+              <h4>Monthly</h4>
+              <span v-if="licenseStatus?.license_type === 'Monthly'" class="current-badge">CURRENT</span>
+            </div>
+            <div class="plan-price">
+              <span class="price-amount">$9</span>
+              <span class="price-period">/month</span>
+            </div>
+          </div>
+          <p class="plan-description">Perfect for occasional use • Cancel anytime</p>
+          <button
+            @click="openPurchase('monthly')"
+            class="plan-button"
+            :disabled="licenseStatus?.license_type === 'Monthly'"
+          >
+            {{ licenseStatus?.license_type === 'Monthly' ? 'Current Plan' : 'Subscribe' }}
+          </button>
+        </div>
+
+        <!-- Yearly (Recommended) -->
+        <div class="plan-item recommended" :class="{ 'current': licenseStatus?.license_type === 'Yearly' }">
+          <div class="plan-header">
+            <div class="plan-title">
+              <h4>Yearly</h4>
+              <span v-if="licenseStatus?.license_type === 'Yearly'" class="current-badge">CURRENT</span>
+              <span v-else class="recommended-badge">RECOMMENDED</span>
+            </div>
+            <div class="plan-price">
+              <span class="price-amount">$99</span>
+              <span class="price-period">/year</span>
+            </div>
+          </div>
+          <p class="plan-description">Save 35% • Priority support • Just $3.25/month</p>
+          <button
+            @click="openPurchase('yearly')"
+            class="plan-button primary"
+            :disabled="licenseStatus?.license_type === 'Yearly'"
+          >
+            {{ licenseStatus?.license_type === 'Yearly' ? 'Current Plan' : 'Subscribe' }}
+          </button>
+        </div>
+
+        <!-- Lifetime -->
+        <div class="plan-item" :class="{ 'current': licenseStatus?.license_type === 'Lifetime' }">
+          <div class="plan-header">
+            <div class="plan-title">
+              <h4>Lifetime</h4>
+              <span v-if="licenseStatus?.license_type === 'Lifetime'" class="current-badge">CURRENT</span>
+            </div>
+            <div class="plan-price">
+              <span class="price-amount">$199</span>
+              <span class="price-period">one-time</span>
+            </div>
+          </div>
+          <p class="plan-description">Pay once, use forever • All future updates included</p>
+          <button
+            @click="openPurchase('lifetime')"
+            class="plan-button"
+            :disabled="licenseStatus?.license_type === 'Lifetime'"
+          >
+            {{ licenseStatus?.license_type === 'Lifetime' ? 'Current Plan' : 'Purchase' }}
+          </button>
+        </div>
+      </div>
+
+      <div class="guarantee-notice">
+        <span class="guarantee-icon">🛡️</span>
+        <span>30-day money-back guarantee • All plans include email support</span>
+      </div>
+    </div>
+
+    <!-- FAQ Section -->
+    <div class="settings-section">
+      <div class="section-header">
+        <h3>Frequently Asked Questions</h3>
+      </div>
+
+      <div class="faq-list">
+        <div
+          class="faq-item"
+          v-for="faq in faqs"
+          :key="faq.id"
+          @click="toggleFaq(faq.id)"
+        >
+          <div class="faq-question">
+            <span>{{ faq.question }}</span>
+            <span class="faq-chevron">{{ expandedFaqs.has(faq.id) ? '▼' : '▶' }}</span>
+          </div>
+          <div v-if="expandedFaqs.has(faq.id)" class="faq-answer">
+            {{ faq.answer }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Support Section -->
+    <div class="settings-section">
+      <div class="support-row">
+        <span>Need help?</span>
+        <a @click="openSupport" class="text-link">Contact Support</a>
+      </div>
+    </div>
 
     <!-- Deactivation Modal -->
     <div v-if="showDeactivate" class="modal-overlay" @click="showDeactivate = false">
-      <div class="modal-content" @click.stop>
+      <div class="modal-dialog" @click.stop>
         <h3>Deactivate License?</h3>
         <p>This will remove the license from this computer. You can reactivate it later on this or another device.</p>
         <div class="modal-actions">
-          <button @click="showDeactivate = false" class="btn btn-outline">Cancel</button>
-          <button @click="confirmDeactivate" class="btn btn-danger" :disabled="deactivating">
+          <button @click="showDeactivate = false" class="action-button secondary">Cancel</button>
+          <button @click="confirmDeactivate" class="action-button danger" :disabled="deactivating">
             {{ deactivating ? 'Deactivating...' : 'Deactivate' }}
           </button>
         </div>
       </div>
     </div>
-  <!-- </div> -->
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -258,6 +257,7 @@ interface LicenseStatus {
   days_remaining?: number;
   message: string;
 }
+
 declare global {
   interface Window {
     Paddle: any;
@@ -280,43 +280,33 @@ const pricingSection = ref<HTMLElement | null>(null);
 const faqs = [
   {
     id: 1,
-    question: 'How does the 14-day trial work?',
-    answer: 'The free trial starts automatically when you first launch the app. You get full access to all features for 14 days. No credit card required, no automatic charges. After 14 days, choose a plan to continue using the app.'
+    question: 'How does the trial work?',
+    answer: 'The free trial starts automatically when you first launch the app. You get full access to all features for 14 days with no credit card required.'
   },
   {
     id: 2,
     question: 'Can I cancel my subscription?',
-    answer: 'Yes, cancel anytime. You keep access until the end of your billing period. No partial refunds, but you continue using the app until your paid period expires.'
+    answer: 'Yes, cancel anytime. You keep access until the end of your billing period with no partial refunds.'
   },
   {
     id: 3,
-    question: 'What happens to my data?',
-    answer: 'Your databases never leave your computer. All data stays local and private. Even if you cancel, you can still access your saved comparisons and exports.'
+    question: 'Where is my data stored?',
+    answer: 'All your databases stay on your computer. Nothing is uploaded to any server. Your data remains completely private and local.'
   },
   {
     id: 4,
     question: 'Do you offer refunds?',
-    answer: 'Yes, 30-day money-back guarantee for all purchases. Contact support with your license key for a full refund, no questions asked.'
+    answer: 'Yes, 30-day money-back guarantee for all purchases. Contact support for a full refund, no questions asked.'
   },
   {
     id: 5,
     question: 'Does this work offline?',
-    answer: 'Yes! The app works fully offline. License validates once during activation, then automatically every 7 days. If offline, you get a 30-day grace period.'
+    answer: 'Yes! The app works fully offline. License validates once during activation, then checks every 7 days with a 30-day grace period.'
   },
   {
     id: 6,
-    question: 'Can I use on multiple computers?',
-    answer: 'Yes, use your license on up to 2 computers you personally own (e.g., work laptop + home desktop). Not for team sharing. Need more? Contact us about team licenses.'
-  },
-  {
-    id: 7,
-    question: 'Can I upgrade my plan?',
-    answer: 'Yes! You can upgrade from Trial to any paid plan, or from Monthly to Yearly/Lifetime anytime. Contact support and we will apply credit for any overlapping time.'
-  },
-  {
-    id: 8,
-    question: 'What if I lose my license key?',
-    answer: 'Your license key is emailed after purchase. If lost, contact support with your purchase email and we will resend it immediately.'
+    question: 'How many computers can I use?',
+    answer: 'Use your license on up to 2 computers you personally own (e.g., work + home). Contact us about team licenses for more.'
   }
 ];
 
@@ -324,24 +314,17 @@ onMounted(async () => {
   await checkLicense();
 });
 
-// const forceReset = async () => {
-//   await invoke('force_reset_license');
-//   await checkLicense();
-// };
-
-
 const checkLicense = async () => {
   try {
     const status = await invoke<LicenseStatus>('get_license_status');
     licenseStatus.value = status;
-    
-    // Only show activation form if expired (not for trial)
+
     if (!status.is_valid && status.license_type !== 'Trial') {
       showActivation.value = true;
     }
   } catch (err) {
     console.error('License check failed:', err);
-    activationError.value = 'Failed to check license. Please restart.';
+    activationError.value = 'Failed to check license status';
   }
 };
 
@@ -356,25 +339,25 @@ const activateLicense = async () => {
   activating.value = true;
   activationError.value = '';
   activationSuccess.value = '';
-  
+
   try {
     const status = await invoke<LicenseStatus>('activate_license', {
       email: email.value,
       licenseKey: licenseKey.value
     });
-    
+
     licenseStatus.value = status;
-    
+
     if (status.is_valid) {
       showActivation.value = false;
-      activationSuccess.value = '✅ License activated successfully!';
+      activationSuccess.value = 'License activated successfully!';
       setTimeout(() => {
         email.value = '';
         licenseKey.value = '';
         activationSuccess.value = '';
       }, 3000);
     } else {
-      activationError.value = '❌ Invalid license key or email.';
+      activationError.value = 'Invalid license key or email';
     }
   } catch (err) {
     activationError.value = `Activation failed: ${err}`;
@@ -404,39 +387,21 @@ const refreshLicense = async () => {
   setTimeout(() => refreshing.value = false, 1000);
 };
 
-const startTrial = () => {
-  // Trial starts automatically, this is just UI feedback
-  alert('Trial is already active! Enjoy all features for 14 days.');
-};
-
-//------------elmonsqueezy purchase links (old)------------//
-// const openPurchase = (plan: string) => {
-//   const urls: Record<string, string> = {
-//     monthly: 'https://planplabs.lemonsqueezy.com/buy/91cb4129-6a90-4ef7-9d2d-4dbc7499d239',//'https://yourstore.lemonsqueezy.com/checkout/buy/MONTHLY_ID',
-//     yearly: 'https://planplabs.lemonsqueezy.com/buy/39100320-dce1-4487-af6f-bf8ff51b6d67', //'https://yourstore.lemonsqueezy.com/checkout/buy/YEARLY_ID',
-//     lifetime: 'https://planplabs.lemonsqueezy.com/buy/401e3fbf-b3c5-4151-8e3c-f629a0f9a753' //'https://yourstore.lemonsqueezy.com/checkout/buy/LIFETIME_ID'
-//   };
-//   open(urls[plan]);
-// };
-
 const openPurchase = (plan: string) => {
   const paddleProductIds: Record<string, string> = {
-    monthly: 'pri_01k807azrz8asavdg42z0fqv34', 
-    yearly: 'pri_01k807dj8bv6h3gp9c1tvp6dfc',  
+    monthly: 'pri_01k807azrz8asavdg42z0fqv34',
+    yearly: 'pri_01k807dj8bv6h3gp9c1tvp6dfc',
     lifetime: 'pri_01k807ewanhdkvhb06wr24ffy9'
   };
-  
-  // Open Paddle checkout
+
   if (window.Paddle) {
     window.Paddle.Checkout.open({
       product: paddleProductIds[plan],
-      successCallback: (data:any) => {
+      successCallback: (data: any) => {
         console.log('Purchase successful:', data);
-        // You can trigger license activation here
       }
     });
   } else {
-    // Fallback to direct Paddle URL
     open(`https://buy.paddle.com/checkout?product=${paddleProductIds[plan]}`);
   }
 };
@@ -457,523 +422,480 @@ const scrollToPricing = () => {
 </script>
 
 <style scoped>
-.license-content {
-  max-width: 1400px;
+.subscription-container {
+  max-width: 900px;
   margin: 0 auto;
-  padding: 20px;
+  padding: 32px 24px;
+  color: var(--text-primary);
 }
 
-.content-header {
-  margin-bottom: 30px;
+.settings-section {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 24px;
+  margin-bottom: 16px;
 }
 
-.content-header h2 {
-  font-size: 2rem;
-  margin-bottom: 8px;
+.section-header {
+  margin-bottom: 24px;
 }
 
-.content-header p {
-  color: #666;
+.section-header h2 {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0 0 4px 0;
+  color: var(--text-primary);
 }
 
-.license-status-card {
+.section-header h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 4px 0;
+  color: var(--text-primary);
+}
+
+.section-description {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+/* License Status Rows */
+.license-status-row {
   display: flex;
+  align-items: start;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.license-status-row:last-child {
+  border-bottom: none;
+}
+
+.status-label {
+  width: 120px;
+  flex-shrink: 0;
+}
+
+.label-text {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.status-value {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.status-badge {
+  display: inline-flex;
   align-items: center;
-  gap: 20px;
-  padding: 30px;
-  border-radius: 12px;
-  margin-bottom: 30px;
-  border: 2px solid;
+  font-size: 13px;
+  font-weight: 500;
 }
 
-.license-status-card.valid {
-  background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
-  border-color: #28a745;
+.status-badge.active {
+  color: #10b981;
 }
 
-.license-status-card.expired {
-  background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
-  border-color: #ffc107;
+.status-badge.inactive {
+  color: #f59e0b;
 }
 
-.status-icon {
-  font-size: 3em;
+.status-text {
+  font-size: 13px;
+  color: var(--text-primary);
 }
 
-.status-info {
-  flex: 1;
+.plan-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
 }
 
-.status-info h3 {
-  margin: 0 0 8px 0;
-  font-size: 1.5em;
+.expires-text {
+  font-size: 12px;
+  color: var(--text-secondary);
 }
 
-.status-info p {
-  margin: 4px 0;
-  color: #555;
-}
-
-.status-actions {
+.license-actions {
   display: flex;
   gap: 12px;
-  align-items: center;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-color);
 }
 
-.activation-section {
-  background: white;
-  padding: 30px;
-  border-radius: 12px;
-  margin-bottom: 40px;
-  border: 1px solid #dee2e6;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-}
-
-.activation-section h3 {
-  margin-top: 0;
+/* Form Styles */
+.form-row {
   margin-bottom: 20px;
 }
 
-.form-group {
-  margin-bottom: 20px;
-}
-
-.form-group label {
+.form-label {
   display: block;
+  font-size: 13px;
+  font-weight: 500;
   margin-bottom: 8px;
-  font-weight: 600;
-  color: #333;
+  color: var(--text-primary);
 }
 
-.input-field {
+.form-input {
   width: 100%;
-  padding: 12px 16px;
-  border: 2px solid #ddd;
-  border-radius: 8px;
-  font-size: 1rem;
-  transition: border-color 0.2s;
+  padding: 8px 12px;
+  font-size: 13px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
 }
 
-.input-field:focus {
+.form-input:focus {
   outline: none;
-  border-color: #007bff;
+  border-color: #3b82f6;
 }
 
-.input-field:disabled {
-  background: #f5f5f5;
+.form-input:disabled {
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
-.btn {
-  padding: 12px 24px;
-  border-radius: 8px;
-  font-weight: 600;
+.form-help {
+  display: block;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+.form-actions {
+  margin-top: 20px;
+}
+
+/* Buttons */
+.action-button {
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  color: var(--text-primary);
   cursor: pointer;
   transition: all 0.2s;
-  font-size: 1rem;
-  border: none;
 }
 
-.btn-primary {
-  background: #007bff;
+.action-button:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.action-button.primary {
+  background: #3b82f6;
+  border-color: #3b82f6;
   color: white;
 }
 
-.btn-primary:hover:not(:disabled) {
-  background: #0056b3;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0,123,255,0.3);
+.action-button.primary:hover:not(:disabled) {
+  background: #2563eb;
+  border-color: #2563eb;
 }
 
-.btn-outline {
-  background: white;
-  color: #007bff;
-  border: 2px solid #007bff;
+.action-button.secondary {
+  background: var(--bg-tertiary);
 }
 
-.btn-outline:hover:not(:disabled) {
-  background: #007bff;
+.action-button.danger {
+  color: #ef4444;
+  border-color: #ef4444;
+}
+
+.action-button.danger:hover:not(:disabled) {
+  background: #ef4444;
   color: white;
 }
 
-.btn-outline-danger {
-  background: white;
-  color: #dc3545;
-  border: 2px solid #dc3545;
-}
-
-.btn-outline-danger:hover:not(:disabled) {
-  background: #dc3545;
-  color: white;
-}
-
-.btn-danger {
-  background: #dc3545;
-  color: white;
-}
-
-.btn-danger:hover:not(:disabled) {
-  background: #c82333;
-}
-
-.btn:disabled {
-  opacity: 0.6;
+.action-button:disabled {
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
-.error-message {
-  background: #fee;
-  border: 1px solid #fcc;
-  color: #c33;
-  padding: 12px 16px;
-  border-radius: 8px;
+/* Messages */
+.message-box {
+  padding: 12px;
+  border-radius: 4px;
+  font-size: 13px;
   margin-bottom: 16px;
 }
 
-.success-message {
-  background: #efe;
-  border: 1px solid #cfc;
-  color: #3c3;
-  padding: 12px 16px;
-  border-radius: 8px;
-  margin-bottom: 16px;
+.message-box.error {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid #ef4444;
+  color: #ef4444;
 }
 
-.help-text {
-  text-align: center;
-  margin-top: 12px;
-  font-size: 0.9em;
-  color: #666;
+.message-box.success {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid #10b981;
+  color: #10b981;
 }
 
-.help-text a {
-  color: #007bff;
+/* Help Links */
+.help-links {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.text-link {
+  color: #3b82f6;
   cursor: pointer;
+  text-decoration: none;
+}
+
+.text-link:hover {
   text-decoration: underline;
 }
 
-.help-text a:hover {
-  color: #0056b3;
+.separator {
+  color: var(--border-color);
 }
 
-small.help-text {
-  display: block;
-  text-align: left;
-  margin-top: 4px;
-  font-size: 0.85em;
+/* Plans List */
+.plans-list {
+  display: grid;
+  gap: 12px;
 }
 
-.pricing-section {
-  margin-top: 60px;
+.plan-item {
+  padding: 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  transition: all 0.2s;
 }
 
-.pricing-header {
-  text-align: center;
-  margin-bottom: 40px;
+.plan-item:hover {
+  border-color: #3b82f6;
 }
 
-.pricing-header h3 {
-  font-size: 2em;
+.plan-item.recommended {
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.05);
+}
+
+.plan-item.current {
+  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.05);
+}
+
+.plan-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
   margin-bottom: 8px;
 }
 
-.pricing-header p {
-  color: #666;
-  font-size: 1.1em;
-}
-
-.pricing-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 20px;
-  margin-bottom: 40px;
-}
-
-/* Responsive: 3 columns on tablets */
-@media (max-width: 1200px) {
-  .pricing-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-/* Responsive: 1 column on mobile */
-@media (max-width: 768px) {
-  .pricing-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .pricing-card.featured {
-    transform: none !important;
-  }
-}
-
-.pricing-card {
-  background: white;
-  padding: 32px 24px;
-  border-radius: 12px;
-  border: 2px solid #dee2e6;
-  position: relative;
-  transition: all 0.3s;
+.plan-title {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  gap: 8px;
 }
 
-.pricing-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
-  border-color: #007bff;
+.plan-title h4 {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text-primary);
 }
 
-.pricing-card.featured {
-  border-color: #007bff;
-  box-shadow: 0 4px 20px rgba(0,123,255,0.15);
-}
-
-.pricing-card.current-plan {
-  border-color: #28a745;
-  background: linear-gradient(135deg, #f8fff9 0%, #f0fff4 100%);
-}
-
-.pricing-card h4 {
-  font-size: 1.5em;
-  margin: 0 0 16px 0;
-  color: #333;
-}
-
-.badge {
-  position: absolute;
-  top: -12px;
-  right: 20px;
-  background: #007bff;
-  color: white;
-  padding: 6px 16px;
-  border-radius: 20px;
-  font-size: 0.75em;
-  font-weight: 700;
+.current-badge,
+.recommended-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 3px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
-.badge.special {
-  background: linear-gradient(135deg, #ff6b00 0%, #ff8c00 100%);
+.current-badge {
+  background: #10b981;
+  color: white;
 }
 
-.badge.current {
-  background: #28a745;
+.recommended-badge {
+  background: #3b82f6;
+  color: white;
 }
 
-.price {
-  margin: 16px 0;
+.plan-price {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
 }
 
-.amount {
-  font-size: 3em;
+.price-amount {
+  font-size: 24px;
   font-weight: 700;
-  color: #007bff;
-  line-height: 1;
+  color: var(--text-primary);
 }
 
-.period {
-  font-size: 1em;
-  color: #6c757d;
-  margin-left: 4px;
+.price-period {
+  font-size: 12px;
+  color: var(--text-secondary);
 }
 
-.savings {
-  color: #28a745;
-  font-weight: 600;
-  margin-bottom: 16px;
-  font-size: 0.95em;
-}
-
-.features {
-  list-style: none;
-  padding: 0;
-  margin: 24px 0;
-  flex: 1;
-}
-
-.features li {
-  padding: 10px 0;
-  border-bottom: 1px solid #f0f0f0;
-  font-size: 0.95em;
+.plan-description {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0 0 12px 0;
   line-height: 1.4;
 }
 
-.features li:last-child {
-  border-bottom: none;
-}
-
-.pricing-card .btn {
+.plan-button {
   width: 100%;
-  margin-top: auto;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
-.pricing-note {
-  text-align: center;
-  font-size: 0.85em;
-  color: #6c757d;
-  margin-top: 12px;
+.plan-button:hover:not(:disabled) {
+  background: var(--bg-hover);
 }
 
-.guarantee-badge {
+.plan-button.primary {
+  background: #3b82f6;
+  border-color: #3b82f6;
+  color: white;
+}
+
+.plan-button.primary:hover:not(:disabled) {
+  background: #2563eb;
+}
+
+.plan-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.guarantee-notice {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  padding: 24px;
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-  border-radius: 12px;
-  text-align: center;
-  flex-wrap: wrap;
-  margin-top: 40px;
+  gap: 8px;
+  padding: 16px;
+  margin-top: 16px;
+  border-radius: 6px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  font-size: 12px;
+  color: var(--text-secondary);
 }
 
 .guarantee-icon {
-  font-size: 2em;
+  font-size: 16px;
 }
 
-.guarantee-badge strong {
-  color: #28a745;
-  font-size: 1.1em;
-}
-
-.guarantee-badge span:last-child {
-  color: #666;
-  flex-basis: 100%;
-  margin-top: 8px;
-}
-
-.faq-section {
-  margin-top: 60px;
-}
-
-.faq-section h3 {
-  font-size: 1.8em;
-  margin-bottom: 24px;
-  text-align: center;
-}
-
+/* FAQ */
 .faq-list {
-  max-width: 900px;
-  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .faq-item {
-  background: white;
-  border: 1px solid #dee2e6;
-  border-radius: 8px;
-  margin-bottom: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-primary);
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .faq-item:hover {
-  border-color: #007bff;
-  box-shadow: 0 2px 8px rgba(0,123,255,0.1);
+  border-color: #3b82f6;
 }
 
 .faq-question {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px 24px;
-  font-weight: 600;
-  color: #333;
+  padding: 14px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
 }
 
-.faq-icon {
-  font-size: 1.5em;
-  color: #007bff;
-  font-weight: 300;
+.faq-chevron {
+  font-size: 10px;
+  color: var(--text-secondary);
 }
 
 .faq-answer {
-  padding: 0 24px 20px 24px;
-  color: #666;
-  line-height: 1.6;
-  animation: fadeIn 0.3s ease-in;
+  padding: 0 16px 14px 16px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+/* Support */
+.support-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
 }
 
-.support-section {
-  text-align: center;
-  margin-top: 40px;
-  padding: 20px;
-}
-
-.support-section a {
-  color: #007bff;
-  cursor: pointer;
-  text-decoration: underline;
-  font-weight: 600;
-}
-
-.support-section a:hover {
-  color: #0056b3;
-}
-
+/* Modal */
 .modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 9999;
-  animation: fadeIn 0.2s;
+  z-index: 10000;
 }
 
-.modal-content {
-  background: white;
-  padding: 32px;
-  border-radius: 12px;
-  max-width: 500px;
+.modal-dialog {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 24px;
+  max-width: 450px;
   width: 90%;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  animation: slideUp 0.3s ease-out;
 }
 
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.modal-dialog h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+  color: var(--text-primary);
 }
 
-.modal-content h3 {
-  margin: 0 0 16px 0;
-  font-size: 1.5rem;
-  color: #333;
-}
-
-.modal-content p {
-  margin-bottom: 12px;
-  color: #666;
+.modal-dialog p {
+  font-size: 13px;
+  color: var(--text-secondary);
   line-height: 1.5;
+  margin: 0 0 20px 0;
 }
 
 .modal-actions {
   display: flex;
   gap: 12px;
-  margin-top: 24px;
   justify-content: flex-end;
 }
 </style>

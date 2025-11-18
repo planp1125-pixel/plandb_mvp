@@ -10,12 +10,6 @@
         {{ error }}
       </div>
 
-      <!-- Success message -->
-      <div v-if="successMessage" class="success-message">
-        <pre>{{ successMessage }}</pre>
-      </div>
-
-
     <div class="database-selection">
       <div class="db-selector">
         <label>Database 1 (Source):</label>
@@ -460,32 +454,39 @@
       </div>
     </div>
     <!-- SQL Patch Modal -->
-    <div v-if="showPatchModal" class="modal-overlay" @click="closePatchModal">
-      <div class="modal-content" @click.stop>
-        <div class="modal-header">
-          <h3>Generated SQL Patch</h3>
-          <button class="close-btn" @click="closePatchModal">✕</button>
+    <!-- Patch Preview Modal -->
+    <div v-if="showPatchModal" class="patch-preview-overlay" @click="closePatchModal">
+      <div class="patch-preview-modal" @click.stop>
+        <div class="patch-preview-header">
+          <h3>🔧 Generated SQL Patch Preview</h3>
+          <button @click="closePatchModal" class="close-btn">✕</button>
         </div>
-        
-        <div class="modal-body">
-          <div class="patch-info">
-            <span class="info-label">File:</span>
-            <span class="info-value">{{ patchFilename }}</span>
+
+        <div class="patch-preview-info">
+          <div class="info-item">
+            <strong>File:</strong> {{ patchFilename }}
           </div>
-          
-          <div class="patch-preview">
-            <pre>{{ generatedPatchSQL }}</pre>
+          <div class="info-item">
+            <strong>Size:</strong> {{ formatBytes(generatedPatchSQL.length) }}
+          </div>
+          <div class="info-item warning">
+            ⚠️ <strong>Important:</strong> Review carefully before executing on your database!
           </div>
         </div>
-        
-        <div class="modal-footer">
-          <button class="copy-btn" @click="copyPatchToClipboard">
-            <span class="btn-icon">📋</span>
-            Copy to Clipboard
+
+        <div class="patch-preview-content">
+          <pre><code>{{ generatedPatchSQL }}</code></pre>
+        </div>
+
+        <div class="patch-preview-actions">
+          <button @click="copyPatchToClipboard" class="action-btn copy-btn" :disabled="isCopied">
+            {{ isCopied ? '✅ Copied!' : '📋 Copy to Clipboard' }}
           </button>
-          <button class="download-btn" @click="downloadPatchFromModal">
-            <span class="btn-icon">⬇️</span>
-            Download
+          <button @click="downloadPatchFromModal" class="action-btn download-btn" :disabled="isDownloaded">
+            {{ isDownloaded ? '✅ Downloaded!' : '💾 Download SQL File' }}
+          </button>
+          <button @click="closePatchModal" class="action-btn cancel-btn">
+            Close
           </button>
         </div>
       </div>
@@ -497,7 +498,8 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount } from "vue"
-import { invoke } from '@tauri-apps/api/core'; 
+import { invoke } from '@tauri-apps/api/core';
+import { message } from '@tauri-apps/plugin-dialog';
 import { DatabaseService, type DatabaseInfo, type SchemaComparison, type ColumnInfo, type TableInfo } from '../services/databaseService';
 
 // Props
@@ -711,6 +713,7 @@ const compareSchemas = async () => {
     saveState();
   } catch (err) {
     error.value = `Comparison failed: ${err}`;
+    await message(String(err), { title: 'Comparison Failed', kind: 'error' });
   } finally {
     isComparing.value = false;
   }
@@ -746,17 +749,12 @@ const exportComparison = () => {
   if (!comparisonResult.value) return;
 
   error.value = '';
-  successMessage.value = '';
-  
+
   const report = generateComparisonReport(comparisonResult.value);
   const filename = `schema-comparison-${new Date().toISOString().slice(0, 10)}.txt`;
   downloadReport(report, filename);
-  
-  successMessage.value = `✅ Comparison report exported successfully!\nFile: ${filename}\nLocation: Your browser's download folder`;
-  
-  setTimeout(() => {
-    successMessage.value = '';
-  }, 5000);
+
+  // Export successful - file downloaded, no notification needed
 };
 
 const generateComparisonReport = (comparison: SchemaComparison): string => {
@@ -937,10 +935,11 @@ const loadState = () => {
   }
 };
 
-const successMessage = ref('');
 const showPatchModal = ref(false);
 const generatedPatchSQL = ref('');
 const patchFilename = ref('');
+const isCopied = ref(false);
+const isDownloaded = ref(false);
 
 // const generatePatch = async () => {
 //   if (!database1.value || !database2.value) return;
@@ -975,7 +974,6 @@ const generatePatch = async () => {
   if (!database1.value || !database2.value) return;
   
   error.value = '';
-  successMessage.value = '';
 
   try {
     const patchSql = await invoke<string>('generate_schema_patch', {
@@ -988,33 +986,60 @@ const generatePatch = async () => {
     const timestamp = new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
     const filename = `patch_${db1Name}_to_${db2Name}_${timestamp}.sql`;
 
-    // Store patch and show modal
-    generatedPatchSQL.value = patchSql;
-    patchFilename.value = filename;
-    showPatchModal.value = true;
-    
+    // Check file size - if larger than 5MB, skip preview and auto-download
+    const fileSizeBytes = new Blob([patchSql]).size;
+    const SIZE_LIMIT_MB = 5;
+    const SIZE_LIMIT_BYTES = SIZE_LIMIT_MB * 1024 * 1024;
+
+    if (fileSizeBytes > SIZE_LIMIT_BYTES) {
+      // Large file - skip preview, directly download
+      const fileSizeMB = (fileSizeBytes / (1024 * 1024)).toFixed(2);
+      await message(
+        `Patch size: ${fileSizeMB}MB\n\nFile is too large to preview and will be downloaded directly.\n\nFile: ${filename}`,
+        { title: 'Large Patch Generated', kind: 'info' }
+      );
+      downloadPatch(patchSql, filename);
+    } else {
+      // Small file - show preview modal
+      generatedPatchSQL.value = patchSql;
+      patchFilename.value = filename;
+      showPatchModal.value = true;
+    }
+
   } catch (err) {
     error.value = `Failed to generate patch: ${err}`;
+    await message(String(err), { title: 'Patch Generation Failed', kind: 'error' });
   }
 };
 const copyPatchToClipboard = async () => {
   try {
     await navigator.clipboard.writeText(generatedPatchSQL.value);
-    successMessage.value = '✅ SQL patch copied to clipboard!';
+    // Show "Copied!" feedback on button
+    isCopied.value = true;
     setTimeout(() => {
-      successMessage.value = '';
-    }, 3000);
+      isCopied.value = false;
+    }, 2000);
   } catch (err) {
     error.value = `Failed to copy to clipboard: ${err}`;
+    await message('Could not copy to clipboard', { title: 'Copy Failed', kind: 'error' });
   }
 };
 
 const downloadPatchFromModal = () => {
   downloadPatch(generatedPatchSQL.value, patchFilename.value);
-  successMessage.value = `✅ SQL patch downloaded successfully!\nFile: ${patchFilename.value}`;
+  // Show "Downloaded!" feedback on button
+  isDownloaded.value = true;
   setTimeout(() => {
-    successMessage.value = '';
-  }, 3000);
+    isDownloaded.value = false;
+  }, 2000);
+};
+
+const formatBytes = (bytes: number): string => {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
 };
 
 const closePatchModal = () => {
@@ -1688,161 +1713,174 @@ onBeforeUnmount(() => {
 }
 
 /* Modal Styles */
-.modal-overlay {
+/* Patch Preview Modal Styles */
+.patch-preview-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.8);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 9999;
-  padding: 20px;
+  z-index: 10000;
+  backdrop-filter: blur(4px);
 }
 
-.modal-content {
-  background: white;
+.patch-preview-modal {
+  background: var(--bg-primary);
   border-radius: 12px;
-  max-width: 800px;
-  width: 100%;
+  width: 90%;
+  max-width: 900px;
   max-height: 90vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
 }
 
-
-.modal-header {
+.patch-preview-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border-color);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px 25px;
-  border-bottom: 1px solid #dee2e6;
+  background: var(--bg-secondary);
+  border-radius: 12px 12px 0 0;
 }
 
-
-.modal-header h3 {
+.patch-preview-header h3 {
   margin: 0;
-  color: #343a40;
+  color: var(--text-primary);
   font-size: 1.3em;
 }
 
-
-.close-btn {
+.patch-preview-header .close-btn {
   background: none;
   border: none;
   font-size: 1.5em;
-  color: #6c757d;
   cursor: pointer;
-  padding: 0;
-  width: 30px;
-  height: 30px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  color: var(--text-secondary);
+  padding: 4px 8px;
   border-radius: 4px;
-  transition: background-color 0.2s;
+  transition: all 0.2s;
 }
 
-.close-btn:hover {
-  background: #f8f9fa;
-  color: #343a40;
+.patch-preview-header .close-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
-
-.modal-body {
-  padding: 20px 25px;
-  overflow-y: auto;
-  flex: 1;
-}
-
-.patch-info {
+.patch-preview-info {
+  padding: 16px 24px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
   display: flex;
-  gap: 10px;
-  margin-bottom: 15px;
-  padding: 12px;
-  background: #f8f9fa;
-  border-radius: 6px;
-  border-left: 3px solid #6610f2;
+  flex-direction: column;
+  gap: 8px;
 }
 
-
-.info-label {
-  font-weight: 600;
-  color: #495057;
-}
-
-.info-value {
-  font-family: monospace;
-  color: #6610f2;
-  word-break: break-all;
-}
-
-.patch-preview {
-  background: #f8f9fa;
-  border: 1px solid #dee2e6;
-  border-radius: 6px;
-  padding: 15px;
-  max-height: 400px;
-  overflow-y: auto;
-}
-
-.patch-preview pre {
-  margin: 0;
-  font-family: 'Courier New', monospace;
+.info-item {
+  color: var(--text-primary);
   font-size: 0.9em;
-  color: #212529;
-  white-space: pre-wrap;
-  word-wrap: break-word;
 }
 
+.info-item strong {
+  color: var(--text-primary);
+  margin-right: 8px;
+}
 
-.modal-footer {
+.info-item.warning {
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.1);
+  padding: 12px;
+  border-radius: 6px;
+  border-left: 3px solid #f59e0b;
+}
+
+.patch-preview-content {
+  flex: 1;
+  overflow: auto;
+  padding: 0;
+  background: #1e1e1e;
+}
+
+.patch-preview-content pre {
+  margin: 0;
+  padding: 20px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.85em;
+  line-height: 1.6;
+  color: #d4d4d4;
+  overflow: auto;
+}
+
+.patch-preview-content code {
+  font-family: 'Courier New', Courier, monospace;
+  color: #d4d4d4;
+}
+
+.patch-preview-actions {
+  padding: 20px 24px;
+  border-top: 1px solid var(--border-color);
   display: flex;
   gap: 12px;
-  padding: 20px 25px;
-  border-top: 1px solid #dee2e6;
   justify-content: flex-end;
+  background: var(--bg-secondary);
+  border-radius: 0 0 12px 12px;
 }
 
-
-.copy-btn,
-.download-btn {
+.action-btn {
   padding: 10px 20px;
   border: none;
   border-radius: 6px;
-  font-size: 1em;
+  font-size: 0.95em;
   font-weight: 600;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 8px;
   transition: all 0.2s;
 }
 
 .copy-btn {
-  background: #17a2b8;
+  background: #3b82f6;
   color: white;
 }
 
-.copy-btn:hover {
-  background: #138496;
+.copy-btn:hover:not(:disabled) {
+  background: #2563eb;
   transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+.copy-btn:disabled {
+  background: #10b981;
+  cursor: default;
+  opacity: 1;
 }
 
 .download-btn {
-  background: #6610f2;
+  background: #10b981;
   color: white;
 }
 
-.download-btn:hover {
-  background: #520dc2;
+.download-btn:hover:not(:disabled) {
+  background: #059669;
   transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
 }
 
-.btn-icon {
-  font-size: 1.1em;
+.download-btn:disabled {
+  background: #10b981;
+  cursor: default;
+  opacity: 0.8;
+}
+
+.cancel-btn {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.cancel-btn:hover {
+  background: var(--bg-hover);
 }
 </style>

@@ -161,14 +161,42 @@
       </button>
     </div>
 
-    <!-- Toast Notification -->
-    <div v-if="toast.show" class="toast" :class="toast.type">
-      <div class="toast-icon">{{ toast.type === 'success' ? '✅' : toast.type === 'info' ? 'ℹ️' : '❌' }}</div>
-      <div class="toast-content">
-        <div class="toast-title">{{ toast.title }}</div>
-        <div class="toast-message">{{ toast.message }}</div>
+    <!-- Patch Preview Modal -->
+    <div v-if="showPatchPreview" class="patch-preview-overlay" @click="showPatchPreview = false">
+      <div class="patch-preview-modal" @click.stop>
+        <div class="patch-preview-header">
+          <h3>🔧 Generated SQL Patch Preview</h3>
+          <button @click="showPatchPreview = false" class="close-btn">✕</button>
+        </div>
+
+        <div class="patch-preview-info">
+          <div class="info-item">
+            <strong>File:</strong> {{ patchFilename }}
+          </div>
+          <div class="info-item">
+            <strong>Size:</strong> {{ formatBytes(patchContent.length) }}
+          </div>
+          <div class="info-item warning">
+            ⚠️ <strong>Important:</strong> Review carefully before executing on your database!
+          </div>
+        </div>
+
+        <div class="patch-preview-content">
+          <pre><code>{{ patchContent }}</code></pre>
+        </div>
+
+        <div class="patch-preview-actions">
+          <button @click="copyPatchToClipboard" class="action-btn copy-btn" :disabled="isCopied">
+            {{ isCopied ? '✅ Copied!' : '📋 Copy to Clipboard' }}
+          </button>
+          <button @click="downloadPatchFile" class="action-btn download-btn" :disabled="isDownloaded">
+            {{ isDownloaded ? '✅ Downloaded!' : '💾 Download SQL File' }}
+          </button>
+          <button @click="showPatchPreview = false" class="action-btn cancel-btn">
+            Close
+          </button>
+        </div>
       </div>
-      <button @click="toast.show = false" class="toast-close">×</button>
     </div>
 
     <div v-if="error" class="error-message">
@@ -730,6 +758,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, type ComponentPublicInstance } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
+import { message } from '@tauri-apps/plugin-dialog';
 import type { DatabaseInfo } from '../services/databaseService';
 
 interface Props {
@@ -804,12 +833,14 @@ const isScrolling = ref<Record<string, boolean>>({});
 
 const currentFilter = ref<'all' | 'identical' | 'different' | 'missing' | 'extra'>('all');
 const isGeneratingPatch = ref(false);
-const toast = ref({
-  show: false,
-  type: 'success' as 'success' | 'error' | 'info',
-  title: '',
-  message: ''
-});
+// Remove toast - using native dialogs instead
+
+// Patch preview
+const showPatchPreview = ref(false);
+const patchContent = ref('');
+const patchFilename = ref('');
+const isCopied = ref(false);
+const isDownloaded = ref(false);
 
 const comparisonProgress = ref({
   message: 'Initializing...',
@@ -848,12 +879,9 @@ const getTotalPages = (totalRows: number): number => {
   return Math.ceil(totalRows / ROWS_PER_PAGE);
 };
 
-// Toast helper
-const showToast = (type: 'success' | 'error' | 'info', title: string, message: string) => {
-  toast.value = { show: true, type, title, message };
-  setTimeout(() => {
-    toast.value.show = false;
-  }, type === 'info' ? 8000 : 5000);
+// Native dialog helper - only show for important messages
+const showMessage = async (title: string, msg: string, kind: 'info' | 'warning' | 'error' = 'info') => {
+  await message(msg, { title, kind });
 };
 
 // Computed properties
@@ -989,10 +1017,10 @@ const loadCommonTables = async () => {
       }
     }
     
-    showToast('success', 'Tables Loaded', `Found ${commonTables.value.length} common tables`);
+    // Tables loaded - no notification needed (user can see the list)
   } catch (err) {
     error.value = `Failed to load tables: ${err}`;
-    showToast('error', 'Error', error.value);
+    await showMessage('Error Loading Tables', error.value, 'error');
   }
 };
 
@@ -1020,9 +1048,7 @@ const compareTables = async () => {
     totalRows: 0,
     speed: 0
   };
-  
-  const startTime = Date.now();
-  
+
   try {
     for (let i = 0; i < selectedTables.value.length; i++) {
       const tableName = selectedTables.value[i];
@@ -1039,14 +1065,12 @@ const compareTables = async () => {
       // Allow UI to update
       await new Promise(resolve => setTimeout(resolve, 0));
     }
-    
-    const elapsed = (Date.now() - startTime) / 1000;
-    showToast('success', 'Comparison Complete', 
-      `Compared ${selectedTables.value.length} tables in ${elapsed.toFixed(1)}s`);
-    
+
+    // Comparison complete - results visible, no notification needed
+
   } catch (err) {
     error.value = `Comparison failed: ${err}`;
-    showToast('error', 'Comparison Failed', String(err));
+    await showMessage('Comparison Failed', String(err), 'error');
     console.error('Comparison error:', err);
   } finally {
     isComparing.value = false;
@@ -1079,8 +1103,7 @@ const compareSingleTable = async (tableName: string, tableKey: string): Promise<
   // Use chunking for large tables (>50K rows)
   if (maxRows > 50000) {
     console.log(`📊 Using chunked comparison for ${tableName} (${maxRows.toLocaleString()} rows)`);
-    showToast('info', 'Large Table', 
-      `Table "${tableName}" has ${maxRows.toLocaleString()} rows. Using optimized chunked processing.`);
+    // Large table - using chunked processing (no notification needed, progress shown)
     
     comparison = await compareTableRowsChunked(
       tableName,
@@ -1466,6 +1489,7 @@ const handleSyncScroll = (event: Event, tableName: string, section: 'source' | '
 
   const sourceEl = event.target as HTMLElement;
   const scrollLeft = sourceEl.scrollLeft;
+  const scrollTop = sourceEl.scrollTop;
 
   // Determine the other section to sync with
   const otherSection = section === 'source' ? 'target' : 'source';
@@ -1477,6 +1501,7 @@ const handleSyncScroll = (event: Event, tableName: string, section: 'source' | '
   if (otherEl) {
     isScrolling.value[otherKey] = true;
     otherEl.scrollLeft = scrollLeft;
+    otherEl.scrollTop = scrollTop;
 
     // Reset the flag after a short delay
     setTimeout(() => {
@@ -1521,17 +1546,19 @@ const exportAllDifferences = async () => {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     
-    showToast('success', 'Exported', 'Comparison report exported successfully');
+    // Export successful - file downloaded, no notification needed
   } catch (err) {
-    showToast('error', 'Export Failed', String(err));
+    await showMessage('Export Failed', String(err), 'error');
   }
 };
 
 const generateDataPatch = async () => {
+  // Large patches are handled automatically - no warning needed
+
   isGeneratingPatch.value = true;
   await nextTick(); // Wait for Vue to update
   await new Promise(resolve => setTimeout(resolve, 50)); // Allow browser to paint
-  
+
   try {
     // Prepare comparison data for backend
     const comparisonData = tableComparisons.value.map(result => ({
@@ -1554,30 +1581,46 @@ const generateDataPatch = async () => {
       db2Path: database2.value,
       tableComparisons: comparisonData  // camelCase - Tauri converts to snake_case
     });
-    
+
     // Generate filename with database names and timestamp
     const db1Name = getDatabaseName(database1.value)
       .replace(/\.[^/.]+$/, '')
       .replace(/[^a-z0-9]/gi, '_');
-    
+
     const db2Name = getDatabaseName(database2.value)
       .replace(/\.[^/.]+$/, '')
       .replace(/[^a-z0-9]/gi, '_');
-    
+
     const timestamp = new Date().toISOString()
       .slice(0, 19)
       .replace('T', '_')
       .replace(/:/g, '-');
-    
+
     const filename = `data_patch_${db1Name}_to_${db2Name}_${timestamp}.sql`;
-    
-    downloadPatch(patchSql, filename);
-    
-    showToast('success', 'Data Patch Generated', 
-      `File: ${filename}\nSaved to Downloads folder\n\nIMPORTANT: Review before executing!`);
-    
+
+    // Check file size - if larger than 5MB, skip preview and auto-download
+    const fileSizeBytes = new Blob([patchSql]).size;
+    const SIZE_LIMIT_MB = 5;
+    const SIZE_LIMIT_BYTES = SIZE_LIMIT_MB * 1024 * 1024;
+
+    if (fileSizeBytes > SIZE_LIMIT_BYTES) {
+      // Large file - skip preview, directly download
+      const fileSizeMB = (fileSizeBytes / (1024 * 1024)).toFixed(2);
+      await showMessage(
+        'Large Patch Generated',
+        `Patch size: ${fileSizeMB}MB\n\nFile is too large to preview and will be downloaded directly.\n\nFile: ${filename}`,
+        'info'
+      );
+      downloadPatch(patchSql, filename);
+    } else {
+      // Small file - show preview
+      patchContent.value = patchSql;
+      patchFilename.value = filename;
+      showPatchPreview.value = true;
+    }
+
   } catch (err) {
-    showToast('error', 'Patch Generation Failed', String(err));
+    await showMessage('Patch Generation Failed', String(err), 'error');
   } finally {
     isGeneratingPatch.value = false;
   }
@@ -1634,14 +1677,44 @@ const generateSingleTablePatch = async (tableName: string) => {
     const filename = `data_patch_${tableName}_${timestamp}.sql`;
     downloadPatch(patchSql, filename);
     
-    showToast('success', 'Table Patch Generated', 
-      `Table: ${tableName}\nFile: ${filename}`);
-    
+    // Patch generated - file downloaded, no notification needed
+
   } catch (err) {
-    showToast('error', 'Failed', String(err));
+    await showMessage('Patch Generation Failed', String(err), 'error');
   } finally {
     isGeneratingPatch.value = false;
   }
+};
+
+// Patch preview helper functions
+const copyPatchToClipboard = async () => {
+  try {
+    await navigator.clipboard.writeText(patchContent.value);
+    // Show "Copied!" feedback on button
+    isCopied.value = true;
+    setTimeout(() => {
+      isCopied.value = false;
+    }, 2000);
+  } catch (err) {
+    await showMessage('Copy Failed', 'Could not copy to clipboard', 'error');
+  }
+};
+
+const downloadPatchFile = () => {
+  downloadPatch(patchContent.value, patchFilename.value);
+  // Show "Downloaded!" feedback on button
+  isDownloaded.value = true;
+  setTimeout(() => {
+    isDownloaded.value = false;
+  }, 2000);
+};
+
+const formatBytes = (bytes: number): string => {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
 };
 </script>
 
@@ -2169,81 +2242,6 @@ const generateSingleTablePatch = async (tableName: string) => {
   background: #520dc2;
 }
 /* Toast Notification */
-.toast {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  /* background: white; */
-  background: var(--bg-card);
-  padding: 20px;
-  border-radius: 8px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-  display: flex;
-  gap: 15px;
-  align-items: start;
-  max-width: 400px;
-  z-index: 10001;
-  animation: slideIn 0.3s ease;
-}
-
-@keyframes slideIn {
-  from {
-    transform: translateX(400px);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
-.toast.success {
-  border-left: 4px solid #27ae60;
-}
-
-.toast.error {
-  border-left: 4px solid #e74c3c;
-}
-
-.toast.info {
-  border-left: 4px solid #3498db;
-}
-
-.toast-icon {
-  font-size: 1.5em;
-}
-
-.toast-content {
-  flex: 1;
-}
-
-.toast-title {
-  font-weight: 600;
-  margin-bottom: 5px;
-  color: var(--text-primary);
-  /* color: #2c3e50; */
-}
-
-.toast-message {
-  font-size: 0.95em;
-  color: var(--text-secondary);
-  /* color: #555; */
-}
-
-.toast-close {
-  background: none;
-  border: none;
-  font-size: 1.5em;
-  cursor: pointer;
-  color: var(--text-secondary);
-  padding: 0;
-}
-
-.toast-close:hover {
-  color: var(--text-primary);
-  /* color: #2c3e50; */
-}
-
 /* Error Message */
 .error-message {
   background: #ffebee;
@@ -2901,5 +2899,176 @@ const generateSingleTablePatch = async (tableName: string) => {
   .pagination-controls {
     justify-content: center;
   }
+}
+
+/* Patch Preview Modal Styles */
+.patch-preview-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  backdrop-filter: blur(4px);
+}
+
+.patch-preview-modal {
+  background: var(--bg-primary);
+  border-radius: 12px;
+  width: 90%;
+  max-width: 900px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+.patch-preview-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--bg-secondary);
+  border-radius: 12px 12px 0 0;
+}
+
+.patch-preview-header h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 1.3em;
+}
+
+.patch-preview-header .close-btn {
+  background: none;
+  border: none;
+  font-size: 1.5em;
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.patch-preview-header .close-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.patch-preview-info {
+  padding: 16px 24px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.info-item {
+  color: var(--text-primary);
+  font-size: 0.9em;
+}
+
+.info-item strong {
+  color: var(--text-primary);
+  margin-right: 8px;
+}
+
+.info-item.warning {
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.1);
+  padding: 12px;
+  border-radius: 6px;
+  border-left: 3px solid #f59e0b;
+}
+
+.patch-preview-content {
+  flex: 1;
+  overflow: auto;
+  padding: 0;
+  background: #1e1e1e;
+}
+
+.patch-preview-content pre {
+  margin: 0;
+  padding: 20px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.85em;
+  line-height: 1.6;
+  color: #d4d4d4;
+  overflow: auto;
+}
+
+.patch-preview-content code {
+  font-family: 'Courier New', Courier, monospace;
+  color: #d4d4d4;
+}
+
+.patch-preview-actions {
+  padding: 20px 24px;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  background: var(--bg-secondary);
+  border-radius: 0 0 12px 12px;
+}
+
+.action-btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.95em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.copy-btn {
+  background: #3b82f6;
+  color: white;
+}
+
+.copy-btn:hover:not(:disabled) {
+  background: #2563eb;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+.copy-btn:disabled {
+  background: #10b981;
+  cursor: default;
+  opacity: 1;
+}
+
+.download-btn {
+  background: #10b981;
+  color: white;
+}
+
+.download-btn:hover:not(:disabled) {
+  background: #059669;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+.download-btn:disabled {
+  background: #10b981;
+  cursor: default;
+  opacity: 0.8;
+}
+
+.cancel-btn {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.cancel-btn:hover {
+  background: var(--bg-hover);
 }
 </style>

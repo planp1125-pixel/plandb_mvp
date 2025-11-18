@@ -666,6 +666,7 @@ h3 {
   padding: 12px 24px;
   background: #f3f4f6;
   border: 2px solid #d1d5db;
+  color: #000000;
   border-radius: 8px;
   font-weight: 600;
   cursor: pointer;

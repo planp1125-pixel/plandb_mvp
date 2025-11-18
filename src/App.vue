@@ -116,8 +116,8 @@
           }"
         >
           <!-- Database Content -->
-          <div v-if="activeNavItem === 'database'" class="h-full">
-            <Database 
+          <div v-show="activeNavItem === 'database'" class="h-full">
+            <Database
               :connected-databases="connectedDatabases"
               :selected-database="selectedDatabase"
               @table-selected="handleTableSelected"
@@ -126,22 +126,23 @@
           </div>
 
           <!-- Settings Content -->
-          <div v-else-if="activeNavItem === 'settings'" class="h-full">
+          <div v-show="activeNavItem === 'settings'" class="h-full">
             <Settings />
           </div>
 
           <!-- Subscription Content -->
-          <div v-else-if="activeNavItem === 'subscription'" class="h-full">
+          <div v-show="activeNavItem === 'subscription'" class="h-full">
             <Subscription />
           </div>
 
           <!-- Profile Content -->
-          <div v-else-if="activeNavItem === 'profile'" class="h-full">
+          <div v-show="activeNavItem === 'profile'" class="h-full">
             <Profile />
           </div>
         </div>
       </div>
     </main>
+
   </div>
 </template>
 
@@ -169,6 +170,7 @@ function toggleTheme() {
   applyTheme(!isDark.value)
 }
 
+// License management
 onMounted(() => {
   const ls = localStorage.getItem('theme')
   if (ls) {
@@ -177,7 +179,7 @@ onMounted(() => {
     const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches
     applyTheme(!!prefersDark)
   }
-  
+
   const mq = window.matchMedia?.('(prefers-color-scheme: dark)')
   mq?.addEventListener('change', e => {
     if (!localStorage.getItem('theme')) applyTheme(e.matches)

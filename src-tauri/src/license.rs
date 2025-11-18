@@ -124,7 +124,7 @@ async fn verify_with_server(&self, email: &str, license_key: &str) -> Result<Lic
     let machine_id = get_machine_id();
     
     let server_url = "https://plandbdiff-licence.vercel.app/api/verify";
-    println!("🔗 Connecting to: {}", server_url); // ADD THIS FOR DEBUGGING
+    println!("🔗 Connecting to: {}", server_url); // FOR DEBUGGING
     
     let response = client
         .post(server_url)
@@ -137,11 +137,11 @@ async fn verify_with_server(&self, email: &str, license_key: &str) -> Result<Lic
         .send()
         .await
         .map_err(|e| {
-            println!("❌ Network error: {}", e); // ADD THIS
+            println!("❌ Network error: {}", e); // FOR DEBUGGING
             format!("License verification failed: {}", e)
         })?;
 
-    println!("✅ Server response status: {}", response.status()); // ADD THIS
+    println!("✅ Server response status: {}", response.status()); // FOR DEBUGGING
     
     if !response.status().is_success() {
         return Err("Invalid license key or email".to_string());
@@ -150,7 +150,7 @@ async fn verify_with_server(&self, email: &str, license_key: &str) -> Result<Lic
     let data: serde_json::Value = response.json().await
         .map_err(|e| format!("Failed to parse server response: {}", e))?;
 
-    println!("📄 Server response: {:?}", data); // ADD THIS
+    println!("📄 Server response: {:?}", data); // FOR DEBUGGING
 
     let license_type = match data["license_type"].as_str() {
         Some("monthly") => LicenseType::Monthly,
