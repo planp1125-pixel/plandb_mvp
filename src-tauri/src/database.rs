@@ -34,6 +34,12 @@ impl DatabaseManager {
         self.connected_databases.get(db_path).and_then(|info| info.password.clone())
     }
 
+    /// Disconnect a database to force reconnection (useful after schema changes)
+    pub fn disconnect(&mut self, db_path: &str) {
+        self.connections.remove(db_path);
+        // Keep connected_databases entry so we remember the password
+    }
+
     /// Detect if a database is encrypted (SQLCipher) or regular SQLite
     fn detect_database_type(&self, path: &str) -> anyhow::Result<DatabaseType> {
         // Use Path for cross-platform handling
@@ -209,8 +215,8 @@ pub fn connect_database(
                 // Extract settings from JSON
                 let page_size = s["page_size"].as_str().unwrap_or("4096");
                 let kdf_iter = s["kdf_iterations"].as_str().unwrap_or("256000");
-                let hmac_algo = s["hmac_algorithm"].as_str().unwrap_or("HMAC_SHA256");
-                let kdf_algo = s["kdf_algorithm"].as_str().unwrap_or("PBKDF2_HMAC_SHA256");
+                let hmac_algo = s["hmac_algorithm"].as_str().unwrap_or("HMAC_SHA512");
+                let kdf_algo = s["kdf_algorithm"].as_str().unwrap_or("PBKDF2_HMAC_SHA512");
                 
                 println!("📝 Applying user settings: page_size={}, kdf_iter={}", page_size, kdf_iter);
                 
@@ -226,19 +232,19 @@ pub fn connect_database(
                 conn.pragma_update(None, "cipher_kdf_algorithm", kdf_algo)
                     .with_context(|| "Failed to set KDF algorithm")?;
             } else {
-                // Use default settings (same as migration defaults)
-                println!("📝 Applying default settings");
-                
+                // Use default settings (SQLCipher 4 defaults with SHA512)
+                println!("📝 Applying default settings (SQLCipher 4 with SHA512)");
+
                 conn.pragma_update(None, "cipher_page_size", "4096")
                     .with_context(|| "Failed to set page size")?;
-                
+
                 conn.pragma_update(None, "kdf_iter", "256000")
                     .with_context(|| "Failed to set KDF iterations")?;
-                
-                conn.pragma_update(None, "cipher_hmac_algorithm", "HMAC_SHA256")
+
+                conn.pragma_update(None, "cipher_hmac_algorithm", "HMAC_SHA512")
                     .with_context(|| "Failed to set HMAC algorithm")?;
-                
-                conn.pragma_update(None, "cipher_kdf_algorithm", "PBKDF2_HMAC_SHA256")
+
+                conn.pragma_update(None, "cipher_kdf_algorithm", "PBKDF2_HMAC_SHA512")
                     .with_context(|| "Failed to set KDF algorithm")?;
             }
             

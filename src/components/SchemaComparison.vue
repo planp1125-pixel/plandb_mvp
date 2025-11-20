@@ -479,6 +479,9 @@
         </div>
 
         <div class="patch-preview-actions">
+          <button @click="applyPatchToDatabase" class="action-btn apply-btn" :disabled="isApplying || patchApplied">
+            {{ patchApplied ? '✅ Applied!' : (isApplying ? '⏳ Applying...' : '⚡ Apply to Database') }}
+          </button>
           <button @click="copyPatchToClipboard" class="action-btn copy-btn" :disabled="isCopied">
             {{ isCopied ? '✅ Copied!' : '📋 Copy to Clipboard' }}
           </button>
@@ -488,6 +491,10 @@
           <button @click="closePatchModal" class="action-btn cancel-btn">
             Close
           </button>
+        </div>
+
+        <div v-if="applyProgress" class="apply-progress">
+          {{ applyProgress }}
         </div>
       </div>
     </div>
@@ -940,6 +947,9 @@ const generatedPatchSQL = ref('');
 const patchFilename = ref('');
 const isCopied = ref(false);
 const isDownloaded = ref(false);
+const isApplying = ref(false);
+const patchApplied = ref(false);
+const applyProgress = ref('');
 
 // const generatePatch = async () => {
 //   if (!database1.value || !database2.value) return;
@@ -1044,6 +1054,54 @@ const formatBytes = (bytes: number): string => {
 
 const closePatchModal = () => {
   showPatchModal.value = false;
+  // Reset apply states when closing
+  isApplying.value = false;
+  patchApplied.value = false;
+  applyProgress.value = '';
+};
+
+const applyPatchToDatabase = async () => {
+  if (!database2.value || !generatedPatchSQL.value) return;
+
+  isApplying.value = true;
+  applyProgress.value = 'Applying schema patch to target database...';
+
+  try {
+    const result = await invoke<string>('apply_schema_patch', {
+      targetDbPath: database2.value,
+      patchSql: generatedPatchSQL.value
+    });
+
+    applyProgress.value = result;
+    patchApplied.value = true;
+
+    await message(result, {
+      title: 'Schema Patch Applied',
+      kind: 'info'
+    });
+
+    // Close modal
+    showPatchModal.value = false;
+
+    // Re-run comparison to show synchronized state
+    isApplying.value = true;
+    await compareSchemas();
+
+  } catch (err) {
+    console.error('Failed to apply schema patch:', err);
+    applyProgress.value = '';
+    await message(
+      `Failed to apply schema patch:\n\n${err}`,
+      {
+        title: 'Error Applying Patch',
+        kind: 'error'
+      }
+    );
+  } finally {
+    isApplying.value = false;
+    patchApplied.value = false;
+    applyProgress.value = '';
+  }
 };
 
 const downloadPatch = (sql: string, filename: string) => {
@@ -1882,5 +1940,36 @@ onBeforeUnmount(() => {
 
 .cancel-btn:hover {
   background: var(--bg-hover);
+}
+
+.apply-btn {
+  background: #10b981;
+  color: white;
+  font-weight: 700;
+}
+
+.apply-btn:hover:not(:disabled) {
+  background: #059669;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+.apply-btn:disabled {
+  background: #6c757d;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.apply-progress {
+  padding: 12px 20px;
+  background: #d1fae5;
+  color: #065f46;
+  border-radius: 6px;
+  font-size: 0.9em;
+  font-weight: 600;
+  text-align: center;
+  margin-top: 12px;
+  border: 1px solid #10b981;
+  animation: slideIn 0.3s ease-out;
 }
 </style>

@@ -387,22 +387,37 @@ const refreshLicense = async () => {
   setTimeout(() => refreshing.value = false, 1000);
 };
 
-const openPurchase = (plan: string) => {
-  const paddleProductIds: Record<string, string> = {
+const openPurchase = async (plan: string) => {
+  const paddlePriceIds: Record<string, string> = {
     monthly: 'pri_01k807azrz8asavdg42z0fqv34',
     yearly: 'pri_01k807dj8bv6h3gp9c1tvp6dfc',
     lifetime: 'pri_01k807ewanhdkvhb06wr24ffy9'
   };
 
-  if (window.Paddle) {
-    window.Paddle.Checkout.open({
-      product: paddleProductIds[plan],
-      successCallback: (data: any) => {
-        console.log('Purchase successful:', data);
-      }
+  try {
+    // Call our backend API to create a checkout session
+    const response = await fetch('https://plandbdiff-license-02-1xyxdl83k-manikandans-projects-be37ef3a.vercel.app/api/create-checkout', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        priceId: paddlePriceIds[plan]
+      })
     });
-  } else {
-    open(`https://buy.paddle.com/checkout?product=${paddleProductIds[plan]}`);
+
+    const data = await response.json();
+
+    if (data.checkoutUrl) {
+      // Open the checkout URL in the user's default browser
+      await open(data.checkoutUrl);
+    } else {
+      throw new Error('No checkout URL received');
+    }
+  } catch (error) {
+    console.error('Failed to create checkout:', error);
+    // Fallback: Open support email
+    await open('mailto:support@planp.com?subject=Purchase SQLCipher Tool License&body=I would like to purchase a ' + plan + ' license. Price ID: ' + paddlePriceIds[plan]);
   }
 };
 

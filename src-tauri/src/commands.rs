@@ -233,20 +233,24 @@ pub async fn generate_schema_patch(
     sql.push_str(&format!("-- Source: {}\n", comparison.database1));
     sql.push_str(&format!("-- Target: {}\n", comparison.database2));
     sql.push_str(&format!("-- Generated: {}\n\n", chrono::Utc::now()));
-    
-    sql.push_str("BEGIN TRANSACTION;\n\n");
-    
-    // Drop removed tables
-    for table in &comparison.removed_tables {
-        sql.push_str("-- Drop removed table\n");
-        sql.push_str(&format!("DROP TABLE IF EXISTS `{}`;\n\n", table));
+    sql.push_str("-- NOTE: PRAGMA statements require the transaction to be committed first.\n");
+    sql.push_str("-- If running in DB Browser, close any open transactions before executing.\n\n");
+
+    // Track if we need PRAGMA statements (table recreation)
+    let has_table_recreation = comparison.modified_tables.iter()
+        .any(|m| !m.removed_columns.is_empty() || !m.added_columns.is_empty() || !m.modified_columns.is_empty());
+
+    // Start transaction only for simple operations (no PRAGMA needed)
+    if !has_table_recreation {
+        sql.push_str("BEGIN TRANSACTION;\n\n");
     }
-    
-    // Create added tables
-    for table in &comparison.added_tables {
-        match get_create_table_sql(&target_conn, table) {
+
+    // Create tables that exist in SOURCE but not in TARGET
+    // Industry standard: Make target match source
+    for table in &comparison.removed_tables {
+        match get_create_table_sql(&source_conn, table) {
             Ok(create_sql) => {
-                sql.push_str("-- Create new table\n");
+                sql.push_str("-- Create table from source\n");
                 sql.push_str(&format!("{};\n\n", create_sql));
             }
             Err(e) => {
@@ -254,19 +258,30 @@ pub async fn generate_schema_patch(
             }
         }
     }
+
+    // Drop tables that exist in TARGET but not in SOURCE
+    // Industry standard: Make target match source
+    for table in &comparison.added_tables {
+        sql.push_str("-- Drop table not in source\n");
+        sql.push_str(&format!("DROP TABLE IF EXISTS `{}`;\n\n", table));
+    }
     
     // Modify existing tables
     for modified in &comparison.modified_tables {
-        let needs_recreation = !modified.removed_columns.is_empty() 
+        // added_columns = columns in TARGET but not in SOURCE → need to DROP (requires recreation)
+        // removed_columns = columns in SOURCE but not in TARGET → need to ADD
+        // modified_columns = columns with different types/constraints → requires recreation
+
+        let needs_recreation = !modified.added_columns.is_empty()
             || !modified.modified_columns.is_empty();
-        
+
         if needs_recreation {
             // Generate table recreation SQL
             sql.push_str(&format!("-- Recreate table: {} (columns removed/modified)\n", modified.table_name));
-            
+
             match generate_table_recreation_sql(
-                &source_conn, 
-                &target_conn, 
+                &source_conn,
+                &target_conn,
                 &modified.table_name,
                 &modified
             ) {
@@ -274,12 +289,12 @@ pub async fn generate_schema_patch(
                     sql.push_str(&recreation_sql);
                 }
                 Err(e) => {
-                    sql.push_str(&format!("-- ERROR: Could not generate recreation SQL for {}: {}\n", 
+                    sql.push_str(&format!("-- ERROR: Could not generate recreation SQL for {}: {}\n",
                         modified.table_name, e));
                     sql.push_str(&format!("-- Manual recreation required for:\n"));
-                    if !modified.removed_columns.is_empty() {
-                        sql.push_str(&format!("--   Removed columns: {}\n", 
-                            modified.removed_columns.join(", ")));
+                    if !modified.added_columns.is_empty() {
+                        sql.push_str(&format!("--   Columns to drop: {}\n",
+                            modified.added_columns.iter().map(|c| c.name.as_str()).collect::<Vec<_>>().join(", ")));
                     }
                     for mod_col in &modified.modified_columns {
                         sql.push_str(&format!(
@@ -290,32 +305,111 @@ pub async fn generate_schema_patch(
                 }
             }
             sql.push_str("\n");
-        } else {
-            // Only added columns - simple ALTER TABLE
-            sql.push_str(&format!("-- Modify table: {} (add columns)\n", modified.table_name));
-            for col in &modified.added_columns {
-                let nullable = if col.is_nullable { "" } else { " NOT NULL" };
-                let default = match &col.default_value {
-                    Some(def) => format!(" DEFAULT {}", def),
-                    None => String::new(),
-                };
-                
-                sql.push_str(&format!(
-                    "ALTER TABLE `{}` ADD COLUMN `{}` {}{}{};\n",
-                    modified.table_name,
-                    col.name,
-                    col.data_type,
-                    nullable,
-                    default
-                ));
+        } else if !modified.removed_columns.is_empty() {
+            // Only removed_columns (in source, not in target) - simple ALTER TABLE ADD
+            sql.push_str(&format!("-- Modify table: {} (add columns from source)\n", modified.table_name));
+
+            // Get column definitions from source
+            for col_name in &modified.removed_columns {
+                // Get the column info from source database
+                match get_column_info(&source_conn, &modified.table_name, col_name) {
+                    Ok(col) => {
+                        let nullable = if col.is_nullable { "" } else { " NOT NULL" };
+                        let default = match &col.default_value {
+                            Some(def) => format!(" DEFAULT {}", def),
+                            None => String::new(),
+                        };
+
+                        sql.push_str(&format!(
+                            "ALTER TABLE `{}` ADD COLUMN `{}` {}{}{};\n",
+                            modified.table_name,
+                            col.name,
+                            col.data_type,
+                            nullable,
+                            default
+                        ));
+                    }
+                    Err(e) => {
+                        sql.push_str(&format!("-- ERROR: Could not get column info for {}: {}\n", col_name, e));
+                    }
+                }
             }
             sql.push_str("\n");
         }
     }
-    
-    sql.push_str("COMMIT;\n");
-    
+
+    // Close transaction only if we started one
+    if !has_table_recreation {
+        sql.push_str("COMMIT;\n");
+    }
+
+    sql.push_str("\n-- Migration complete\n");
+
     Ok(sql)
+}
+
+#[tauri::command]
+pub async fn apply_schema_patch(
+    target_db_path: String,
+    patch_sql: String,
+    db_manager: State<'_, Mutex<DatabaseManager>>,
+) -> Result<String, String> {
+    let db_password = {
+        let manager = db_manager.lock().unwrap();
+        manager.get_password(&target_db_path).unwrap_or_default()
+    };
+
+    // Open target database with a new connection
+    let conn = Connection::open(&target_db_path)
+        .map_err(|e| format!("Failed to open target database: {}", e))?;
+
+    // Unlock if needed
+    unlock_database(&conn, &db_password)?;
+
+    // Execute the patch SQL
+    // Split by statements and execute one by one for better error handling
+    let statements: Vec<&str> = patch_sql.split(';').collect();
+    let total_statements = statements.len();
+    let mut executed = 0;
+
+    for (idx, statement) in statements.iter().enumerate() {
+        let trimmed = statement.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        // Remove comment lines (lines starting with --)
+        let cleaned: String = trimmed
+            .lines()
+            .filter(|line| !line.trim().starts_with("--"))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        let cleaned = cleaned.trim();
+        if cleaned.is_empty() {
+            continue;
+        }
+
+        // Execute the statement
+        conn.execute(cleaned, [])
+            .map_err(|e| format!("Error at statement {}/{}: {}\nStatement: {}",
+                idx + 1, total_statements, e, cleaned))?;
+
+        executed += 1;
+    }
+
+    // Close the connection to flush changes
+    drop(conn);
+
+    // Force DatabaseManager to reconnect to see the updated schema
+    {
+        let mut manager = db_manager.lock().unwrap();
+        // Disconnect and reconnect to refresh the schema cache
+        manager.disconnect(&target_db_path);
+        let _ = manager.connect_database(&target_db_path, &db_password, None);
+    }
+
+    Ok(format!("Schema patch applied successfully. Executed {} statements.", executed))
 }
 
 // Helper function to unlock database
@@ -359,15 +453,22 @@ fn generate_table_recreation_sql(
     table_name: &str,
     diff: &crate::models::TableDiff,
 ) -> Result<String, String> {
-    // Get the target schema (what we want)
-    let target_schema = get_create_table_sql(target_conn, table_name)
-        .map_err(|e| format!("Could not get target schema: {}", e))?;
-    
-    // Get columns from target (final state)
-    let target_columns = get_table_column_names(target_conn, table_name)?;
-    
-    // Get columns from source (current state)
+    // Get the SOURCE schema (what we want - make target match source)
+    let mut source_schema = get_create_table_sql(source_conn, table_name)
+        .map_err(|e| format!("Could not get source schema: {}", e))?;
+
+    // Fix unsupported collations
+    source_schema = source_schema
+        .replace("COLLATE UTF16", "COLLATE BINARY")
+        .replace("COLLATE utf16", "COLLATE BINARY")
+        .replace("COLLATE UTF8", "COLLATE BINARY")
+        .replace("COLLATE utf8", "COLLATE BINARY");
+
+    // Get columns from source (final state - what we want)
     let source_columns = get_table_column_names(source_conn, table_name)?;
+
+    // Get columns from target (current state)
+    let target_columns = get_table_column_names(target_conn, table_name)?;
     
     // Find common columns for data migration
     let common_columns: Vec<String> = source_columns.iter()
@@ -386,17 +487,17 @@ fn generate_table_recreation_sql(
     
     let mut sql = String::new();
     
-    // Step 1: Disable foreign keys
+    // Step 1: Disable foreign keys (must be outside transaction)
     sql.push_str("PRAGMA foreign_keys=off;\n\n");
+
+    // Step 2: Start a transaction for this table recreation
+    sql.push_str("BEGIN IMMEDIATE;\n\n");
     
-    // Step 2: Start transaction (already in one, but document it)
-    sql.push_str("-- Transaction already started\n\n");
-    
-    // Step 3: Rename old table
+    // Step 3: Rename old table (current target)
     sql.push_str(&format!("ALTER TABLE `{}` RENAME TO `{}_old`;\n\n", table_name, table_name));
-    
-    // Step 4: Create new table with target schema
-    sql.push_str(&format!("{};\n\n", target_schema));
+
+    // Step 4: Create new table with source schema (make target match source)
+    sql.push_str(&format!("{};\n\n", source_schema));
     
     // Step 5: Copy data from old to new table
     sql.push_str(&format!(
@@ -409,18 +510,21 @@ fn generate_table_recreation_sql(
     
     // Step 6: Drop old table
     sql.push_str(&format!("DROP TABLE `{}_old`;\n\n", table_name));
-    
-    // Step 7: Re-enable foreign keys
+
+    // Step 7: Commit this table's transaction
+    sql.push_str("COMMIT;\n\n");
+
+    // Step 8: Re-enable foreign keys (must be outside transaction)
     sql.push_str("PRAGMA foreign_keys=on;\n\n");
     
     // Add comment about what changed
     sql.push_str("-- Changes applied:\n");
     if !diff.removed_columns.is_empty() {
-        sql.push_str(&format!("--   Removed: {}\n", diff.removed_columns.join(", ")));
+        sql.push_str(&format!("--   Added (from source): {}\n", diff.removed_columns.join(", ")));
     }
     if !diff.added_columns.is_empty() {
-        let added: Vec<String> = diff.added_columns.iter().map(|c| c.name.clone()).collect();
-        sql.push_str(&format!("--   Added: {}\n", added.join(", ")));
+        let dropped: Vec<String> = diff.added_columns.iter().map(|c| c.name.clone()).collect();
+        sql.push_str(&format!("--   Dropped (not in source): {}\n", dropped.join(", ")));
     }
     if !diff.modified_columns.is_empty() {
         for mod_col in &diff.modified_columns {
@@ -558,19 +662,19 @@ pub async fn generate_data_patch(
             }
         }
 
-        // 3. DELETE extra rows (exist in target, not in source) - COMMENTED OUT
+        // 3. DELETE extra rows (exist in target, not in source)
+        // Industry standard: Make target match source by removing extra rows
         if let Some(extra) = comparison.get("extraInTarget").and_then(|v| v.as_array()) {
             if !extra.is_empty() {
-                sql.push_str(&format!("-- DELETE {} extra rows from {} (COMMENTED FOR SAFETY)\n", 
+                sql.push_str(&format!("-- DELETE {} extra rows from {}\n",
                     extra.len(), table_name));
-                sql.push_str("-- Uncomment the following lines if you want to remove these rows:\n\n");
-                
+
                 for row in extra {
                     let key_value = row.get(key_column)
                         .ok_or_else(|| format!("Missing key column {} in row", key_column))?;
-                    
+
                     let delete_sql = format!(
-                        "-- DELETE FROM `{}` WHERE `{}` = {};\n",
+                        "DELETE FROM `{}` WHERE `{}` = {};\n",
                         table_name,
                         key_column,
                         format_value_for_sql(key_value)
@@ -584,8 +688,59 @@ pub async fn generate_data_patch(
     
     sql.push_str("COMMIT;\n\n");
     sql.push_str("-- End of data synchronization patch\n");
-    
+
     Ok(sql)
+}
+
+#[tauri::command]
+pub async fn apply_data_patch(
+    target_db_path: String,
+    patch_sql: String,
+    db_manager: State<'_, Mutex<DatabaseManager>>,
+) -> Result<String, String> {
+    let manager = db_manager.lock().unwrap();
+
+    // Open target database
+    let mut conn = Connection::open(&target_db_path)
+        .map_err(|e| format!("Failed to open target database: {}", e))?;
+
+    // Get password and unlock if needed
+    let db_password = manager.get_password(&target_db_path).unwrap_or_default();
+    unlock_database(&conn, &db_password)?;
+
+    // Execute the patch SQL
+    // Split by statements and execute one by one for better error handling
+    let statements: Vec<&str> = patch_sql.split(';').collect();
+    let total_statements = statements.len();
+    let mut executed = 0;
+
+    for (idx, statement) in statements.iter().enumerate() {
+        let trimmed = statement.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        // Remove comment lines (lines starting with --)
+        let cleaned: String = trimmed
+            .lines()
+            .filter(|line| !line.trim().starts_with("--"))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        let cleaned = cleaned.trim();
+        if cleaned.is_empty() {
+            continue;
+        }
+
+        // Execute the statement
+        conn.execute(cleaned, [])
+            .map_err(|e| format!("Error at statement {}/{}: {}\nStatement: {}",
+                idx + 1, total_statements, e, cleaned))?;
+
+        executed += 1;
+    }
+
+    Ok(format!("Data patch applied successfully. Executed {} statements.", executed))
 }
 
 // Helper function to generate INSERT statement
@@ -659,17 +814,40 @@ fn format_value_for_sql(value: &serde_json::Value) -> String {
 }
 
 // Get column names from table
+// Get a specific column's info from a table
+fn get_column_info(conn: &Connection, table_name: &str, column_name: &str) -> Result<ColumnInfo, String> {
+    let mut stmt = conn.prepare(&format!("PRAGMA table_info(`{}`)", table_name))
+        .map_err(|e| format!("Failed to get table info: {}", e))?;
+
+    let columns: Vec<ColumnInfo> = stmt.query_map([], |row| {
+        Ok(ColumnInfo {
+            name: row.get(1)?,
+            data_type: row.get(2)?,
+            is_nullable: row.get::<_, i32>(3)? == 0,
+            default_value: row.get(4).ok(),
+            is_primary_key: row.get::<_, i32>(5)? == 1,
+        })
+    })
+    .map_err(|e| format!("Failed to query columns: {}", e))?
+    .collect::<Result<Vec<_>, _>>()
+    .map_err(|e| format!("Failed to collect columns: {}", e))?;
+
+    columns.into_iter()
+        .find(|c| c.name == column_name)
+        .ok_or_else(|| format!("Column {} not found in table {}", column_name, table_name))
+}
+
 fn get_column_names(conn: &Connection, table_name: &str) -> Result<Vec<String>, String> {
     let mut stmt = conn.prepare(&format!("PRAGMA table_info(`{}`)", table_name))
         .map_err(|e| format!("Failed to get table info: {}", e))?;
-    
+
     let columns: Vec<String> = stmt.query_map([], |row| {
         row.get::<_, String>(1) // Column name is at index 1
     })
     .map_err(|e| format!("Failed to query columns: {}", e))?
     .collect::<Result<Vec<_>, _>>()
     .map_err(|e| format!("Failed to collect columns: {}", e))?;
-    
+
     Ok(columns)
 }
 
@@ -996,10 +1174,18 @@ pub async fn migrate_to_sqlcipher(
         .execute("BEGIN TRANSACTION", [])
         .map_err(|e| format!("Failed to begin transaction: {}", e))?;
 
-    // Create tables
+    // Create tables with fixed collations
     for (table_name, schema) in &table_schemas {
+        // Replace unsupported collations with SQLCipher-compatible ones
+        // SQLCipher only supports: BINARY, NOCASE, RTRIM
+        let fixed_schema = schema
+            .replace("COLLATE UTF16", "COLLATE BINARY")
+            .replace("COLLATE utf16", "COLLATE BINARY")
+            .replace("COLLATE UTF8", "COLLATE BINARY")
+            .replace("COLLATE utf8", "COLLATE BINARY");
+
         dest_conn
-            .execute(schema, [])
+            .execute(&fixed_schema, [])
             .map_err(|e| format!("Failed to create table {}: {}", table_name, e))?;
     }
 
@@ -1188,22 +1374,22 @@ fn apply_sqlcipher_settings(
     conn.pragma_update(None, "kdf_iter", &settings.kdf_iterations)
         .map_err(|e| format!("Failed to set KDF iterations: {}", e))?;
 
-    // Set HMAC algorithm
+    // Set HMAC algorithm (default: SHA512 for SQLCipher 4)
     let hmac_value = match settings.hmac_algorithm.as_str() {
         "HMAC_SHA1" => "HMAC_SHA1",
         "HMAC_SHA256" => "HMAC_SHA256",
         "HMAC_SHA512" => "HMAC_SHA512",
-        _ => "HMAC_SHA256",
+        _ => "HMAC_SHA512",
     };
     conn.pragma_update(None, "cipher_hmac_algorithm", hmac_value)
         .map_err(|e| format!("Failed to set HMAC algorithm: {}", e))?;
 
-    // Set KDF algorithm
+    // Set KDF algorithm (default: SHA512 for SQLCipher 4)
     let kdf_value = match settings.kdf_algorithm.as_str() {
         "PBKDF2_HMAC_SHA1" => "PBKDF2_HMAC_SHA1",
         "PBKDF2_HMAC_SHA256" => "PBKDF2_HMAC_SHA256",
         "PBKDF2_HMAC_SHA512" => "PBKDF2_HMAC_SHA512",
-        _ => "PBKDF2_HMAC_SHA256",
+        _ => "PBKDF2_HMAC_SHA512",
     };
     conn.pragma_update(None, "cipher_kdf_algorithm", kdf_value)
         .map_err(|e| format!("Failed to set KDF algorithm: {}", e))?;

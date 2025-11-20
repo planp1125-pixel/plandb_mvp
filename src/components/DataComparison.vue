@@ -186,6 +186,9 @@
         </div>
 
         <div class="patch-preview-actions">
+          <button @click="applyPatchToDatabase" class="action-btn apply-btn" :disabled="isApplying || patchApplied">
+            {{ patchApplied ? '✅ Applied!' : (isApplying ? '⏳ Applying...' : '⚡ Apply to Database') }}
+          </button>
           <button @click="copyPatchToClipboard" class="action-btn copy-btn" :disabled="isCopied">
             {{ isCopied ? '✅ Copied!' : '📋 Copy to Clipboard' }}
           </button>
@@ -195,6 +198,10 @@
           <button @click="showPatchPreview = false" class="action-btn cancel-btn">
             Close
           </button>
+        </div>
+
+        <div v-if="applyProgress" class="apply-progress">
+          {{ applyProgress }}
         </div>
       </div>
     </div>
@@ -841,6 +848,9 @@ const patchContent = ref('');
 const patchFilename = ref('');
 const isCopied = ref(false);
 const isDownloaded = ref(false);
+const isApplying = ref(false);
+const patchApplied = ref(false);
+const applyProgress = ref('');
 
 const comparisonProgress = ref({
   message: 'Initializing...',
@@ -1709,6 +1719,48 @@ const downloadPatchFile = () => {
   }, 2000);
 };
 
+const applyPatchToDatabase = async () => {
+  if (!database2.value || !patchContent.value) return;
+
+  isApplying.value = true;
+  applyProgress.value = 'Applying data patch to target database...';
+
+  try {
+    const result = await invoke<string>('apply_data_patch', {
+      targetDbPath: database2.value,
+      patchSql: patchContent.value
+    });
+
+    applyProgress.value = result;
+    patchApplied.value = true;
+
+    await showMessage(
+      'Data Patch Applied',
+      result,
+      'info'
+    );
+
+    // Close modal and refresh comparison
+    showPatchPreview.value = false;
+    patchApplied.value = false;
+    applyProgress.value = '';
+
+    // Re-run comparison to show synchronized state
+    await compareTables();
+
+  } catch (err) {
+    console.error('Failed to apply data patch:', err);
+    applyProgress.value = '';
+    await showMessage(
+      'Error Applying Patch',
+      `Failed to apply data patch:\n\n${err}`,
+      'error'
+    );
+  } finally {
+    isApplying.value = false;
+  }
+};
+
 const formatBytes = (bytes: number): string => {
   if (bytes === 0) return '0 Bytes';
   const k = 1024;
@@ -1932,19 +1984,6 @@ const formatBytes = (bytes: number): string => {
   border-color: #3498db;
   box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
 }
-
-/* .vs-indicator {
-  font-size: 1.8em;
-  font-weight: bold;
-  color: #3498db;
-  background: #e3f2fd;
-  width: 60px;
-  height: 60px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-} */
 
 /* Comparison Options */
 .comparison-options {
@@ -2660,6 +2699,7 @@ const formatBytes = (bytes: number): string => {
 .cell-different {
   background: #fed7aa !important;
   font-weight: 600 !important;
+  color:#000000;
 }
 
 .single-view {
@@ -3070,5 +3110,36 @@ const formatBytes = (bytes: number): string => {
 
 .cancel-btn:hover {
   background: var(--bg-hover);
+}
+
+.apply-btn {
+  background: #10b981;
+  color: white;
+  font-weight: 700;
+}
+
+.apply-btn:hover:not(:disabled) {
+  background: #059669;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+.apply-btn:disabled {
+  background: #6c757d;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.apply-progress {
+  padding: 12px 20px;
+  background: #d1fae5;
+  color: #065f46;
+  border-radius: 6px;
+  font-size: 0.9em;
+  font-weight: 600;
+  text-align: center;
+  margin-top: 12px;
+  border: 1px solid #10b981;
+  animation: slideIn 0.3s ease-out;
 }
 </style>

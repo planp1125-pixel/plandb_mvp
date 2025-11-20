@@ -6,6 +6,9 @@
     },
     "api/paddle-webhook.js": {
       "maxDuration": 10
+    },
+    "api/create-checkout.js": {
+      "maxDuration": 10
     }
   }
 }
