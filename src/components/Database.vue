@@ -255,47 +255,45 @@ const handleComparisonComplete = (comparison: SchemaComparisonType) => {
 /* Tabs Navigation */
 .tabs {
   display: flex;
-  background: var(--white);
-  border-bottom: 1px solid var(--gray-200);
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
   flex-shrink: 0;
-  padding: 0 1.25rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  padding: 0;
   overflow-x: auto;
   overflow-y: hidden;
+  gap: 0;
 }
 
 /* Custom scrollbar for tabs */
 .tabs::-webkit-scrollbar {
-  height: 6px;
+  height: 4px;
 }
 
 .tabs::-webkit-scrollbar-track {
-  background: var(--gray-100);
+  background: transparent;
 }
 
 .tabs::-webkit-scrollbar-thumb {
-  background: var(--gray-300);
-  border-radius: 3px;
+  background: var(--gray-400);
+  border-radius: 2px;
 }
 
 .tabs::-webkit-scrollbar-thumb:hover {
-  background: var(--primary-500);
+  background: var(--gray-500);
 }
 
 .tab {
-  padding: 1rem 1.5rem;
-  background: none;
+  padding: 0.625rem 1rem;
+  background: transparent;
   border: none;
   cursor: pointer;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--gray-500);
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  border-bottom: 3px solid transparent;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: var(--text-secondary);
+  transition: all 0.15s ease;
+  border-right: 1px solid var(--border-color);
   white-space: nowrap;
-  border-radius: 0.5rem 0.5rem 0 0;
   position: relative;
-  margin: 0 0.25rem;
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -309,52 +307,57 @@ const handleComparisonComplete = (comparison: SchemaComparisonType) => {
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 1.25rem;
+  font-size: 1.125rem;
   line-height: 1;
-  padding: 0 0.25rem;
+  padding: 0;
   color: var(--gray-400);
-  transition: all 0.2s;
+  transition: all 0.15s;
   border-radius: 0.25rem;
-  width: 1.5rem;
-  height: 1.5rem;
+  width: 1.25rem;
+  height: 1.25rem;
   display: flex;
   align-items: center;
   justify-content: center;
+  margin-left: 0.25rem;
 }
 
 .tab-close-btn:hover {
-  background: var(--gray-200);
-  color: var(--gray-700);
+  background: var(--gray-300);
+  color: var(--gray-800);
 }
 
 .tab:hover {
-  background: var(--gray-100);
-  color: var(--primary-600);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
 }
 
 .tab-active {
-  color: var(--primary-600);
-  background: var(--white);
-  border-bottom-color: var(--primary-500);
-  box-shadow: 0 -2px 0 var(--primary-500);
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  border-bottom: 2px solid var(--blue-500);
+  font-weight: 500;
+}
+
+.tab-active .tab-close-btn {
+  color: var(--gray-500);
 }
 
 .tab:focus {
-  outline: 2px solid var(--primary-500);
-  outline-offset: -2px;
+  outline: none;
 }
 
 /* Tab Content */
 .tab-content {
   flex: 1;
   overflow: hidden;
+  background: var(--bg-primary);
 }
 
 .tab-panel {
   height: 100%;
   overflow: auto;
-  padding: 1.5rem;
-  background: var(--gray-50);
+  padding: 0;
+  background: var(--bg-primary);
 }
 
 /* Custom scrollbar for tab panels */

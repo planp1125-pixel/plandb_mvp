@@ -25,7 +25,20 @@
         <!-- Left Navigation Sidebar -->
         <nav class="nav-sidebar">
           <div class="nav-buttons-container">
-            <button 
+            <!-- Sidebar toggle button (only shown when database is active) -->
+            <button
+              v-show="activeNavItem === 'database'"
+              @click="toggleSidebar"
+              class="nav-icon sidebar-toggle-icon"
+              :title="isSidebarVisible ? 'Hide Database Panel' : 'Show Database Panel'"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path v-if="isSidebarVisible" d="M15.41,16.58L10.83,12L15.41,7.41L14,6L8,12L14,18L15.41,16.58Z"/>
+                <path v-else d="M8.59,16.58L13.17,12L8.59,7.41L10,6L16,12L10,18L8.59,16.58Z"/>
+              </svg>
+            </button>
+
+            <button
               class="nav-icon"
               :class="{
                 'nav-icon-active': activeNavItem === 'database',
@@ -38,8 +51,8 @@
                 <path d="M12 3C7.58 3 4 4.79 4 7v10c0 2.21 3.58 4 8 4s8-1.79 8-4V7c0-2.21-3.58-4-8-4M12 5c3.31 0 6 1.34 6 3s-2.69 3-6 3-6-1.34-6-3 2.69-3 6-3m-6 5.15c1.36.72 3.54 1.15 6 1.15s4.64-.43 6-1.15V12c0 1.66-2.69 3-6 3s-6-1.34-6-3v-1.85m0 3.7c1.36.72 3.54 1.15 6 1.15s4.64-.43 6-1.15V17c0 1.66-2.69 3-6 3s-6-1.34-6-3v-1.15Z"/>
               </svg>
             </button>
-            
-            <button 
+
+            <button
               class="nav-icon"
               :class="{
                 'nav-icon-active': activeNavItem === 'settings',
@@ -52,8 +65,8 @@
                 <path d="M12 15.5A3.5 3.5 0 0 1 8.5 12A3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5a3.5 3.5 0 0 1-3.5 3.5m7.43-2.53c.04-.32.07-.64.07-.97c0-.33-.03-.66-.07-1l2.11-1.63c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.31-.61-.22l-2.49 1c-.52-.39-1.06-.73-1.69-.98l-.37-2.65A.506.506 0 0 0 14 2h-4c-.25 0-.46.18-.5.42l-.37 2.65c-.63.25-1.17.59-1.69.98l-2.49-1c-.22-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64L4.57 11c-.04.34-.07.67-.07 1c0 .33.03.65.07.97l-2.11 1.66c-.19.15-.25.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1.01c.52.4 1.06.74 1.69.99l.37 2.65c.04.24.25.42.5.42h4c.25 0 .46-.18.5-.42l.37-2.65c.63-.26 1.17-.59 1.69-.99l2.49 1.01c.22.08.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.66Z"/>
               </svg>
             </button>
-            
-            <button 
+
+            <button
               class="nav-icon"
               :class="{
                 'nav-icon-active': activeNavItem === 'subscription',
@@ -66,8 +79,8 @@
                 <path d="M12 2A10 10 0 0 0 2 12a10 10 0 0 0 10 10a10 10 0 0 0 10-10A10 10 0 0 0 12 2m0 18a8 8 0 0 1-8-8a8 8 0 0 1 8-8a8 8 0 0 1 8 8a8 8 0 0 1-8 8m.5-13H11v6l5.25 3.15l.75-1.23l-4.5-2.67V7Z"/>
               </svg>
             </button>
-            
-            <button 
+
+            <button
               class="nav-icon"
               :class="{
                 'nav-icon-active': activeNavItem === 'profile',
@@ -82,15 +95,6 @@
             </button>
           </div>
         </nav>
-
-        <!-- Sidebar toggle button -->
-        <button 
-          v-show="activeNavItem === 'database'"
-          @click="toggleSidebar"
-          class="sidebar-toggle"
-        >
-          {{ isSidebarVisible ? '◀' : '▶' }}
-        </button>
 
         <!-- Sidebar for database connections -->
         <aside 
@@ -353,35 +357,19 @@ const handleTableSelected = (tableName: string) => {
   transform: translateX(0.125rem);
 }
 
-/* Sidebar Toggle Button */
-.sidebar-toggle {
-  position: absolute;
-  top: 0.5rem;
-  left: 4.75rem;
-  z-index: 30;
-  background-color: var(--blue-500);
-  color: white;
-  border: none;
-  border-radius: 0.5rem;
-  width: 2.5rem;
-  height: 2.5rem;
-  cursor: pointer;
-  font-size: 0.875rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: var(--shadow-lg);
-  transition: all 0.2s;
+/* Sidebar Toggle Icon in Navigation */
+.sidebar-toggle-icon {
+  color: var(--gray-400);
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid var(--gray-700);
+  border-radius: 0.375rem 0.375rem 0 0;
+  padding-bottom: 0.5rem;
 }
 
-.sidebar-toggle:hover {
-  background-color: var(--blue-600);
-  transform: translateY(-0.125rem);
-  box-shadow: var(--shadow-xl);
-}
-
-.sidebar-toggle:active {
-  transform: translateY(0);
+.sidebar-toggle-icon:hover {
+  background-color: var(--gray-700);
+  color: var(--blue-400);
+  transform: translateX(0.125rem);
 }
 
 /* Sidebar */
@@ -455,10 +443,6 @@ const handleTableSelected = (tableName: string) => {
     height: 2.25rem;
   }
 
-  .sidebar-toggle {
-    left: 4.25rem;
-  }
-
   .sidebar {
     width: 22rem;
     position: absolute;
@@ -479,13 +463,6 @@ const handleTableSelected = (tableName: string) => {
   .nav-icon {
     width: 2rem;
     height: 2rem;
-  }
-
-  .sidebar-toggle {
-    left: 3.75rem;
-    width: 2rem;
-    height: 2rem;
-    font-size: 0.75rem;
   }
 
   .sidebar {
@@ -524,7 +501,6 @@ const handleTableSelected = (tableName: string) => {
 /* Print Styles */
 @media print {
   .nav-sidebar,
-  .sidebar-toggle,
   .sidebar {
     display: none;
   }

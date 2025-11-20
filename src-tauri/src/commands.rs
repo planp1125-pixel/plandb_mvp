@@ -354,6 +354,8 @@ pub async fn apply_schema_patch(
     patch_sql: String,
     db_manager: State<'_, Mutex<DatabaseManager>>,
 ) -> Result<String, String> {
+    const BATCH_SIZE: usize = 500; // Commit every 500 statements to prevent long locks
+
     let db_password = {
         let manager = db_manager.lock().unwrap();
         manager.get_password(&target_db_path).unwrap_or_default()
@@ -366,13 +368,11 @@ pub async fn apply_schema_patch(
     // Unlock if needed
     unlock_database(&conn, &db_password)?;
 
-    // Execute the patch SQL
-    // Split by statements and execute one by one for better error handling
-    let statements: Vec<&str> = patch_sql.split(';').collect();
-    let total_statements = statements.len();
-    let mut executed = 0;
+    // Prepare statements - filter and clean first
+    let all_statements: Vec<&str> = patch_sql.split(';').collect();
+    let mut cleaned_statements: Vec<String> = Vec::new();
 
-    for (idx, statement) in statements.iter().enumerate() {
+    for statement in all_statements.iter() {
         let trimmed = statement.trim();
         if trimmed.is_empty() {
             continue;
@@ -386,17 +386,54 @@ pub async fn apply_schema_patch(
             .join("\n");
 
         let cleaned = cleaned.trim();
-        if cleaned.is_empty() {
+        if !cleaned.is_empty() {
+            cleaned_statements.push(cleaned.to_string());
+        }
+    }
+
+    let total_statements = cleaned_statements.len();
+    let mut executed = 0;
+
+    // Start initial transaction
+    conn.execute("BEGIN IMMEDIATE", [])
+        .map_err(|e| format!("Failed to begin transaction: {}", e))?;
+
+    // Execute statements in batches
+    for (idx, statement) in cleaned_statements.iter().enumerate() {
+        // Skip BEGIN/COMMIT from the patch itself - we manage transactions
+        let stmt_upper = statement.to_uppercase();
+        if stmt_upper.starts_with("BEGIN") || stmt_upper.starts_with("COMMIT") {
             continue;
         }
 
         // Execute the statement
-        conn.execute(cleaned, [])
-            .map_err(|e| format!("Error at statement {}/{}: {}\nStatement: {}",
-                idx + 1, total_statements, e, cleaned))?;
+        conn.execute(statement, [])
+            .map_err(|e| {
+                // Try to rollback on error
+                let _ = conn.execute("ROLLBACK", []);
+                format!("Error at statement {}/{}: {}\nStatement: {}",
+                    idx + 1, total_statements, e, statement)
+            })?;
 
         executed += 1;
+
+        // Commit and start new transaction every BATCH_SIZE statements
+        // This prevents long-running transactions that lock the database
+        if executed % BATCH_SIZE == 0 && idx < cleaned_statements.len() - 1 {
+            conn.execute("COMMIT", [])
+                .map_err(|e| format!("Failed to commit batch: {}", e))?;
+
+            // Yield to system to prevent UI freeze
+            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+
+            conn.execute("BEGIN IMMEDIATE", [])
+                .map_err(|e| format!("Failed to begin new batch: {}", e))?;
+        }
     }
+
+    // Final commit
+    conn.execute("COMMIT", [])
+        .map_err(|e| format!("Failed to final commit: {}", e))?;
 
     // Close the connection to flush changes
     drop(conn);
@@ -569,24 +606,69 @@ pub async fn generate_data_patch(
     table_comparisons: Vec<serde_json::Value>, // From frontend comparison results
     db_manager: State<'_, Mutex<DatabaseManager>>,
 ) -> Result<String, String> {
-    let manager = db_manager.lock().unwrap();
-    
+    let db1_password = {
+        let manager = db_manager.lock().unwrap();
+        manager.get_password(&db1_path).unwrap_or_default()
+    };
+
+    let db2_password = {
+        let manager = db_manager.lock().unwrap();
+        manager.get_password(&db2_path).unwrap_or_default()
+    };
+
+    // Run blocking database operations in a separate thread pool
+    tokio::task::spawn_blocking(move || {
+        generate_data_patch_blocking(
+            &db1_path,
+            &db2_path,
+            &table_comparisons,
+            &db1_password,
+            &db2_password
+        )
+    })
+    .await
+    .map_err(|e| format!("Task join error: {}", e))?
+}
+
+// Blocking version that does the actual work
+fn generate_data_patch_blocking(
+    db1_path: &str,
+    db2_path: &str,
+    table_comparisons: &[serde_json::Value],
+    db1_password: &str,
+    db2_password: &str,
+) -> Result<String, String> {
     // Open both databases
-    let source_conn = Connection::open(&db1_path)
+    let source_conn = Connection::open(db1_path)
         .map_err(|e| format!("Failed to open source database: {}", e))?;
-    
-    let target_conn = Connection::open(&db2_path)
+
+    let target_conn = Connection::open(db2_path)
         .map_err(|e| format!("Failed to open target database: {}", e))?;
 
     // Unlock databases if needed
-    let db1_password = manager.get_password(&db1_path).unwrap_or_default();
-    let db2_password = manager.get_password(&db2_path).unwrap_or_default();
-    
-    unlock_database(&source_conn, &db1_password)?;
-    unlock_database(&target_conn, &db2_password)?;
+    unlock_database(&source_conn, db1_password)?;
+    unlock_database(&target_conn, db2_password)?;
 
-    // Generate SQL patch
-    let mut sql = String::new();
+    // Pre-calculate approximate size to avoid reallocations
+    // Estimate: ~200 bytes per row on average
+    let mut estimated_rows = 0;
+    for table_json in table_comparisons.iter() {
+        if let Some(comparison) = table_json.get("comparison") {
+            if let Some(missing) = comparison.get("missingInTarget").and_then(|v| v.as_array()) {
+                estimated_rows += missing.len();
+            }
+            if let Some(different) = comparison.get("differentRows").and_then(|v| v.as_array()) {
+                estimated_rows += different.len();
+            }
+            if let Some(extra) = comparison.get("extraInTarget").and_then(|v| v.as_array()) {
+                estimated_rows += extra.len();
+            }
+        }
+    }
+    let estimated_size = estimated_rows * 200 + 1024; // 200 bytes per row + header
+
+    // Generate SQL patch with pre-allocated capacity
+    let mut sql = String::with_capacity(estimated_size);
     sql.push_str("-- Data Synchronization Patch\n");
     sql.push_str(&format!("-- Source: {}\n", db1_path));
     sql.push_str(&format!("-- Target: {}\n", db2_path));
@@ -602,11 +684,11 @@ pub async fn generate_data_patch(
         let table_name = table_json.get("tableName")
             .and_then(|v| v.as_str())
             .ok_or("Missing table name")?;
-        
+
         let key_column = table_json.get("keyColumn")
             .and_then(|v| v.as_str())
             .ok_or("Missing key column")?;
-        
+
         let comparison = table_json.get("comparison")
             .ok_or("Missing comparison data")?;
 
@@ -617,20 +699,25 @@ pub async fn generate_data_patch(
 
         // Get columns info
         let columns = get_column_names(&target_conn, table_name)?;
-        
+
         // 1. INSERT missing rows (exist in source, not in target)
         if let Some(missing) = comparison.get("missingInTarget").and_then(|v| v.as_array()) {
             if !missing.is_empty() {
                 sql.push_str(&format!("-- INSERT {} missing rows into {}\n", missing.len(), table_name));
-                
-                for row in missing {
+
+                for (idx, row) in missing.iter().enumerate() {
                     let insert_sql = generate_insert_statement(
-                        table_name, 
-                        &columns, 
+                        table_name,
+                        &columns,
                         row
                     )?;
                     sql.push_str(&insert_sql);
                     sql.push_str("\n");
+
+                    // Yield every 1000 rows to allow other work
+                    if idx % 1000 == 0 && idx > 0 {
+                        std::thread::yield_now();
+                    }
                 }
                 sql.push_str("\n");
             }
@@ -640,15 +727,15 @@ pub async fn generate_data_patch(
         if let Some(different) = comparison.get("differentRows").and_then(|v| v.as_array()) {
             if !different.is_empty() {
                 sql.push_str(&format!("-- UPDATE {} different rows in {}\n", different.len(), table_name));
-                
-                for diff in different {
+
+                for (idx, diff) in different.iter().enumerate() {
                     let source_row = diff.get("sourceRow")
                         .ok_or("Missing source row")?;
-                    
+
                     let different_cols = diff.get("differentColumns")
                         .and_then(|v| v.as_array())
                         .ok_or("Missing different columns")?;
-                    
+
                     let update_sql = generate_update_statement(
                         table_name,
                         key_column,
@@ -657,6 +744,11 @@ pub async fn generate_data_patch(
                     )?;
                     sql.push_str(&update_sql);
                     sql.push_str("\n");
+
+                    // Yield every 1000 rows to allow other work
+                    if idx % 1000 == 0 && idx > 0 {
+                        std::thread::yield_now();
+                    }
                 }
                 sql.push_str("\n");
             }
@@ -669,7 +761,7 @@ pub async fn generate_data_patch(
                 sql.push_str(&format!("-- DELETE {} extra rows from {}\n",
                     extra.len(), table_name));
 
-                for row in extra {
+                for (idx, row) in extra.iter().enumerate() {
                     let key_value = row.get(key_column)
                         .ok_or_else(|| format!("Missing key column {} in row", key_column))?;
 
@@ -680,6 +772,11 @@ pub async fn generate_data_patch(
                         format_value_for_sql(key_value)
                     );
                     sql.push_str(&delete_sql);
+
+                    // Yield every 1000 rows to allow other work
+                    if idx % 1000 == 0 && idx > 0 {
+                        std::thread::yield_now();
+                    }
                 }
                 sql.push_str("\n");
             }
@@ -698,23 +795,25 @@ pub async fn apply_data_patch(
     patch_sql: String,
     db_manager: State<'_, Mutex<DatabaseManager>>,
 ) -> Result<String, String> {
-    let manager = db_manager.lock().unwrap();
+    const BATCH_SIZE: usize = 1000; // Commit every 1000 statements for data patches
+
+    let db_password = {
+        let manager = db_manager.lock().unwrap();
+        manager.get_password(&target_db_path).unwrap_or_default()
+    };
 
     // Open target database
-    let mut conn = Connection::open(&target_db_path)
+    let conn = Connection::open(&target_db_path)
         .map_err(|e| format!("Failed to open target database: {}", e))?;
 
-    // Get password and unlock if needed
-    let db_password = manager.get_password(&target_db_path).unwrap_or_default();
+    // Unlock if needed
     unlock_database(&conn, &db_password)?;
 
-    // Execute the patch SQL
-    // Split by statements and execute one by one for better error handling
-    let statements: Vec<&str> = patch_sql.split(';').collect();
-    let total_statements = statements.len();
-    let mut executed = 0;
+    // Prepare statements - filter and clean first
+    let all_statements: Vec<&str> = patch_sql.split(';').collect();
+    let mut cleaned_statements: Vec<String> = Vec::new();
 
-    for (idx, statement) in statements.iter().enumerate() {
+    for statement in all_statements.iter() {
         let trimmed = statement.trim();
         if trimmed.is_empty() {
             continue;
@@ -728,16 +827,80 @@ pub async fn apply_data_patch(
             .join("\n");
 
         let cleaned = cleaned.trim();
-        if cleaned.is_empty() {
+        if !cleaned.is_empty() {
+            cleaned_statements.push(cleaned.to_string());
+        }
+    }
+
+    let total_statements = cleaned_statements.len();
+    let mut executed = 0;
+    let mut in_transaction = false;
+
+    // Execute statements in batches
+    for (idx, statement) in cleaned_statements.iter().enumerate() {
+        let stmt_upper = statement.to_uppercase();
+
+        // Handle transaction commands
+        if stmt_upper.starts_with("BEGIN") {
+            if !in_transaction {
+                conn.execute(statement, [])
+                    .map_err(|e| format!("Failed to begin transaction: {}", e))?;
+                in_transaction = true;
+            }
             continue;
         }
 
+        if stmt_upper.starts_with("COMMIT") {
+            if in_transaction {
+                conn.execute(statement, [])
+                    .map_err(|e| format!("Failed to commit transaction: {}", e))?;
+                in_transaction = false;
+            }
+            continue;
+        }
+
+        // Start transaction if not already in one
+        if !in_transaction {
+            conn.execute("BEGIN IMMEDIATE", [])
+                .map_err(|e| format!("Failed to begin transaction: {}", e))?;
+            in_transaction = true;
+        }
+
         // Execute the statement
-        conn.execute(cleaned, [])
-            .map_err(|e| format!("Error at statement {}/{}: {}\nStatement: {}",
-                idx + 1, total_statements, e, cleaned))?;
+        conn.execute(statement, [])
+            .map_err(|e| {
+                // Try to rollback on error
+                if in_transaction {
+                    let _ = conn.execute("ROLLBACK", []);
+                }
+                format!("Error at statement {}/{}: {}\nStatement: {}",
+                    idx + 1, total_statements, e, statement)
+            })?;
 
         executed += 1;
+
+        // Commit and start new transaction every BATCH_SIZE statements
+        // This prevents long-running transactions that lock the database
+        if executed % BATCH_SIZE == 0 && idx < cleaned_statements.len() - 1 {
+            conn.execute("COMMIT", [])
+                .map_err(|e| format!("Failed to commit batch: {}", e))?;
+
+            in_transaction = false;
+
+            // Yield to system to prevent UI freeze
+            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+
+            conn.execute("BEGIN IMMEDIATE", [])
+                .map_err(|e| format!("Failed to begin new batch: {}", e))?;
+
+            in_transaction = true;
+        }
+    }
+
+    // Final commit if still in transaction
+    if in_transaction {
+        conn.execute("COMMIT", [])
+            .map_err(|e| format!("Failed to final commit: {}", e))?;
     }
 
     Ok(format!("Data patch applied successfully. Executed {} statements.", executed))
@@ -805,11 +968,25 @@ fn format_value_for_sql(value: &serde_json::Value) -> String {
         serde_json::Value::Bool(b) => if *b { "1" } else { "0" }.to_string(),
         serde_json::Value::Number(n) => n.to_string(),
         serde_json::Value::String(s) => {
-            // Escape single quotes by doubling them (SQL standard)
+            // For strings with special chars, use CAST from hex-encoded BLOB
+            // This is the most reliable method for preserving all characters
+            if s.contains('\n') || s.contains('\r') || s.contains('\t') {
+                // Convert string to hex
+                let hex: String = s.as_bytes()
+                    .iter()
+                    .map(|b| format!("{:02X}", b))
+                    .collect();
+                format!("CAST(x'{}' AS TEXT)", hex)
+            } else {
+                // Simple string - just escape single quotes
+                format!("'{}'", s.replace("'", "''"))
+            }
+        },
+        _ => {
+            let s = value.to_string();
             let escaped = s.replace("'", "''");
             format!("'{}'", escaped)
-        },
-        _ => format!("'{}'", value.to_string().replace("'", "''"))
+        }
     }
 }
 

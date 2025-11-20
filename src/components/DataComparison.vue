@@ -182,7 +182,22 @@
         </div>
 
         <div class="patch-preview-content">
-          <pre><code>{{ patchContent }}</code></pre>
+          <div v-if="patchTooLargeToShow" class="large-patch-info">
+            <h4>⚠️ Patch Too Large to Display</h4>
+            <p>This patch is <strong>{{ formatBytes(patchContent.length) }}</strong> and contains too much text to display in the preview.</p>
+            <p>You can:</p>
+            <ul>
+              <li><strong>Apply directly</strong> - Click "⚡ Apply to Database" button below</li>
+              <li><strong>Download first</strong> - Click "💾 Download SQL File" to review in a text editor</li>
+              <li><strong>Copy to clipboard</strong> - Click "📋 Copy" (may take a moment for large files)</li>
+            </ul>
+            <div class="patch-stats">
+              <div><strong>Patch file:</strong> {{ patchFilename }}</div>
+              <div><strong>Size:</strong> {{ formatBytes(patchContent.length) }}</div>
+              <div><strong>Estimated statements:</strong> ~{{ Math.floor(patchContent.length / 500).toLocaleString() }}</div>
+            </div>
+          </div>
+          <pre v-else><code>{{ patchContent }}</code></pre>
         </div>
 
         <div class="patch-preview-actions">
@@ -846,6 +861,7 @@ const isGeneratingPatch = ref(false);
 const showPatchPreview = ref(false);
 const patchContent = ref('');
 const patchFilename = ref('');
+const patchTooLargeToShow = ref(false);
 const isCopied = ref(false);
 const isDownloaded = ref(false);
 const isApplying = ref(false);
@@ -1608,25 +1624,26 @@ const generateDataPatch = async () => {
 
     const filename = `data_patch_${db1Name}_to_${db2Name}_${timestamp}.sql`;
 
-    // Check file size - if larger than 5MB, skip preview and auto-download
+    // Check if patch is too large to render in DOM (prevent UI freeze)
     const fileSizeBytes = new Blob([patchSql]).size;
-    const SIZE_LIMIT_MB = 5;
-    const SIZE_LIMIT_BYTES = SIZE_LIMIT_MB * 1024 * 1024;
+    const fileSizeMB = (fileSizeBytes / (1024 * 1024)).toFixed(2);
+    const DOM_RENDER_LIMIT = 20 * 1024 * 1024; // 20MB - safe limit for DOM rendering
 
-    if (fileSizeBytes > SIZE_LIMIT_BYTES) {
-      // Large file - skip preview, directly download
-      const fileSizeMB = (fileSizeBytes / (1024 * 1024)).toFixed(2);
+    patchContent.value = patchSql;
+    patchFilename.value = filename;
+
+    // Set flag if too large to show in preview (but still allow apply/download)
+    patchTooLargeToShow.value = fileSizeBytes > DOM_RENDER_LIMIT;
+
+    showPatchPreview.value = true;
+
+    // Show info message for very large patches
+    if (fileSizeBytes > 50 * 1024 * 1024) { // > 50MB
       await showMessage(
         'Large Patch Generated',
-        `Patch size: ${fileSizeMB}MB\n\nFile is too large to preview and will be downloaded directly.\n\nFile: ${filename}`,
+        `Patch size: ${fileSizeMB}MB\n\nThis is a large patch. The preview will show options instead of the full SQL.\n\nYou can apply it directly or download it for review.\n\nNote: Applying may take several minutes.`,
         'info'
       );
-      downloadPatch(patchSql, filename);
-    } else {
-      // Small file - show preview
-      patchContent.value = patchSql;
-      patchFilename.value = filename;
-      showPatchPreview.value = true;
     }
 
   } catch (err) {
@@ -3046,6 +3063,48 @@ const formatBytes = (bytes: number): string => {
 .patch-preview-content code {
   font-family: 'Courier New', Courier, monospace;
   color: #d4d4d4;
+}
+
+.large-patch-info {
+  padding: 40px;
+  color: var(--text-primary);
+}
+
+.large-patch-info h4 {
+  margin: 0 0 20px 0;
+  font-size: 1.3em;
+  color: #ff9800;
+}
+
+.large-patch-info p {
+  margin: 0 0 15px 0;
+  line-height: 1.6;
+}
+
+.large-patch-info ul {
+  margin: 15px 0 25px 25px;
+  line-height: 1.8;
+}
+
+.large-patch-info ul li {
+  margin-bottom: 10px;
+}
+
+.patch-stats {
+  background: var(--bg-tertiary);
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  margin-top: 20px;
+}
+
+.patch-stats > div {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.patch-stats > div:last-child {
+  border-bottom: none;
 }
 
 .patch-preview-actions {
