@@ -1,5 +1,5 @@
 <template>
-  <div class="schema-comparison">
+  <div ref="schemaComparisonContainer" class="schema-comparison">
     <div class="comparison-header">
       <h3>Database Schema Comparison</h3>
       <p>Compare table structures between two SQLCipher databases</p>
@@ -80,24 +80,45 @@
 
     <!-- Comparison Results - Side by Side -->
     <div v-if="comparisonResult && !isLoadingSchemas" class="comparison-results">
-      <div class="results-summary">
-        <h4>Comparison Summary</h4>
+      <!-- Sticky Navigation Summary -->
+      <div class="results-summary" :class="{ 'minimized': isMinimized }">
+        <h4 v-show="!isMinimized">Comparison Summary</h4>
         <div class="summary-stats">
-          <div class="stat-item added">
+          <div 
+            class="stat-item added clickable" 
+            @click="scrollToSection('added-section')"
+            :class="{ 'active': activeSection === 'added' }"
+          >
             <span class="count">{{ comparisonResult.added_tables.length }}</span>
-            <span class="label">Added Tables</span>
+            <span class="label" v-show="!isMinimized">Added Tables</span>
+            <span class="label-mini" v-show="isMinimized">Added</span>
           </div>
-          <div class="stat-item removed">
+          <div 
+            class="stat-item removed clickable" 
+            @click="scrollToSection('removed-section')"
+            :class="{ 'active': activeSection === 'removed' }"
+          >
             <span class="count">{{ comparisonResult.removed_tables.length }}</span>
-            <span class="label">Removed Tables</span>
+            <span class="label" v-show="!isMinimized">Removed Tables</span>
+            <span class="label-mini" v-show="isMinimized">Removed</span>
           </div>
-          <div class="stat-item modified">
+          <div 
+            class="stat-item modified clickable" 
+            @click="scrollToSection('modified-section')"
+            :class="{ 'active': activeSection === 'modified' }"
+          >
             <span class="count">{{ comparisonResult.modified_tables.length }}</span>
-            <span class="label">Modified Tables</span>
+            <span class="label" v-show="!isMinimized">Modified Tables</span>
+            <span class="label-mini" v-show="isMinimized">Mod</span>
           </div>
-          <div class="stat-item unchanged">
+          <div 
+            class="stat-item unchanged clickable" 
+            @click="scrollToSection('unchanged-section')"
+            :class="{ 'active': activeSection === 'unchanged' }"
+          >
             <span class="count">{{ comparisonResult.identical_tables.length }}</span>
-            <span class="label">Unchanged Tables</span>
+            <span class="label" v-show="!isMinimized">Unchanged Tables</span>
+            <span class="label-mini" v-show="isMinimized">Same</span>
           </div>
         </div>
       </div>
@@ -105,7 +126,7 @@
       <!-- Side by Side Comparison - Grouped by Status -->
       
       <!-- Added Tables Section -->
-      <div v-if="addedTables.length > 0" class="status-section">
+      <div id="added-section" v-if="addedTables.length > 0" class="status-section">
         <div class="status-section-header added">
           <span class="status-icon">➕</span>
           <h4>Added Tables ({{ addedTables.length }})</h4>
@@ -194,7 +215,7 @@
       </div>
 
       <!-- Removed Tables Section -->
-      <div v-if="removedTables.length > 0" class="status-section">
+      <div id="removed-section" v-if="removedTables.length > 0" class="status-section">
         <div class="status-section-header removed">
           <span class="status-icon">➖</span>
           <h4>Removed Tables ({{ removedTables.length }})</h4>
@@ -283,7 +304,7 @@
       </div>
 
   <!-- Modified Tables Section with ALL columns side-by-side -->
-  <div v-if="modifiedTables.length > 0" class="status-section">
+  <div id="modified-section" v-if="modifiedTables.length > 0" class="status-section">
     <div class="status-section-header modified">
       <span class="status-icon">🔄</span>
       <h4>Modified Tables ({{ modifiedTables.length }})</h4>
@@ -429,7 +450,7 @@
   </div>
 
       <!-- Unchanged Tables Section -->
-      <div v-if="unchangedTables.length > 0" class="status-section">
+      <div id="unchanged-section" v-if="unchangedTables.length > 0" class="status-section">
         <div class="status-section-header unchanged">
           <span class="status-icon">✓</span>
           <h4>Unchanged Tables ({{ unchangedTables.length }})</h4>
@@ -619,6 +640,11 @@ const isLoadingSchemas = ref(false);
 const error = ref('');
 const comparisonResult = ref<SchemaComparison | null>(null);
 const expandedTables = ref<Set<string>>(new Set());
+
+// Sticky Navigation State
+const isMinimized = ref(false);
+const activeSection = ref<'added' | 'removed' | 'modified' | 'unchanged' | ''>('');
+const schemaComparisonContainer = ref<HTMLElement | null>(null);
 
 // Store full table schemas
 const db1FullSchemas = ref<Map<string, ColumnInfo[]>>(new Map());
@@ -827,6 +853,44 @@ const toggleTableDetails = (tableName: string) => {
   }
   expandedTables.value = s;
   saveState();
+};
+
+// Sticky Navigation Functions
+const scrollToSection = (sectionId: string) => {
+  const element = document.getElementById(sectionId);
+  if (element) {
+    element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+};
+
+const handleScroll = () => {
+  if (!schemaComparisonContainer.value) return;
+  
+  const scrollY = schemaComparisonContainer.value.scrollTop;
+  console.log('SchemaComparison Scroll:', scrollY);
+  
+  // Minimize if scrolled down more than 50px
+  isMinimized.value = scrollY > 50;
+  
+  // Detect which section is currently visible
+  const sections = [
+    { id: 'added-section', name: 'added' as const },
+    { id: 'removed-section', name: 'removed' as const },
+    { id: 'modified-section', name: 'modified' as const },
+    { id: 'unchanged-section', name: 'unchanged' as const }
+  ];
+  
+  for (const section of sections) {
+    const element = document.getElementById(section.id);
+    if (element) {
+      const rect = element.getBoundingClientRect();
+      // Check if section is in viewport (within top 200px)
+      if (rect.top <= 200 && rect.bottom >= 0) {
+        activeSection.value = section.name;
+        break;
+      }
+    }
+  }
 };
 
 const getDatabaseName = (path: string): string => {
@@ -1270,10 +1334,20 @@ watch(comparisonResult, saveState, { deep: true });
 // Lifecycle hooks
 onMounted(() => {
   loadState();
+  
+  // Attach scroll listener to the container
+  if (schemaComparisonContainer.value) {
+    schemaComparisonContainer.value.addEventListener('scroll', handleScroll);
+  }
 });
 
 onBeforeUnmount(() => {
   saveState();
+  
+  // Clean up scroll listener
+  if (schemaComparisonContainer.value) {
+    schemaComparisonContainer.value.removeEventListener('scroll', handleScroll);
+  }
 });
 </script>
 <style scoped>
@@ -1283,6 +1357,8 @@ onBeforeUnmount(() => {
   height: 100%;
   background: var(--bg-primary);
   color: var(--text-primary);
+  overflow-y: auto; /* Allow scrolling for sticky to work */
+  overflow-x: hidden;
 }
 
 .comparison-header {
@@ -1453,13 +1529,24 @@ onBeforeUnmount(() => {
   background: var(--bg-primary);
   border: 1px solid var(--border-color);
   border-radius: 8px;
-  overflow: hidden;
 }
 
 .results-summary {
+  position: sticky;
+  top: 0;
+  z-index: 100;
   padding: 25px;
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border-color);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 30px;
+  transition: all 0.3s ease;
+}
+
+.results-summary.minimized {
+  padding: 10px 20px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  margin-bottom: 10px;
 }
 
 .results-summary h4 {
@@ -1474,17 +1561,37 @@ onBeforeUnmount(() => {
   gap: 15px;
 }
 
+.results-summary.minimized .summary-stats {
+  gap: 8px;
+}
+
 .stat-item {
   text-align: center;
   padding: 15px;
   border-radius: 6px;
   background: white;
-  /* border: 1px solid #dee2e6; */
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
 }
 
+.stat-item.clickable {
+  cursor: pointer;
+  border: 2px solid transparent;
+}
 
+.stat-item.clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
 
+.stat-item.clickable.active {
+  border: 2px solid #3498db;
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
+}
+
+.results-summary.minimized .stat-item {
+  padding: 8px;
+}
 
 .stat-item.added {
   background: var(--status-added-bg);
@@ -1515,9 +1622,25 @@ onBeforeUnmount(() => {
   color: var(--text-primary);
 }
 
+.results-summary.minimized .stat-item .count {
+  font-size: 1.5em;
+  margin-bottom: 2px;
+}
+
 .stat-item .label {
   font-size: 0.9em;
   color: var(--text-secondary);
+}
+
+.stat-item .label-mini {
+  display: none;
+  font-size: 0.75em;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.results-summary.minimized .stat-item .label-mini {
+  display: block;
 }
 /* Status Sections */
 .status-section {

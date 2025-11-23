@@ -1301,13 +1301,8 @@ fn generate_data_patch_blocking_to_file(
         writeln!(file, "-- Apply to: {} (Target)", db2_path).map_err(|e| e.to_string())?;
     }
     writeln!(file, "-- Generated: {} UTC", chrono::Utc::now()).map_err(|e| e.to_string())?;
-    writeln!(file, "\n-- IMPORTANT: Review this script before execution!")
-        .map_err(|e| e.to_string())?;
-    writeln!(
-        file,
-        "-- DELETE statements are commented out by default for safety.\n"
-    )
-    .map_err(|e| e.to_string())?;
+    // Warnings removed as per user request
+    writeln!(file, "").map_err(|e| e.to_string())?;
     writeln!(file, "BEGIN TRANSACTION;\n").map_err(|e| e.to_string())?;
 
     // Process tables and write directly to file
@@ -1359,10 +1354,10 @@ fn generate_data_patch_blocking_to_file(
                                 serde_json::Value::Bool(b) => b.to_string(),
                                 _ => "NULL".to_string(),
                             };
-                            // Comment out DELETEs by default for safety
+                            // DELETEs are now executable
                             writeln!(
                                 file,
-                                "-- DELETE FROM {} WHERE {} = '{}';",
+                                "DELETE FROM {} WHERE {} = '{}';",
                                 table_name, key_column, key_value
                             )
                             .map_err(|e| e.to_string())?;
@@ -1424,10 +1419,10 @@ fn generate_data_patch_blocking_to_file(
                                 serde_json::Value::Bool(b) => b.to_string(),
                                 _ => "NULL".to_string(),
                             };
-                            // Comment out DELETEs by default for safety
+                            // DELETEs are now executable
                             writeln!(
                                 file,
-                                "-- DELETE FROM {} WHERE {} = '{}';",
+                                "DELETE FROM {} WHERE {} = '{}';",
                                 table_name, key_column, key_value
                             )
                             .map_err(|e| e.to_string())?;

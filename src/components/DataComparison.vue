@@ -1,5 +1,5 @@
 <template>
-  <div class="data-comparison">
+  <div ref="dataComparisonContainer" class="data-comparison">
 
     <!-- Loading Overlay for Comparison -->
     <div v-if="isComparing" class="loading-overlay">
@@ -206,7 +206,7 @@
         <div class="patch-preview-content">
           <div v-if="patchTooLargeToShow" class="large-patch-info">
             <h4>📦 Large Patch Generated</h4>
-            <p>This patch is <strong>{{ formatBytes(patchContent.length) }}</strong> and too large to display in the preview (limit: 5MB for stability).</p>
+            <p>This patch is too large to display in the preview. Please download it to view the contents.</p>
             <p><strong>✅ Your patch is ready!</strong> You can:</p>
             <ul>
               <li><strong>💾 Download</strong> - Save to file and review in your text editor</li>
@@ -283,24 +283,49 @@
         </div>
       </div>
 
-      <div class="results-summary">
-        <h4>Summary ({{ currentFilterDisplay }})</h4>
+      <!-- Sticky Navigation Summary -->
+      <div class="results-summary" :class="{ 'minimized': isMinimized }">
+        <h4 v-show="!isMinimized">Summary ({{ currentFilterDisplay }})</h4>
         <div class="summary-stats">
-          <div class="stat-item added" v-if="filteredTotalExtra > 0">
+          <div 
+            class="stat-item added clickable" 
+            v-if="filteredTotalExtra > 0"
+            @click="scrollToSection('data-added-section')"
+            :class="{ 'active': activeSection === 'added' }"
+          >
             <span class="count">{{ filteredTotalExtra.toLocaleString() }}</span>
-            <span class="label">Added to Target</span>
+            <span class="label" v-show="!isMinimized">Added to Target</span>
+            <span class="label-mini" v-show="isMinimized">Added</span>
           </div>
-          <div class="stat-item removed" v-if="filteredTotalMissing > 0">
+          <div 
+            class="stat-item removed clickable" 
+            v-if="filteredTotalMissing > 0"
+            @click="scrollToSection('data-removed-section')"
+            :class="{ 'active': activeSection === 'removed' }"
+          >
             <span class="count">{{ filteredTotalMissing.toLocaleString() }}</span>
-            <span class="label">Removed from Target</span>
+            <span class="label" v-show="!isMinimized">Removed from Target</span>
+            <span class="label-mini" v-show="isMinimized">Removed</span>
           </div>
-          <div class="stat-item modified" v-if="filteredTotalDifferent > 0">
+          <div 
+            class="stat-item modified clickable" 
+            v-if="filteredTotalDifferent > 0"
+            @click="scrollToSection('data-modified-section')"
+            :class="{ 'active': activeSection === 'modified' }"
+          >
             <span class="count">{{ filteredTotalDifferent.toLocaleString() }}</span>
-            <span class="label">Modified Rows</span>
+            <span class="label" v-show="!isMinimized">Modified Rows</span>
+            <span class="label-mini" v-show="isMinimized">Mod</span>
           </div>
-          <div class="stat-item unchanged" v-if="filteredTotalIdentical > 0">
+          <div 
+            class="stat-item unchanged clickable" 
+            v-if="filteredTotalIdentical > 0"
+            @click="scrollToSection('data-unchanged-section')"
+            :class="{ 'active': activeSection === 'unchanged' }"
+          >
             <span class="count">{{ filteredTotalIdentical.toLocaleString() }}</span>
-            <span class="label">Unchanged Rows</span>
+            <span class="label" v-show="!isMinimized">Unchanged Rows</span>
+            <span class="label-mini" v-show="isMinimized">Same</span>
           </div>
         </div>
       </div>
@@ -310,7 +335,7 @@
       </div>
 
       <!-- Added Rows Section -->
-      <div v-if="showExtraSection" class="status-section">
+      <div id="data-added-section" v-if="showExtraSection" class="status-section">
         <div class="status-section-header added">
           <span class="status-icon">+</span>
           <h4>Added Rows ({{ filteredTotalExtra }})</h4>
@@ -406,7 +431,7 @@
       </div>
 
       <!-- Removed Rows Section -->
-      <div v-if="showMissingSection" class="status-section">
+      <div id="data-removed-section" v-if="showMissingSection" class="status-section">
         <div class="status-section-header removed">
           <span class="status-icon">−</span>
           <h4>Removed Rows ({{ filteredTotalMissing }})</h4>
@@ -502,7 +527,7 @@
       </div>
 
       <!-- Modified Rows Section -->
-      <div v-if="showDifferentSection" class="status-section">
+      <div id="data-modified-section" v-if="showDifferentSection" class="status-section">
         <div class="status-section-header modified">
           <span class="status-icon">≠</span>
           <h4>Tables with Modified Rows ({{ filteredTotalDifferent }})</h4>
@@ -755,8 +780,8 @@
         </div>
       </div>
 
-      <!-- Unchanged Tables Section -->
-      <div v-if="showIdenticalSection" class="status-section">
+      <!-- Unchanged Rows Section -->
+      <div id="data-unchanged-section" v-if="showIdenticalSection" class="status-section">
         <div class="status-section-header unchanged">
           <span class="status-icon">✓</span>
           <h4>Unchanged Tables ({{ filteredTotalIdentical }})</h4>
@@ -833,7 +858,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, type ComponentPublicInstance } from 'vue';
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount, type ComponentPublicInstance } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
 import { message } from '@tauri-apps/plugin-dialog';
 import type { DatabaseInfo } from '../services/databaseService';
@@ -903,6 +928,11 @@ const options = ref({
   ignoreWhitespace: false,
   chunkSize: 10000
 });
+
+// Sticky Navigation State
+const isMinimized = ref(false);
+const activeSection = ref<'added' | 'removed' | 'modified' | 'unchanged' | ''>('');
+const dataComparisonContainer = ref<HTMLElement | null>(null);
 
 // Refs for synchronized scrolling
 const scrollRefs = ref<Record<string, HTMLElement>>({});
@@ -1271,7 +1301,8 @@ const compareTableRowsChunked = async (
   
   // Load ALL source data in chunks
   const sourceMap = new Map<string, DataRow>();
-  let sourceColumns: string[] = [];
+  // Initialize columns from the initial fetch - CRITICAL FIX for empty tables
+  let sourceColumns: string[] = sourceCountData.columns || [];
   
   let offset = 0;
   const sourceStartTime = Date.now();
@@ -1284,12 +1315,13 @@ const compareTableRowsChunked = async (
       offset
     });
     
-    if (offset === 0) {
+    // Fallback: update columns if they were somehow missing (though they shouldn't be)
+    if (sourceColumns.length === 0 && chunk.columns && chunk.columns.length > 0) {
       sourceColumns = chunk.columns;
     }
     
     // Convert rows to objects and store in map
-    const rowObjects = convertToObject(chunk.rows, chunk.columns);
+    const rowObjects = convertToObject(chunk.rows, sourceColumns);
     for (const row of rowObjects) {
       const key = normalizeValue(row[keyColumn]);
       if (key && key !== 'NULL') {
@@ -1313,7 +1345,8 @@ const compareTableRowsChunked = async (
   
   // Load ALL target data in chunks
   const targetMap = new Map<string, DataRow>();
-  let targetColumns: string[] = [];
+  // Initialize columns from the initial fetch - CRITICAL FIX for empty tables
+  let targetColumns: string[] = targetCountData.columns || [];
   
   offset = 0;
   const targetStartTime = Date.now();
@@ -1326,12 +1359,13 @@ const compareTableRowsChunked = async (
       offset
     });
     
-    if (offset === 0) {
+    // Fallback: update columns if they were somehow missing
+    if (targetColumns.length === 0 && chunk.columns && chunk.columns.length > 0) {
       targetColumns = chunk.columns;
     }
     
     // Convert rows to objects and store in map
-    const rowObjects = convertToObject(chunk.rows, chunk.columns);
+    const rowObjects = convertToObject(chunk.rows, targetColumns);
     for (const row of rowObjects) {
       const key = normalizeValue(row[keyColumn]);
       if (key && key !== 'NULL') {
@@ -1519,6 +1553,44 @@ const toggleCard = (section: string, tableName: string) => {
     expandedCards.value.delete(key);
   } else {
     expandedCards.value.add(key);
+  }
+};
+
+// Sticky Navigation Functions
+const scrollToSection = (sectionId: string) => {
+  const element = document.getElementById(sectionId);
+  if (element) {
+    element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+};
+
+const handleScroll = () => {
+  if (!dataComparisonContainer.value) return;
+  
+  const scrollY = dataComparisonContainer.value.scrollTop;
+  console.log('DataComparison Scroll:', scrollY);
+  
+  // Minimize if scrolled down more than 50px
+  isMinimized.value = scrollY > 50;
+  
+  // Detect which section is currently visible
+  const sections = [
+    { id: 'data-added-section', name: 'added' as const },
+    { id: 'data-removed-section', name: 'removed' as const },
+    { id: 'data-modified-section', name: 'modified' as const },
+    { id: 'data-unchanged-section', name: 'unchanged' as const }
+  ];
+  
+  for (const section of sections) {
+    const element = document.getElementById(section.id);
+    if (element) {
+      const rect = element.getBoundingClientRect();
+      // Check if section is in viewport (within top 200px)
+      if (rect.top <= 200 && rect.bottom >= 0) {
+        activeSection.value = section.name;
+        break;
+      }
+    }
   }
 };
 
@@ -1862,6 +1934,23 @@ const formatBytes = (bytes: number): string => {
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
 };
+
+// Lifecycle hooks
+onMounted(() => {
+  // Attach scroll listener to the container
+  nextTick(() => {
+    if (dataComparisonContainer.value) {
+      dataComparisonContainer.value.addEventListener('scroll', handleScroll);
+    }
+  });
+});
+
+onBeforeUnmount(() => {
+  // Clean up scroll listener
+  if (dataComparisonContainer.value) {
+    dataComparisonContainer.value.removeEventListener('scroll', handleScroll);
+  }
+});
 </script>
 
 <style scoped>
@@ -2007,7 +2096,9 @@ const formatBytes = (bytes: number): string => {
   padding: 20px;
   /* background: #f5f7fa; */
   background: var(--bg-secondary);
-  min-height: 100vh;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
   color: var(--text-primary);
 }
 
@@ -2548,10 +2639,21 @@ const formatBytes = (bytes: number): string => {
 
 /* Results Summary */
 .results-summary {
+  position: sticky;
+  top: 0;
+  z-index: 100;
   background: var(--bg-surface);
   padding: 25px;
   border-radius: 8px;
   margin-bottom: 30px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.results-summary.minimized {
+  padding: 10px 20px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  margin-bottom: 10px;
 }
 
 .results-summary h4 {
@@ -2567,12 +2669,36 @@ const formatBytes = (bytes: number): string => {
   gap: 20px;
 }
 
+.results-summary.minimized .summary-stats {
+  gap: 8px;
+}
+
 .stat-item {
   padding: 15px;
   border-radius: 6px;
   text-align: center;
   /* box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05); */
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+}
+
+.stat-item.clickable {
+  cursor: pointer;
+  border: 2px solid transparent;
+}
+
+.stat-item.clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.stat-item.clickable.active {
+  border: 2px solid #3498db;
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
+}
+
+.results-summary.minimized .stat-item {
+  padding: 8px;
 }
 
 .stat-item.added {
@@ -2624,6 +2750,23 @@ const formatBytes = (bytes: number): string => {
 .stat-item .label {
   font-size: 0.9em;
   color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.stat-item .label-mini {
+  display: none;
+  font-size: 0.75em;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.results-summary.minimized .stat-item .label-mini {
+  display: block;
+}
+
+.results-summary.minimized .stat-item .count {
+  font-size: 1.5em;
+  margin-bottom: 2px;
 }
 
 /* Status Sections */

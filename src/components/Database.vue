@@ -45,14 +45,14 @@
           />
         </div>
 
-        <div v-show="activeTab === 'comparison'" class="tab-panel">
+        <div v-show="activeTab === 'comparison'" class="tab-panel" style="overflow: hidden">
           <SchemaComparison
             :databases="connectedDatabases"
             @comparison-complete="handleComparisonComplete"
           />
         </div>
 
-        <div v-show="activeTab === 'data-comparison'" class="tab-panel">
+        <div v-show="activeTab === 'data-comparison'" class="tab-panel" style="overflow: hidden">
           <DataComparison
             :databases="connectedDatabases"
           />
