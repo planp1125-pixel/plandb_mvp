@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>planDB - The Professional SQLCipher Manager</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --bg-body: #0f172a;
+            --bg-surface: #1e293b;
+            --bg-surface-hover: #334155;
+            --text-main: #f1f5f9;
+            --text-muted: #94a3b8;
+            --border: rgba(255, 255, 255, 0.1);
+            --gradient-hero: linear-gradient(135deg, #60a5fa 0%, #a78bfa 100%);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        /* Navbar */
+        nav {
+            padding: 24px 0;
+            border-bottom: 1px solid var(--border);
+            backdrop-filter: blur(10px);
+            background: rgba(15, 23, 42, 0.8);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .nav-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+        }
+
+        /* .logo span removed to allow individual coloring */
+
+        .nav-links a {
+            color: var(--text-muted);
+            text-decoration: none;
+            margin-left: 24px;
+            font-size: 0.95rem;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover {
+            color: white;
+        }
+
+        /* Hero */
+        .hero {
+            padding: 120px 0 80px;
+            text-align: center;
+            background: radial-gradient(circle at top center, rgba(59, 130, 246, 0.15), transparent 40%);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 6px 12px;
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 100px;
+            color: #60a5fa;
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-bottom: 24px;
+        }
+
+        h1 {
+            font-size: 4rem;
+            line-height: 1.1;
+            margin-bottom: 24px;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+        }
+
+        h1 span {
+            background: var(--gradient-hero);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero p {
+            font-size: 1.25rem;
+            color: var(--text-muted);
+            max-width: 640px;
+            margin: 0 auto 48px;
+        }
+
+        .cta-group {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 14px 28px;
+            border-radius: 8px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 4px 14px rgba(59, 130, 246, 0.4);
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-hover);
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: var(--bg-surface);
+            color: white;
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-surface-hover);
+            transform: translateY(-2px);
+        }
+
+        /* Features */
+        .features {
+            padding: 100px 0;
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 64px;
+        }
+
+        .section-header h2 {
+            font-size: 2.5rem;
+            margin-bottom: 16px;
+        }
+
+        .section-header p {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+            gap: 32px;
+        }
+
+        .feature-card {
+            background: var(--bg-surface);
+            padding: 32px;
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            transition: transform 0.2s, border-color 0.2s;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(59, 130, 246, 0.3);
+        }
+
+        .feature-icon {
+            width: 48px;
+            height: 48px;
+            background: rgba(59, 130, 246, 0.1);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin-bottom: 24px;
+            color: var(--primary);
+        }
+
+        .feature-card h3 {
+            font-size: 1.25rem;
+            margin-bottom: 12px;
+        }
+
+        .feature-card p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+
+        /* Showcase */
+        .showcase {
+            padding: 80px 0;
+            background: linear-gradient(to bottom, var(--bg-body), #162032);
+        }
+
+        .showcase-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 32px;
+        }
+
+        .showcase-item {
+            position: relative;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .showcase-item img {
+            width: 100%;
+            height: auto;
+            display: block;
+            transition: transform 0.5s;
+        }
+
+        .showcase-item:hover img {
+            transform: scale(1.03);
+        }
+
+        .showcase-item.large {
+            grid-column: span 2;
+        }
+
+        /* Downloads */
+        .downloads {
+            padding: 100px 0;
+            text-align: center;
+        }
+
+        .download-cards {
+            display: flex;
+            justify-content: center;
+            gap: 32px;
+            margin-top: 48px;
+            flex-wrap: wrap;
+        }
+
+        .download-card {
+            background: var(--bg-surface);
+            padding: 32px;
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            width: 300px;
+            text-align: left;
+        }
+
+        .os-icon {
+            font-size: 2rem;
+            margin-bottom: 16px;
+            display: block;
+        }
+
+        .download-card h3 {
+            margin-bottom: 8px;
+        }
+
+        .download-card p {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin-bottom: 24px;
+        }
+
+        .download-btn {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            background: var(--primary);
+            color: white;
+            text-align: center;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+
+        .download-btn:hover {
+            background: var(--primary-hover);
+        }
+
+        /* Contact */
+        .contact {
+            max-width: 600px;
+            margin: 0 auto 100px;
+            padding: 48px;
+            background: var(--bg-surface);
+            border-radius: 24px;
+            border: 1px solid var(--border);
+        }
+
+        .form-group {
+            margin-bottom: 24px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: var(--text-main);
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px 16px;
+            background: var(--bg-body);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: white;
+            font-size: 1rem;
+            transition: border-color 0.2s;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        textarea.form-control {
+            height: 120px;
+            resize: vertical;
+        }
+
+        /* Footer */
+        footer {
+            padding: 48px 0;
+            border-top: 1px solid var(--border);
+            text-align: center;
+            color: var(--text-muted);
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2.5rem;
+            }
+
+            .showcase-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .showcase-item.large {
+                grid-column: span 1;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <nav>
+        <div class="container nav-content">
+            <a href="#" class="logo">
+                <!-- Placeholder for Logo Icon -->
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path
+                        d="M12 3C7.58 3 4 4.79 4 7v10c0 2.21 3.58 4 8 4s8-1.79 8-4V7c0-2.21-3.58-4-8-4M12 5c3.31 0 6 1.34 6 3s-2.69 3-6 3-6-1.34-6-3 2.69-3 6-3m-6 5.15c1.36.72 3.54 1.15 6 1.15s4.64-.43 6-1.15V12c0 1.66-2.69 3-6 3s-6-1.34-6-3v-1.85m0 3.7c1.36.72 3.54 1.15 6 1.15s4.64-.43 6-1.15V17c0 1.66-2.69 3-6 3s-6-1.34-6-3v-1.15Z" />
+                </svg>
+                <span style="color: #3b82f6">plan</span><span style="color: #22c55e">DB</span>
+            </a>
+            <div class="nav-links">
+                <a href="#features">Features</a>
+                <a href="#showcase">Screenshots</a>
+                <a href="#download">Download</a>
+                <a href="#contact">Contact</a>
+            </div>
+        </div>
+    </nav>
+
+    <section class="hero">
+        <div class="container">
+            <div class="badge">New: Beta v0.5.3 Released</div>
+            <h1>Master Your Encrypted<br><span>SQLite Databases</span></h1>
+            <p>The professional desktop tool for SQLCipher schema comparison, data synchronization, and precision
+                patching. Built for developers who demand accuracy.</p>
+            <div class="cta-group">
+                <a href="#download" class="btn btn-primary">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="7 10 12 15 17 10" />
+                        <line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                    Download Now
+                </a>
+                <a href="#showcase" class="btn btn-secondary">View Screenshots</a>
+            </div>
+        </div>
+    </section>
+
+    <section id="features" class="features">
+        <div class="container">
+            <div class="section-header">
+                <h2>Professional Grade Features</h2>
+                <p>Everything you need to manage SQLCipher databases in production.</p>
+            </div>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">�</div>
+                    <h3>SQLite ↔ SQLCipher Migration</h3>
+                    <p>Effortlessly encrypt existing SQLite databases or decrypt SQLCipher databases. Our built-in
+                        migration tool makes security upgrades simple and safe.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">⇄</div>
+                    <h3>Bidirectional Sync</h3>
+                    <p>Generate synchronization patches in either direction (Source → Target or Target → Source). Keep
+                        your development and production environments perfectly aligned.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🎯</div>
+                    <h3>Per-Table Granularity</h3>
+                    <p>Focus on what matters. Select specific tables for granular schema and data comparison, allowing
+                        you to isolate changes and ignore irrelevant tables.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">✨</div>
+                    <h3>Precision Diffing</h3>
+                    <p>Our exact matching algorithm identifies every schema change and data discrepancy with 100%
+                        accuracy. No fuzzy guessing, just reliable diffs.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🔒</div>
+                    <h3>Zero-Dependency SQLCipher</h3>
+                    <p>Connect to encrypted databases instantly. No OpenSSL installation, no DLL hell, no external
+                        dependencies required. It just works.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🛡️</div>
+                    <h3>Secure by Design</h3>
+                    <p>Your data never leaves your machine. planDB runs entirely locally, ensuring maximum security for
+                        sensitive databases.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="showcase" class="showcase">
+        <div class="container">
+            <div class="section-header">
+                <h2>See planDB in Action</h2>
+            </div>
+            <div class="showcase-grid">
+                <div class="showcase-item large">
+                    <img src="landing_assets/uploaded_image_0_1763916169898.png" alt="Dashboard Overview">
+                </div>
+                <div class="showcase-item">
+                    <img src="landing_assets/uploaded_image_1_1763916169898.png" alt="Schema Diff">
+                </div>
+                <div class="showcase-item">
+                    <img src="landing_assets/uploaded_image_2_1763916169898.png" alt="Data Comparison">
+                </div>
+                <div class="showcase-item large">
+                    <img src="landing_assets/uploaded_image_3_1763916169898.png" alt="Patch Generation">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="download" class="downloads">
+        <div class="container">
+            <div class="section-header">
+                <h2>Start Your Free Trial</h2>
+                <p>Download planDB today. 90-day full feature trial included.</p>
+            </div>
+            <div class="download-cards">
+                <!-- Windows -->
+                <div class="download-card">
+                    <span class="os-icon">🪟</span>
+                    <h3>Windows</h3>
+                    <p>Windows 10/11 (64-bit)</p>
+                    <button
+                        onclick="openDownloadModal('https://github.com/planp1125-pixel/planDB/releases/latest/download/planDB_0.5.3_x64_en-US.msi')"
+                        class="download-btn" style="border: none; cursor: pointer;">Download .msi</button>
+                    <div style="margin-top: 10px; font-size: 0.85rem; color: var(--text-muted);">
+                        <a href="#"
+                            onclick="openDownloadModal('https://github.com/planp1125-pixel/planDB/releases/latest/download/planDB_0.5.3_x64-setup.exe'); return false;"
+                            style="color: var(--primary); text-decoration: none;">Also available as .exe</a>
+                    </div>
+                </div>
+
+                <!-- Linux -->
+                <div class="download-card">
+                    <span class="os-icon">🐧</span>
+                    <h3>Linux</h3>
+                    <p>Ubuntu, Debian, Fedora</p>
+                    <button
+                        onclick="openDownloadModal('https://github.com/planp1125-pixel/planDB/releases/latest/download/planDB_0.5.3_amd64.deb')"
+                        class="download-btn" style="border: none; cursor: pointer;">Download .deb</button>
+                    <div style="margin-top: 10px; font-size: 0.85rem; color: var(--text-muted);">
+                        <a href="#"
+                            onclick="openDownloadModal('https://github.com/planp1125-pixel/planDB/releases/latest/download/planDB_0.5.3_amd64.AppImage'); return false;"
+                            style="color: var(--primary); text-decoration: none;">Also available as AppImage</a>
+                    </div>
+                </div>
+
+                <!-- macOS -->
+                <div class="download-card" style="opacity: 0.7; border-style: dashed;">
+                    <span class="os-icon">🍎</span>
+                    <h3>macOS</h3>
+                    <p>Apple Silicon & Intel</p>
+                    <button class="download-btn" disabled
+                        style="background: var(--bg-surface-hover); cursor: not-allowed; opacity: 0.6;">Coming
+                        Soon</button>
+                    <div style="margin-top: 10px; font-size: 0.85rem; color: var(--text-muted);">
+                        Join waitlist below
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="contact" class="container">
+        <div class="contact">
+            <div class="section-header" style="margin-bottom: 32px;">
+                <h2>Get in Touch</h2>
+                <p>Have questions or found a bug? We'd love to hear from you.</p>
+            </div>
+            <form action="https://formspree.io/f/mrbdveqw" method="POST">
+                <div class="form-group">
+                    <label>Email Address</label>
+                    <input type="email" name="email" class="form-control" required placeholder="you@company.com">
+                </div>
+                <div class="form-group">
+                    <label>Message</label>
+                    <textarea name="message" class="form-control" required placeholder="How can we help?"></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center;">Send
+                    Message</button>
+            </form>
+        </div>
+    </section>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 planDB. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <!-- Download Modal -->
+    <div id="downloadModal" class="modal-overlay">
+        <div class="modal-content">
+            <button class="close-modal" onclick="closeModal()">×</button>
+            <div class="modal-header">
+                <h3>One Last Step!</h3>
+                <p>Enter your email to start the download.</p>
+            </div>
+            <form id="downloadForm" onsubmit="handleDownloadSubmit(event)">
+                <div class="form-group">
+                    <label>Email Address</label>
+                    <input type="email" id="downloadEmail" class="form-control" required placeholder="you@company.com">
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center;">
+                    Start Download
+                </button>
+                <div style="text-align: center; margin-top: 12px;">
+                    <a href="#" onclick="skipAndDownload(event)"
+                        style="color: var(--text-muted); font-size: 0.85rem; text-decoration: none;">Skip and download
+                        without email</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <style>
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(5px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: var(--bg-surface);
+            padding: 32px;
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            width: 90%;
+            max-width: 400px;
+            position: relative;
+            animation: modalSlide 0.3s ease-out;
+        }
+
+        @keyframes modalSlide {
+            from {
+                transform: translateY(20px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .close-modal {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        .close-modal:hover {
+            color: white;
+        }
+
+        .modal-header {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        .modal-header h3 {
+            margin-bottom: 8px;
+        }
+
+        .modal-header p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+    </style>
+
+    <script>
+        let currentDownloadUrl = '';
+
+        function openDownloadModal(url) {
+            currentDownloadUrl = url;
+            document.getElementById('downloadModal').style.display = 'flex';
+            document.getElementById('downloadEmail').focus();
+        }
+
+        function closeModal() {
+            document.getElementById('downloadModal').style.display = 'none';
+        }
+
+        // Close modal when clicking outside
+        document.getElementById('downloadModal').addEventListener('click', function (e) {
+            if (e.target === this) closeModal();
+        });
+
+        async function handleDownloadSubmit(e) {
+            e.preventDefault();
+            const email = document.getElementById('downloadEmail').value;
+            const btn = e.target.querySelector('button[type="submit"]');
+            const originalText = btn.innerText;
+
+            btn.innerText = 'Processing...';
+            btn.disabled = true;
+
+            try {
+                // Submit to Formspree
+                await fetch('https://formspree.io/f/mrbdveqw', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        email: email,
+                        message: `Downloaded: ${currentDownloadUrl.split('/').pop()}`
+                    })
+                });
+
+                // Trigger download
+                window.location.href = currentDownloadUrl;
+
+                // Close modal
+                closeModal();
+
+                // Reset form
+                e.target.reset();
+
+            } catch (error) {
+                console.error('Error:', error);
+                // If form fails, still let them download
+                window.location.href = currentDownloadUrl;
+                closeModal();
+            } finally {
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        function skipAndDownload(e) {
+            e.preventDefault();
+            window.location.href = currentDownloadUrl;
+            closeModal();
+        }
+    </script>
+</body>
+
+</html>

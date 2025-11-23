@@ -54,6 +54,8 @@ fn main() {
             commands::migrate_to_sqlcipher,
             commands::rekey_sqlcipher_database,
             commands::check_database_type,
+            commands::check_installation_status,
+            commands::get_trial_info,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

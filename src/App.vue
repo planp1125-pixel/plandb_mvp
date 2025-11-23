@@ -3,9 +3,12 @@
     <!-- Header -->
     <header class="app-header">
       <div class="header-content">
-        <div>
-          <h1>SQLCipher Schema Comparison Tool</h1>
-          <div class="subtitle">Desktop application for SQLCipher database management</div>
+        <div class="flex items-center gap-3">
+          <img src="./assets/logo1.png" alt="planDB Logo" class="w-20 h-20" />
+          <div>
+            <h1 class="text-xl font-bold">planDB</h1>
+            <div class="subtitle">Desktop application for SQLCipher database management</div>
+          </div>
         </div>
 
         <!-- Theme toggle -->
@@ -51,48 +54,29 @@
                 <path d="M12 3C7.58 3 4 4.79 4 7v10c0 2.21 3.58 4 8 4s8-1.79 8-4V7c0-2.21-3.58-4-8-4M12 5c3.31 0 6 1.34 6 3s-2.69 3-6 3-6-1.34-6-3 2.69-3 6-3m-6 5.15c1.36.72 3.54 1.15 6 1.15s4.64-.43 6-1.15V12c0 1.66-2.69 3-6 3s-6-1.34-6-3v-1.85m0 3.7c1.36.72 3.54 1.15 6 1.15s4.64-.43 6-1.15V17c0 1.66-2.69 3-6 3s-6-1.34-6-3v-1.15Z"/>
               </svg>
             </button>
-
             <button
               class="nav-icon"
-              :class="{
-                'nav-icon-active': activeNavItem === 'settings',
-                'nav-icon-inactive': activeNavItem !== 'settings'
-              }"
-              @click="activeNavItem = 'settings'"
-              title="Settings"
+              @click="reportBugEmail"
+              title="Report Bug via Email"
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 15.5A3.5 3.5 0 0 1 8.5 12A3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5a3.5 3.5 0 0 1-3.5 3.5m7.43-2.53c.04-.32.07-.64.07-.97c0-.33-.03-.66-.07-1l2.11-1.63c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.31-.61-.22l-2.49 1c-.52-.39-1.06-.73-1.69-.98l-.37-2.65A.506.506 0 0 0 14 2h-4c-.25 0-.46.18-.5.42l-.37 2.65c-.63.25-1.17.59-1.69.98l-2.49-1c-.22-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64L4.57 11c-.04.34-.07.67-.07 1c0 .33.03.65.07.97l-2.11 1.66c-.19.15-.25.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1.01c.52.4 1.06.74 1.69.99l.37 2.65c.04.24.25.42.5.42h4c.25 0 .46-.18.5-.42l.37-2.65c.63-.26 1.17-.59 1.69-.99l2.49 1.01c.22.08.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.66Z"/>
-              </svg>
+              <span class="text-xl">✉️</span>
             </button>
 
             <button
               class="nav-icon"
-              :class="{
-                'nav-icon-active': activeNavItem === 'subscription',
-                'nav-icon-inactive': activeNavItem !== 'subscription'
-              }"
-              @click="activeNavItem = 'subscription'"
-              title="Subscription"
+              @click="reportBugGithub"
+              title="Report Bug on GitHub"
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2A10 10 0 0 0 2 12a10 10 0 0 0 10 10a10 10 0 0 0 10-10A10 10 0 0 0 12 2m0 18a8 8 0 0 1-8-8a8 8 0 0 1 8-8a8 8 0 0 1 8 8a8 8 0 0 1-8 8m.5-13H11v6l5.25 3.15l.75-1.23l-4.5-2.67V7Z"/>
-              </svg>
+              <span class="text-xl">🐙</span>
             </button>
+          </div>
 
-            <button
-              class="nav-icon"
-              :class="{
-                'nav-icon-active': activeNavItem === 'profile',
-                'nav-icon-inactive': activeNavItem !== 'profile'
-              }"
-              @click="activeNavItem = 'profile'"
-              title="Profile"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 4a4 4 0 0 1 4 4a4 4 0 0 1-4 4a4 4 0 0 1-4-4a4 4 0 0 1 4-4m0 10c4.42 0 8 1.79 8 4v2H4v-2c0-2.21 3.58-4 8-4Z"/>
-              </svg>
-            </button>
+          <!-- Trial Info -->
+          <div class="trial-info">
+            <div class="version-tag">Beta v{{ trialInfo.version }}</div>
+            <div class="trial-days" :class="{ 'expired': trialInfo.is_expired }">
+              {{ trialInfo.is_expired ? 'Trial Expired' : `Trial: ${trialInfo.remaining_days} days left` }}
+            </div>
           </div>
         </nav>
 
@@ -128,21 +112,6 @@
               @comparison-complete="handleComparisonComplete"
             />
           </div>
-
-          <!-- Settings Content -->
-          <div v-show="activeNavItem === 'settings'" class="h-full">
-            <Settings />
-          </div>
-
-          <!-- Subscription Content -->
-          <div v-show="activeNavItem === 'subscription'" class="h-full">
-            <Subscription />
-          </div>
-
-          <!-- Profile Content -->
-          <div v-show="activeNavItem === 'profile'" class="h-full">
-            <Profile />
-          </div>
         </div>
       </div>
     </main>
@@ -151,13 +120,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import DatabaseConnection from './components/DatabaseConnection.vue';
+import { ref, onMounted } from "vue";
+import { open } from '@tauri-apps/plugin-shell';
+import DatabaseConnection from "./components/DatabaseConnection.vue";
 import Database from './components/Database.vue';
-import Settings from './components/Settings.vue';
-import Subscription from './components/Subscription.vue';
-import Profile from './components/Profile.vue';
-import type { DatabaseInfo, SchemaComparison as SchemaComparisonType } from './services/databaseService';
+import { DatabaseService, type DatabaseInfo, type SchemaComparison as SchemaComparisonType, type TrialInfo } from './services/databaseService';
 
 // Theme management
 const isDark = ref(false)
@@ -174,8 +141,23 @@ function toggleTheme() {
   applyTheme(!isDark.value)
 }
 
-// License management
-onMounted(() => {
+// App state
+const connectedDatabases = ref<DatabaseInfo[]>([]);
+const selectedDatabase = ref<DatabaseInfo | null>(null);
+const activeTab = ref('explorer');
+const isSidebarVisible = ref(true);
+const activeNavItem = ref('database');
+const databaseService = new DatabaseService();
+
+const trialInfo = ref<TrialInfo>({
+  is_expired: false,
+  remaining_days: 90,
+  version: '0.5.2'
+});
+
+// License management and initial setup
+onMounted(async () => {
+  // Theme initialization
   const ls = localStorage.getItem('theme')
   if (ls) {
     applyTheme(ls === 'dark')
@@ -188,14 +170,38 @@ onMounted(() => {
   mq?.addEventListener('change', e => {
     if (!localStorage.getItem('theme')) applyTheme(e.matches)
   })
-})
 
-// App state
-const connectedDatabases = ref<DatabaseInfo[]>([]);
-const selectedDatabase = ref<DatabaseInfo | null>(null);
-const activeTab = ref('explorer');
-const isSidebarVisible = ref(true);
-const activeNavItem = ref('database');
+  // Fetch trial info
+  try {
+    trialInfo.value = await databaseService.getTrialInfo();
+  } catch (e) {
+    console.error('Failed to fetch trial info:', e);
+  }
+});
+
+const reportBugEmail = async () => {
+  const subject = encodeURIComponent(`Bug Report - planDB v${trialInfo.value.version}`);
+  const body = encodeURIComponent(`Please describe the issue you are facing:\n\n\n\nOS: Linux\nVersion: ${trialInfo.value.version}`);
+  const mailtoLink = `mailto:planptechsup@gmail.com?subject=${subject}&body=${body}`;
+  
+  try {
+    await open(mailtoLink);
+  } catch (e) {
+    console.error('Failed to open email client:', e);
+  }
+};
+
+const reportBugGithub = async () => {
+  // Replace with your actual repo URL
+    const openGitHubReport = async () => {
+      await open('https://github.com/planp1125-pixel/planDB/issues/new');
+    }; 
+  try {
+    await openGitHubReport();
+  } catch (e) {
+    console.error('Failed to open GitHub:', e);
+  }
+};
 
 // Toggle sidebar visibility
 const toggleSidebar = () => {
@@ -253,7 +259,7 @@ const handleTableSelected = (tableName: string) => {
 }
 
 .header-content {
-  padding: 1rem 1.5rem;
+  padding: 0.1rem 1.5rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -347,14 +353,42 @@ const handleTableSelected = (tableName: string) => {
   transform: translateX(0.125rem);
 }
 
-.nav-icon-active {
-  background-color: var(--blue-500);
-  color: white;
+.nav-icon:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
 }
 
-.nav-icon-active:hover {
-  background-color: var(--blue-600);
-  transform: translateX(0.125rem);
+.nav-icon-active {
+  background: var(--bg-tertiary);
+  color: var(--primary-500);
+}
+
+.nav-icon-inactive {
+  color: var(--text-secondary);
+}
+
+.trial-info {
+  margin-top: auto;
+  padding: 1rem 0.5rem;
+  text-align: center;
+  font-size: 0.75rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.version-tag {
+  color: var(--text-secondary);
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+}
+
+.trial-days {
+  color: var(--primary-500);
+  font-weight: 600;
+}
+
+.trial-days.expired {
+  color: #ef4444;
+  font-weight: 600;
 }
 
 /* Sidebar Toggle Icon in Navigation */

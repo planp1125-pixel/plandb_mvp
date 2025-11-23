@@ -640,6 +640,8 @@ const isLoadingSchemas = ref(false);
 const error = ref('');
 const comparisonResult = ref<SchemaComparison | null>(null);
 const expandedTables = ref<Set<string>>(new Set());
+const isTrialExpired = ref(false); // Added trial expiration state
+const isGeneratingPatch = ref(false);
 
 // Sticky Navigation State
 const isMinimized = ref(false);
@@ -708,6 +710,18 @@ const fetchFullSchemas = async () => {
     isLoadingSchemas.value = false;
   }
 }
+
+onMounted(async () => {
+  // Check trial status
+  try {
+    isTrialExpired.value = await databaseService.checkInstallationStatus();
+    if (isTrialExpired.value) {
+      console.log('Trial expired: Patch generation disabled');
+    }
+  } catch (e) {
+    console.error('Failed to check trial status:', e);
+  }
+});
 
 // Computed properties for grouped display by status
 const addedTables = computed((): TableDisplay[] => {
@@ -1070,11 +1084,17 @@ const downloadPatch = (content: string, filename: string) => {
 };
 
 // Generate patch for a single table
-const generateTablePatch = async (
+async function generateTablePatch(
   tableName: string,
   direction: 'source_to_target' | 'target_to_source',
   status: 'added' | 'removed' | 'modified'
-) => {
+) {
+  if (isTrialExpired.value) {
+    await message('Beta period over. Please install the new official version.', { title: 'Trial Expired', kind: 'info' });
+    return;
+  }
+
+  isGeneratingPatch.value = true;
   if (!database1.value || !database2.value) return;
   
   error.value = '';
@@ -1105,6 +1125,8 @@ const generateTablePatch = async (
   } catch (err) {
     error.value = `Failed to generate table patch: ${err}`;
     await message(String(err), { title: 'Table Patch Generation Failed', kind: 'error' });
+  } finally {
+    isGeneratingPatch.value = false;
   }
 };
 
@@ -1192,7 +1214,15 @@ const currentPatchStatus = ref<'added' | 'removed' | 'modified'>('modified');
 //   }
 // };
 
-const generatePatch = async (direction: 'source_to_target' | 'target_to_source' = 'source_to_target') => {
+async function generatePatch(direction: 'source_to_target' | 'target_to_source' = 'source_to_target') {
+  if (isTrialExpired.value) {
+    await message('Beta period over. Please install the new official version.', { title: 'Trial Expired', kind: 'info' });
+    return;
+  }
+  
+  if (!comparisonResult.value) return;
+  
+  isGeneratingPatch.value = true;
   if (!database1.value || !database2.value) return;
   
   error.value = '';

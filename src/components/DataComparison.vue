@@ -861,7 +861,7 @@
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount, type ComponentPublicInstance } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
 import { message } from '@tauri-apps/plugin-dialog';
-import type { DatabaseInfo } from '../services/databaseService';
+import { DatabaseService, type DatabaseInfo } from '../services/databaseService';
 
 interface Props {
   databases: DatabaseInfo[];
@@ -953,7 +953,10 @@ const isDownloaded = ref(false);
 const applyProgress = ref('');
 const isApplying = ref(false);
 const currentPatchDirection = ref<'source_to_target' | 'target_to_source'>('source_to_target');
+const isTrialExpired = ref(false); // Added trial expiration state
+const databaseService = new DatabaseService();
 
+// Progress tracking
 const comparisonProgress = ref({
   message: 'Initializing...',
   percentage: 0,
@@ -962,6 +965,18 @@ const comparisonProgress = ref({
   currentRows: 0,
   totalRows: 0,
   speed: 0
+});
+
+onMounted(async () => {
+  // Check trial status
+  try {
+    isTrialExpired.value = await databaseService.checkInstallationStatus();
+    if (isTrialExpired.value) {
+      console.log('Trial expired: Patch generation disabled');
+    }
+  } catch (e) {
+    console.error('Failed to check trial status:', e);
+  }
 });
 
 // Pagination for large datasets
@@ -1715,7 +1730,15 @@ const patchFilePath = ref<string | null>(null);
 // ... existing code ...
 
 const generateDataPatch = async (direction: 'source_to_target' | 'target_to_source' = 'source_to_target') => {
+  if (isTrialExpired.value) {
+    await message('Beta period over. Please install the new official version.', { title: 'Trial Expired', kind: 'info' });
+    return;
+  }
+
+  if (isGeneratingPatch.value) return;
   isGeneratingPatch.value = true;
+  // Assuming 'error.value = '';ntPatchDirection.value = direction;' was a typo and should be:
+  // error.value = '';
   currentPatchDirection.value = direction;
   patchFilePath.value = null; // Reset previous path
   applyProgress.value = ''; // Clear any previous apply messages
@@ -1774,6 +1797,11 @@ const generateDataPatch = async (direction: 'source_to_target' | 'target_to_sour
 };
 
 const generateSingleTablePatch = async (tableName: string, direction: 'source_to_target' | 'target_to_source' = 'source_to_target', patchType: 'different' | 'missing' | 'extra' = 'different') => {
+  if (isTrialExpired.value) {
+    await message('Beta period over. Please install the new official version.', { title: 'Trial Expired', kind: 'info' });
+    return;
+  }
+  
   const tableResult = tableComparisons.value.find(t => t.tableName === tableName);
   if (!tableResult) return;
   

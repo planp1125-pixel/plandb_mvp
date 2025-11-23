@@ -12,10 +12,20 @@ use tokio::time::timeout;
 use crate::license::{LicenseManager, LicenseStatus};
 use chrono::{DateTime, Utc};
 use std::fs;
-use std::path::PathBuf; // ← Add DateTime here
-                        // ADD THIS TYPE ALIAS AFTER YOUR IMPORTS
+use std::io::Write;
+use std::path::PathBuf;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+// ADD THIS TYPE ALIAS AFTER YOUR IMPORTS
 type LicenseManagerState = Mutex<LicenseManager>;
 type DbManager = Mutex<DatabaseManager>;
+
+#[derive(serde::Serialize)]
+pub struct TrialInfo {
+    is_expired: bool,
+    remaining_days: i64,
+    version: String,
+}
 
 #[tauri::command]
 pub async fn connect_database(
@@ -124,7 +134,18 @@ pub async fn get_table_data(
             table_name, db_path, limit, offset
         );
 
-        db_manager.get_table_data(&db_path, &table_name, limit, offset) // ← Pass offset
+        // Check installation status for trial expiration
+        let is_expired = check_installation_status().unwrap_or(false);
+
+        // Enforce 2-row limit if expired
+        let (effective_limit, effective_offset) = if is_expired {
+            println!("Trial expired - enforcing 2 row limit for table data");
+            (Some(2), Some(0)) // Force limit 2, offset 0
+        } else {
+            (limit, offset)
+        };
+
+        db_manager.get_table_data(&db_path, &table_name, effective_limit, effective_offset)
     })
     .await;
 
@@ -485,6 +506,154 @@ pub async fn save_temp_file(temp_path: String, dest_path: String) -> Result<(), 
     std::fs::copy(&temp_path, &dest_path)
         .map(|_| ())
         .map_err(|e| format!("Failed to save file: {}", e))
+}
+
+#[tauri::command]
+pub fn check_installation_status() -> Result<bool, String> {
+    // Hidden obfuscated file path: ~/.local/share/.plandb-data/sys_core.bin
+    let home_dir =
+        std::env::var("HOME").map_err(|_| "Could not find HOME directory".to_string())?;
+    let data_dir = Path::new(&home_dir)
+        .join(".local")
+        .join("share")
+        .join(".plandb-data");
+    let sys_file = data_dir.join("sys_core.bin");
+
+    // Ensure directory exists
+    if !data_dir.exists() {
+        fs::create_dir_all(&data_dir)
+            .map_err(|e| format!("Failed to create data directory: {}", e))?;
+    }
+
+    if !sys_file.exists() {
+        // First run: Create file with current timestamp
+        let start = SystemTime::now();
+        let since_the_epoch = start
+            .duration_since(UNIX_EPOCH)
+            .map_err(|e| format!("Time error: {}", e))?;
+        let timestamp = since_the_epoch.as_secs();
+
+        // Obfuscate: XOR with a key (simple but effective against casual editing)
+        let key: u64 = 0xDEADBEEFCAFEBABE;
+        let obfuscated = timestamp ^ key;
+
+        let bytes = obfuscated.to_le_bytes();
+        let mut file = fs::File::create(&sys_file)
+            .map_err(|e| format!("Failed to create system file: {}", e))?;
+        file.write_all(&bytes)
+            .map_err(|e| format!("Failed to write system file: {}", e))?;
+
+        println!("System initialized. Trial started.");
+        return Ok(false); // Not expired
+    }
+
+    // Read and verify
+    let bytes = fs::read(&sys_file).map_err(|e| format!("Failed to read system file: {}", e))?;
+    if bytes.len() != 8 {
+        // Corrupted file? Reset it (or could treat as expired/tampered)
+        println!("System file corrupted. Resetting.");
+        let _ = fs::remove_file(&sys_file);
+        return check_installation_status();
+    }
+
+    let mut arr = [0u8; 8];
+    arr.copy_from_slice(&bytes);
+    let obfuscated = u64::from_le_bytes(arr);
+
+    let key: u64 = 0xDEADBEEFCAFEBABE;
+    let timestamp = obfuscated ^ key;
+
+    let install_time = UNIX_EPOCH + Duration::from_secs(timestamp);
+    let now = SystemTime::now();
+
+    let duration = now
+        .duration_since(install_time)
+        .unwrap_or(Duration::from_secs(0));
+    let days = duration.as_secs() / 86400;
+
+    println!("System active for {} days", days);
+
+    if days > 90 {
+        Ok(true) // Expired
+    } else {
+        Ok(false) // Active
+    }
+}
+
+#[tauri::command]
+pub fn get_trial_info() -> Result<TrialInfo, String> {
+    // Hidden obfuscated file path: ~/.local/share/.plandb-data/sys_core.bin
+    let home_dir =
+        std::env::var("HOME").map_err(|_| "Could not find HOME directory".to_string())?;
+    let data_dir = Path::new(&home_dir)
+        .join(".local")
+        .join("share")
+        .join(".plandb-data");
+    let sys_file = data_dir.join("sys_core.bin");
+
+    // Ensure directory exists
+    if !data_dir.exists() {
+        fs::create_dir_all(&data_dir)
+            .map_err(|e| format!("Failed to create data directory: {}", e))?;
+    }
+
+    let timestamp = if !sys_file.exists() {
+        // First run: Create file with current timestamp
+        let start = SystemTime::now();
+        let since_the_epoch = start
+            .duration_since(UNIX_EPOCH)
+            .map_err(|e| format!("Time error: {}", e))?;
+        let ts = since_the_epoch.as_secs();
+
+        // Obfuscate: XOR with a key
+        let key: u64 = 0xDEADBEEFCAFEBABE;
+        let obfuscated = ts ^ key;
+
+        let bytes = obfuscated.to_le_bytes();
+        let mut file = fs::File::create(&sys_file)
+            .map_err(|e| format!("Failed to create system file: {}", e))?;
+        file.write_all(&bytes)
+            .map_err(|e| format!("Failed to write system file: {}", e))?;
+
+        ts
+    } else {
+        // Read and verify
+        let bytes =
+            fs::read(&sys_file).map_err(|e| format!("Failed to read system file: {}", e))?;
+        if bytes.len() != 8 {
+            // Corrupted file? Reset it
+            let _ = fs::remove_file(&sys_file);
+            // Recursively call to recreate
+            return get_trial_info();
+        }
+
+        let mut arr = [0u8; 8];
+        arr.copy_from_slice(&bytes);
+        let obfuscated = u64::from_le_bytes(arr);
+
+        let key: u64 = 0xDEADBEEFCAFEBABE;
+        obfuscated ^ key
+    };
+
+    let install_time = UNIX_EPOCH + Duration::from_secs(timestamp);
+    let now = SystemTime::now();
+
+    let duration = now
+        .duration_since(install_time)
+        .unwrap_or(Duration::from_secs(0));
+    let active_days = duration.as_secs() / 86400;
+
+    let remaining_days = if active_days >= 90 {
+        0
+    } else {
+        90 - active_days
+    };
+
+    Ok(TrialInfo {
+        is_expired: active_days > 90,
+        remaining_days: remaining_days as i64,
+        version: "0.5.2".to_string(),
+    })
 }
 
 #[tauri::command]

@@ -161,10 +161,10 @@ jobs:
           SQLCIPHER_BUNDLED: 1
           LIBSQLITE3_SYS_BUNDLED_SQLCIPHER: 1
         with:
-          tagName: 'sqlcipher-tool-v__VERSION__'
-          releaseName: 'SQLCipher Tool v__VERSION__'
+          tagName: 'plandb-v__VERSION__'
+          releaseName: 'planDB v__VERSION__'
           releaseBody: |
-            ## SQLCipher Database Schema Comparison Tool v__VERSION__
+            ## planDB v__VERSION__
             
             ### Features:
             - Compare SQLCipher database schemas
@@ -188,5 +188,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: windows-exe
-          path: src-tauri/target/release/sqlcipher-tool.exe
+          path: src-tauri/target/release/planDB.exe
           if-no-files-found: warn

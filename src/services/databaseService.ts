@@ -80,17 +80,17 @@ export class DatabaseService {
   }
 
   // Add this to your DatabaseService class
-async getTableColumns(databasePath: string, tableName: string): Promise<any[]> {
-  try {
-    return await invoke('get_table_columns', {
-      dbPath: databasePath,
-      tableName: tableName
-    });
-  } catch (err) {
-    console.error(`Failed to get columns for table ${tableName}:`, err);
-    return [];
+  async getTableColumns(databasePath: string, tableName: string): Promise<any[]> {
+    try {
+      return await invoke('get_table_columns', {
+        dbPath: databasePath,
+        tableName: tableName
+      });
+    } catch (err) {
+      console.error(`Failed to get columns for table ${tableName}:`, err);
+      return [];
+    }
   }
-}
 
   // async getTableData(dbPath: string, tableName: string, limit?: number): Promise<TableData> {
   //   console.log('Getting table data:', tableName, 'from', dbPath);
@@ -102,46 +102,46 @@ async getTableColumns(databasePath: string, tableName: string): Promise<any[]> {
   // }
 
   // REPLACE the existing getTableData method in databaseService.ts (around line 70)
-// with this version that supports OFFSET
-// REPLACE the existing getTableData method in databaseService.ts (around line 70)
-// with this version that supports OFFSET
+  // with this version that supports OFFSET
+  // REPLACE the existing getTableData method in databaseService.ts (around line 70)
+  // with this version that supports OFFSET
 
-async getTableData(
-  dbPath: string, 
-  tableName: string, 
-  limit?: number | null, 
-  offset?: number | null  // ← NEW PARAMETER
-): Promise<TableData> {
-  console.log('Getting table data:', tableName, 'from', dbPath, 'limit:', limit, 'offset:', offset);
-  const hasLimit = limit !== null && limit !== undefined;
-  const limitParam = hasLimit ? limit : null;
-  const offsetParam = hasLimit ? (offset === null || offset === undefined ? 0 : offset) : undefined;
+  async getTableData(
+    dbPath: string,
+    tableName: string,
+    limit?: number | null,
+    offset?: number | null  // ← NEW PARAMETER
+  ): Promise<TableData> {
+    console.log('Getting table data:', tableName, 'from', dbPath, 'limit:', limit, 'offset:', offset);
+    const hasLimit = limit !== null && limit !== undefined;
+    const limitParam = hasLimit ? limit : null;
+    const offsetParam = hasLimit ? (offset === null || offset === undefined ? 0 : offset) : undefined;
 
-  const payload: Record<string, any> = {
-    dbPath,
-    tableName,
-    limit: limitParam
-  };
-  if (hasLimit) {
-    payload.offset = offsetParam;
+    const payload: Record<string, any> = {
+      dbPath,
+      tableName,
+      limit: limitParam
+    };
+    if (hasLimit) {
+      payload.offset = offsetParam;
+    }
+
+    return await invoke('get_table_data', payload);
   }
-
-  return await invoke('get_table_data', payload);
-}
-// async getTableData(
-//   dbPath: string, 
-//   tableName: string, 
-//   limit?: number, 
-//   offset?: number  // ← NEW PARAMETER
-// ): Promise<TableData> {
-//   console.log('Getting table data:', tableName, 'from', dbPath, 'limit:', limit, 'offset:', offset);
-//   return await invoke('get_table_data', { 
-//     dbPath, 
-//     tableName, 
-//     limit: limit || 100,
-//     offset: offset || 0  // ← Pass offset
-//   });
-// }
+  // async getTableData(
+  //   dbPath: string, 
+  //   tableName: string, 
+  //   limit?: number, 
+  //   offset?: number  // ← NEW PARAMETER
+  // ): Promise<TableData> {
+  //   console.log('Getting table data:', tableName, 'from', dbPath, 'limit:', limit, 'offset:', offset);
+  //   return await invoke('get_table_data', { 
+  //     dbPath, 
+  //     tableName, 
+  //     limit: limit || 100,
+  //     offset: offset || 0  // ← Pass offset
+  //   });
+  // }
 
 
   async compareDatabaseSchemas(db1Path: string, db2Path: string): Promise<SchemaComparison> {
@@ -150,18 +150,32 @@ async getTableData(
   }
 
   async compareTableDataFast(
-  db1Path: string, 
-  db2Path: string, 
-  tableName: string, 
-  primaryKey: string
-): Promise<DataComparisonResult> {
-  console.log('Fast comparing table:', tableName);
-  return await invoke('compare_table_data_fast', { 
-    db1Path, 
-    db2Path, 
-    tableName, 
-    primaryKey 
-  });
+    db1Path: string,
+    db2Path: string,
+    tableName: string,
+    primaryKey: string
+  ): Promise<DataComparisonResult> {
+    console.log('Fast comparing table:', tableName);
+    return await invoke('compare_table_data_fast', {
+      db1Path,
+      db2Path,
+      tableName,
+      primaryKey
+    });
+  }
+
+  async checkInstallationStatus(): Promise<boolean> {
+    return await invoke('check_installation_status');
+  }
+
+  async getTrialInfo(): Promise<TrialInfo> {
+    return await invoke('get_trial_info');
+  }
 }
+
+export interface TrialInfo {
+  is_expired: boolean;
+  remaining_days: number;
+  version: string;
 }
 
