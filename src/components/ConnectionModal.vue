@@ -81,8 +81,8 @@
                 <label for="hmacAlgorithm">HMAC Algorithm</label>
                 <select id="hmacAlgorithm" v-model="settings.hmac_algorithm" class="form-select">
                   <option value="HMAC_SHA1">HMAC SHA1</option>
-                  <option value="HMAC_SHA256">HMAC SHA256 (Default)</option>
-                  <option value="HMAC_SHA512">HMAC SHA512</option>
+                  <option value="HMAC_SHA256">HMAC SHA256</option>
+                  <option value="HMAC_SHA512">HMAC SHA512 (Default)</option>
                 </select>
               </div>
 
@@ -162,7 +162,7 @@ const errorMessage = ref('');
 const settings = ref({
   page_size: '4096',
   kdf_iterations: '256000',
-  hmac_algorithm: 'HMAC_SHA256',
+  hmac_algorithm: 'HMAC_SHA512',
   kdf_algorithm: 'PBKDF2_HMAC_SHA512'
 });
 

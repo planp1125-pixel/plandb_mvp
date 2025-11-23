@@ -53,10 +53,18 @@
       
       <button 
         v-if="comparisonResult"
-        @click="generatePatch"
-        class="patch-btn"
-        >
-        Generate SQL Patch
+        @click="generatePatch('source_to_target')"
+        class="patch-btn forward-btn"
+      >
+        Source → Target
+      </button>
+      
+      <button 
+        v-if="comparisonResult"
+        @click="generatePatch('target_to_source')"
+        class="patch-btn reverse-btn"
+      >
+        Target → Source
       </button>
     </div>
 
@@ -112,6 +120,18 @@
               <div class="empty-message">
                 <span>These tables don't exist in the source database</span>
               </div>
+              
+              <!-- Source→Target buttons for Added tables (on source side) -->
+              <div v-for="table in addedTables" :key="'added_src_' + table.name" class="table-source-actions">
+                <button 
+                  v-if="expandedTables.has(table.name)"
+                  @click="generateTablePatch(table.name, 'source_to_target', 'added')"
+                  class="mini-patch-btn forward"
+                  title="Drop this table from Target database"
+                >
+                  Source → Target
+                </button>
+              </div>
             </div>
           </div>
           <div class="database-column">
@@ -154,6 +174,17 @@
                   </div>
                   <div v-else class="empty-columns-message">
                     No columns found
+                  </div>
+                  
+                  <!-- Target→Source button for Added tables (on target side) -->
+                  <div class="table-patch-actions">
+                    <button 
+                      @click="generateTablePatch(table.name, 'target_to_source', 'added')"
+                      class="mini-patch-btn reverse"
+                      title="Create this table in Source database"
+                    >
+                      Target → Source
+                    </button>
                   </div>
                 </div>
               </div>
@@ -211,6 +242,17 @@
                   <div v-else class="empty-columns-message">
                     No columns found
                   </div>
+                  
+                  <!-- Source→Target button for Removed tables (on source side) -->
+                  <div class="table-patch-actions">
+                    <button 
+                      @click="generateTablePatch(table.name, 'source_to_target', 'removed')"
+                      class="mini-patch-btn forward"
+                      title="Create this table in Target database"
+                    >
+                      Source → Target
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -222,6 +264,18 @@
             <div class="column-content empty-state">
               <div class="empty-message">
                 <span>These tables don't exist in the target database</span>
+              </div>
+              
+              <!-- Target→Source buttons for Removed tables (on target side) -->
+              <div v-for="table in removedTables" :key="'removed_tgt_' + table.name" class="table-source-actions">
+                <button 
+                  v-if="expandedTables.has(table.name)"
+                  @click="generateTablePatch(table.name, 'target_to_source', 'removed')"
+                  class="mini-patch-btn reverse"
+                  title="Drop this table from Source database"
+                >
+                  Target → Source
+                </button>
               </div>
             </div>
           </div>
@@ -294,6 +348,17 @@
                 <div v-else class="empty-columns-message">
                   No columns found
                 </div>
+                
+                <!-- Source→Target button for Modified tables (on source side) -->
+                <div class="table-patch-actions">
+                  <button 
+                    @click="generateTablePatch(modifiedTable.tableName, 'source_to_target', 'modified')"
+                    class="mini-patch-btn forward"
+                    title="Make Target match Source structure"
+                  >
+                    Source → Target
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -342,6 +407,17 @@
                 </div>
                 <div v-else class="empty-columns-message">
                   No columns found
+                </div>
+                
+                <!-- Target→Source button for Modified tables (on target side) -->
+                <div class="table-patch-actions">
+                  <button 
+                    @click="generateTablePatch(modifiedTable.tableName, 'target_to_source', 'modified')"
+                    class="mini-patch-btn reverse"
+                    title="Make Source match Target structure"
+                  >
+                    Target → Source
+                  </button>
                 </div>
               </div>
             </div>
@@ -463,6 +539,22 @@
         </div>
 
         <div class="patch-preview-info">
+          <div v-if="currentPatchTable" class="info-item table-info-highlight">
+            <strong>Table:</strong> {{ currentPatchTable }}
+          </div>
+          <div v-if="currentPatchDirection" class="info-item direction-info">
+            <strong>Direction:</strong> 
+            <span v-if="currentPatchDirection === 'source_to_target'" class="direction-badge forward">
+              Source → Target
+            </span>
+            <span v-else class="direction-badge reverse">
+              Target → Source
+            </span>
+          </div>
+          <div v-if="currentPatchDirection" class="info-item target-db-info">
+            <strong>Will modify:</strong> 
+            <span class="db-name">{{ currentPatchDirection === 'source_to_target' ? getDatabaseName(database2) : getDatabaseName(database1) }}</span>
+          </div>
           <div class="info-item">
             <strong>File:</strong> {{ patchFilename }}
           </div>
@@ -901,6 +993,57 @@ const downloadReport = (content: string, filename: string) => {
   URL.revokeObjectURL(url);
 };
 
+const downloadPatch = (content: string, filename: string) => {
+  const blob = new Blob([content], { type: 'text/sql' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
+
+// Generate patch for a single table
+const generateTablePatch = async (
+  tableName: string,
+  direction: 'source_to_target' | 'target_to_source',
+  status: 'added' | 'removed' | 'modified'
+) => {
+  if (!database1.value || !database2.value) return;
+  
+  error.value = '';
+  
+  // Store current patch context
+  currentPatchTable.value = tableName;
+  currentPatchDirection.value = direction;
+  currentPatchStatus.value = status;
+
+  try {
+    const patchSql = await invoke<string>('generate_table_schema_patch', {
+      db1Path: database1.value,
+      db2Path: database2.value,
+      tableName: tableName,
+      tableStatus: status,
+      direction: direction,
+    });
+    
+    const directionStr = direction === 'target_to_source' ? 'T2S' : 'S2T';
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
+    const filename = `table_${tableName}_${directionStr}_${timestamp}.sql`;
+
+    // Always show preview modal for individual table patches (they're usually small)
+    generatedPatchSQL.value = patchSql;
+    patchFilename.value = filename;
+    showPatchModal.value = true;
+
+  } catch (err) {
+    error.value = `Failed to generate table patch: ${err}`;
+    await message(String(err), { title: 'Table Patch Generation Failed', kind: 'error' });
+  }
+};
+
 // State persistence
 const saveState = () => {
   const state = {
@@ -951,6 +1094,11 @@ const isApplying = ref(false);
 const patchApplied = ref(false);
 const applyProgress = ref('');
 
+// Per-table patch state
+const currentPatchTable = ref('');
+const currentPatchDirection = ref<'source_to_target' | 'target_to_source'>('source_to_target');
+const currentPatchStatus = ref<'added' | 'removed' | 'modified'>('modified');
+
 // const generatePatch = async () => {
 //   if (!database1.value || !database2.value) return;
   
@@ -980,21 +1128,24 @@ const applyProgress = ref('');
 //   }
 // };
 
-const generatePatch = async () => {
+const generatePatch = async (direction: 'source_to_target' | 'target_to_source' = 'source_to_target') => {
   if (!database1.value || !database2.value) return;
   
   error.value = '';
+  currentPatchDirection.value = direction;
 
   try {
     const patchSql = await invoke<string>('generate_schema_patch', {
       db1Path: database1.value,
       db2Path: database2.value,
+      direction: direction,
     });
     
     const db1Name = getDatabaseName(database1.value).replace(/[^a-z0-9]/gi, '_');
     const db2Name = getDatabaseName(database2.value).replace(/[^a-z0-9]/gi, '_');
     const timestamp = new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
-    const filename = `patch_${db1Name}_to_${db2Name}_${timestamp}.sql`;
+    const directionLabel = direction === 'source_to_target' ? 'source_to_target' : 'target_to_source';
+    const filename = `schema_patch_${directionLabel}_${db1Name}_to_${db2Name}_${timestamp}.sql`;
 
     // Check file size - if larger than 5MB, skip preview and auto-download
     const fileSizeBytes = new Blob([patchSql]).size;
@@ -1054,21 +1205,29 @@ const formatBytes = (bytes: number): string => {
 
 const closePatchModal = () => {
   showPatchModal.value = false;
-  // Reset apply states when closing
+  // Reset apply states and patch context when closing
   isApplying.value = false;
   patchApplied.value = false;
   applyProgress.value = '';
+  currentPatchTable.value = '';
+  currentPatchDirection.value = 'source_to_target';
 };
 
 const applyPatchToDatabase = async () => {
-  if (!database2.value || !generatedPatchSQL.value) return;
+  // Determine which database to apply to based on direction
+  const targetDbPath = currentPatchDirection.value === 'target_to_source' 
+    ? database1.value  // Apply to SOURCE for target→source
+    : database2.value; // Apply to TARGET for source→target
+    
+  if (!targetDbPath || !generatedPatchSQL.value) return;
 
   isApplying.value = true;
-  applyProgress.value = 'Applying schema patch to target database...';
+  const targetName = getDatabaseName(targetDbPath);
+  applyProgress.value = `Applying schema patch to ${targetName}...`;
 
   try {
     const result = await invoke<string>('apply_schema_patch', {
-      targetDbPath: database2.value,
+      targetDbPath: targetDbPath,
       patchSql: generatedPatchSQL.value
     });
 
@@ -1102,18 +1261,6 @@ const applyPatchToDatabase = async () => {
     patchApplied.value = false;
     applyProgress.value = '';
   }
-};
-
-const downloadPatch = (sql: string, filename: string) => {
-  const blob = new Blob([sql], { type: 'text/plain' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
 };
 
 // Watchers to save state on changes
@@ -1932,6 +2079,93 @@ onBeforeUnmount(() => {
   opacity: 0.8;
 }
 
+/* Per-Table Patch Buttons */
+.table-patch-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color);
+}
+
+.table-patch-btn {
+  flex: 1;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.table-patch-btn.forward-btn {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+}
+
+.table-patch-btn.reverse-btn {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  color: white;
+}
+
+.table-patch-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.table-patch-btn.forward-btn:hover {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+}
+
+.table-patch-btn.reverse-btn:hover {
+  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+}
+
+.direction-icon {
+  font-size: 14px;
+}
+
+/* Modal direction badges */
+.direction-badge {
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.direction-badge.forward {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+}
+
+.direction-badge.reverse {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  color: white;
+}
+
+.table-info-highlight {
+  background: var(--bg-secondary);
+  border-left: 3px solid #3b82f6;
+  padding: 8px 12px !important;
+  font-weight: 600;
+}
+
+.target-db-info {
+  background: #fef3c7;
+  border-left: 3px solid #f59e0b;
+  padding: 8px 12px !important;
+}
+
+.target-db-info .db-name {
+  font-weight: 600;
+  color: #92400e;
+}
+
 .cancel-btn {
   background: var(--bg-tertiary);
   color: var(--text-primary);
@@ -1971,5 +2205,41 @@ onBeforeUnmount(() => {
   margin-top: 12px;
   border: 1px solid #10b981;
   animation: slideIn 0.3s ease-out;
+}
+
+/* Mini Patch Buttons Styling */
+.mini-patch-btn {
+  padding: 6px 12px;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85em;
+  transition: all 0.2s;
+  font-weight: 500;
+}
+
+.mini-patch-btn.forward {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+}
+
+.mini-patch-btn.forward:hover {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+}
+
+.mini-patch-btn.reverse {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+}
+
+.mini-patch-btn.reverse:hover {
+  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3);
+}
+
+.mini-patch-btn:active {
+  transform: translateY(0);
 }
 </style>

@@ -151,15 +151,24 @@
         📥 Export Report
       </button>
 
-      <button 
-        v-if="hasResults && !isComparing"
-        @click="generateDataPatch"
-        class="patch-btn"
-        :disabled="isGeneratingPatch"
-      >
-        {{ isGeneratingPatch ? '⏳ Generating...' : '🔧 Generate Patch' }}
-      </button>
+      <div v-if="hasResults && !isComparing" class="patch-actions-group">
+        <button
+          @click="generateDataPatch('source_to_target')"
+          class="patch-btn forward-btn"
+          :disabled="isGeneratingPatch"
+        >
+          {{ isGeneratingPatch  ? '⏳ Generating...' : '📤 Source → Target Patch' }}
+        </button>
+        <button
+          @click="generateDataPatch('target_to_source')"
+          class="patch-btn reverse-btn"
+          :disabled="isGeneratingPatch"
+        >
+          {{ isGeneratingPatch ? '⏳ Generating...' : '📥 Target → Source Patch' }}
+        </button>
+      </div>
     </div>
+
 
     <!-- Patch Preview Modal -->
     <div v-if="showPatchPreview" class="patch-preview-overlay" @click="showPatchPreview = false">
@@ -170,6 +179,19 @@
         </div>
 
         <div class="patch-preview-info">
+          <div class="info-item">
+            <strong>Direction:</strong>
+            <span v-if="currentPatchDirection === 'source_to_target'" class="direction-badge forward">
+              📤 Source → Target
+            </span>
+            <span v-else class="direction-badge reverse">
+              📥 Target → Source
+            </span>
+          </div>
+          <div class="info-item">
+            <strong>Will modify:</strong>
+            <span class="db-name">{{ currentPatchDirection === 'source_to_target' ? getDatabaseName(database2) : getDatabaseName(database1) }}</span>
+          </div>
           <div class="info-item">
             <strong>File:</strong> {{ patchFilename }}
           </div>
@@ -183,19 +205,20 @@
 
         <div class="patch-preview-content">
           <div v-if="patchTooLargeToShow" class="large-patch-info">
-            <h4>⚠️ Patch Too Large to Display</h4>
-            <p>This patch is <strong>{{ formatBytes(patchContent.length) }}</strong> and contains too much text to display in the preview.</p>
-            <p>You can:</p>
+            <h4>📦 Large Patch Generated</h4>
+            <p>This patch is <strong>{{ formatBytes(patchContent.length) }}</strong> and too large to display in the preview (limit: 5MB for stability).</p>
+            <p><strong>✅ Your patch is ready!</strong> You can:</p>
             <ul>
-              <li><strong>Apply directly</strong> - Click "⚡ Apply to Database" button below</li>
-              <li><strong>Download first</strong> - Click "💾 Download SQL File" to review in a text editor</li>
-              <li><strong>Copy to clipboard</strong> - Click "📋 Copy" (may take a moment for large files)</li>
+              <li><strong>💾 Download</strong> - Save to file and review in your text editor</li>
+              <li><strong>⚡ Apply directly</strong> - Execute on database without viewing</li>
+              <li><strong>📋 Copy</strong> - Copy full SQL to clipboard (may take a few seconds)</li>
             </ul>
             <div class="patch-stats">
-              <div><strong>Patch file:</strong> {{ patchFilename }}</div>
+              <div><strong>File:</strong> {{ patchFilename }}</div>
               <div><strong>Size:</strong> {{ formatBytes(patchContent.length) }}</div>
-              <div><strong>Estimated statements:</strong> ~{{ Math.floor(patchContent.length / 500).toLocaleString() }}</div>
+              <div><strong>Estimated statements:</strong> ~{{ Math.floor(patchContent.length / 200).toLocaleString() }}</div>
             </div>
+            <p class="info-note">💡 <strong>Tip:</strong> For large datasets, download first to review before applying.</p>
           </div>
           <pre v-else><code>{{ patchContent }}</code></pre>
         </div>
@@ -304,17 +327,29 @@
               <span class="table-status-badge added">{{ result.summary.extraInTarget }} added rows</span>
             </div>
             <div class="header-controls">
+              <div class="table-patch-buttons">
+                <button
+                  @click.stop="generateSingleTablePatch(result.tableName, 'source_to_target', 'extra')"
+                  class="mini-patch-btn forward"
+                  title="Generate Source → Target patch for this table"
+                >
+                  Source → Target
+                </button>
+                <button
+                  @click.stop="generateSingleTablePatch(result.tableName, 'target_to_source', 'extra')"
+                  class="mini-patch-btn reverse"
+                  title="Generate Target → Source patch for this table"
+                >
+                  Target → Source
+                </button>
+              </div>
               <button
-                @click.stop="generateSingleTablePatch(result.tableName)"
-                class="mini-patch-btn"
-                title="Generate patch for this table only"
+                @click="toggleCard('extra', result.tableName)"
+                class="expand-btn"
+                :class="{ expanded: expandedCards.has(`extra_${result.tableName}`) }"
               >
-                📄 Patch
+                {{ expandedCards.has(`extra_${result.tableName}`) ? '▲' : '▼' }}
               </button>
-
-              <span class="toggle-icon">
-                {{ expandedCards.has(`extra_${result.tableName}`) ? '▼' : '▶' }}
-              </span>
             </div>
           </div>
           <div v-if="expandedCards.has(`extra_${result.tableName}`)" class="table-details">
@@ -388,17 +423,29 @@
               <span class="table-status-badge removed">{{ result.summary.missingInTarget }} removed rows</span>
             </div>
             <div class="header-controls">
+              <div class="table-patch-buttons">
+                <button
+                  @click.stop="generateSingleTablePatch(result.tableName, 'source_to_target', 'missing')"
+                  class="mini-patch-btn forward"
+                  title="Generate Source → Target patch for this table"
+                >
+                  Source → Target
+                </button>
+                <button
+                  @click.stop="generateSingleTablePatch(result.tableName, 'target_to_source', 'missing')"
+                  class="mini-patch-btn reverse"
+                  title="Generate Target → Source patch for this table"
+                >
+                  Target → Source
+                </button>
+              </div>
               <button
-                @click.stop="generateSingleTablePatch(result.tableName)"
-                class="mini-patch-btn"
-                title="Generate patch for this table only"
+                @click="toggleCard('missing', result.tableName)"
+                class="expand-btn"
+                :class="{ expanded: expandedCards.has(`missing_${result.tableName}`) }"
               >
-                📄 Patch
+                {{ expandedCards.has(`missing_${result.tableName}`) ? '▲' : '▼' }}
               </button>
-
-              <span class="toggle-icon">
-                {{ expandedCards.has(`missing_${result.tableName}`) ? '▼' : '▶' }}
-              </span>
             </div>
           </div>
           <div v-if="expandedCards.has(`missing_${result.tableName}`)" class="table-details">
@@ -492,14 +539,22 @@
                 </button>
               </div>
 
-              <!-- Per-table patch button -->
-              <button
-                @click.stop="generateSingleTablePatch(result.tableName)"
-                class="mini-patch-btn"
-                title="Generate patch for this table only"
-              >
-                📄 Patch
-              </button>
+              <div class="table-patch-buttons">
+                <button
+                  @click.stop="generateSingleTablePatch(result.tableName, 'source_to_target', 'different')"
+                  class="mini-patch-btn forward"
+                  title="Generate Source → Target patch for this table"
+                >
+                  Source → Target
+                </button>
+                <button
+                  @click.stop="generateSingleTablePatch(result.tableName, 'target_to_source', 'different')"
+                  class="mini-patch-btn reverse"
+                  title="Generate Target → Source patch for this table"
+                >
+                  Target → Source
+                </button>
+              </div>
 
               <span class="toggle-icon">
                 {{ expandedCards.has(`different_${result.tableName}`) ? '▼' : '▶' }}
@@ -857,16 +912,17 @@ const currentFilter = ref<'all' | 'identical' | 'different' | 'missing' | 'extra
 const isGeneratingPatch = ref(false);
 // Remove toast - using native dialogs instead
 
-// Patch preview
+// Patch preview state
 const showPatchPreview = ref(false);
 const patchContent = ref('');
 const patchFilename = ref('');
-const patchTooLargeToShow = ref(false);
+const patchTooLargeToShow = ref(false); // Added - to hide huge SQL from dominating UI
+const patchApplied = ref(false);
 const isCopied = ref(false);
 const isDownloaded = ref(false);
-const isApplying = ref(false);
-const patchApplied = ref(false);
 const applyProgress = ref('');
+const isApplying = ref(false);
+const currentPatchDirection = ref<'source_to_target' | 'target_to_source'>('source_to_target');
 
 const comparisonProgress = ref({
   message: 'Initializing...',
@@ -1578,15 +1634,24 @@ const exportAllDifferences = async () => {
   }
 };
 
-const generateDataPatch = async () => {
-  // Large patches are handled automatically - no warning needed
+import { save } from '@tauri-apps/plugin-dialog';
 
+// ... existing imports ...
+
+const patchFilePath = ref<string | null>(null);
+
+// ... existing code ...
+
+const generateDataPatch = async (direction: 'source_to_target' | 'target_to_source' = 'source_to_target') => {
   isGeneratingPatch.value = true;
-  await nextTick(); // Wait for Vue to update
-  await new Promise(resolve => setTimeout(resolve, 50)); // Allow browser to paint
+  currentPatchDirection.value = direction;
+  patchFilePath.value = null; // Reset previous path
+  applyProgress.value = ''; // Clear any previous apply messages
+  
+  await nextTick();
+  await new Promise(resolve => setTimeout(resolve, 50));
 
   try {
-    // Prepare comparison data for backend
     const comparisonData = tableComparisons.value.map(result => ({
       tableName: result.tableName,
       keyColumn: result.keyColumn,
@@ -1602,49 +1667,90 @@ const generateDataPatch = async () => {
       }
     }));
 
-    const patchSql = await invoke<string>('generate_data_patch', {
+    // Backend now returns JSON string with { filePath, fileSize, preview, isLarge }
+    const responseJson = await invoke<string>('generate_data_patch', {
       db1Path: database1.value,
       db2Path: database2.value,
-      tableComparisons: comparisonData  // camelCase - Tauri converts to snake_case
+      tableComparisons: comparisonData,
+      direction: direction,
     });
+    
+    const response = JSON.parse(responseJson);
+    
+    // Store file path for download/apply
+    patchFilePath.value = response.filePath;
+    patchContent.value = response.preview;
+    patchTooLargeToShow.value = response.isLarge;
 
-    // Generate filename with database names and timestamp
-    const db1Name = getDatabaseName(database1.value)
-      .replace(/\.[^/.]+$/, '')
-      .replace(/[^a-z0-9]/gi, '_');
-
-    const db2Name = getDatabaseName(database2.value)
-      .replace(/\.[^/.]+$/, '')
-      .replace(/[^a-z0-9]/gi, '_');
-
-    const timestamp = new Date().toISOString()
-      .slice(0, 19)
-      .replace('T', '_')
-      .replace(/:/g, '-');
-
-    const filename = `data_patch_${db1Name}_to_${db2Name}_${timestamp}.sql`;
-
-    // Check if patch is too large to render in DOM (prevent UI freeze)
-    const fileSizeBytes = new Blob([patchSql]).size;
-    const fileSizeMB = (fileSizeBytes / (1024 * 1024)).toFixed(2);
-    const DOM_RENDER_LIMIT = 20 * 1024 * 1024; // 20MB - safe limit for DOM rendering
-
-    patchContent.value = patchSql;
-    patchFilename.value = filename;
-
-    // Set flag if too large to show in preview (but still allow apply/download)
-    patchTooLargeToShow.value = fileSizeBytes > DOM_RENDER_LIMIT;
+    // Generate filename for display/download suggestion
+    const db1Name = getDatabaseName(database1.value).replace(/\.[^/.]+$/, '').replace(/[^a-z0-9]/gi, '_');
+    const db2Name = getDatabaseName(database2.value).replace(/\.[^/.]+$/, '').replace(/[^a-z0-9]/gi, '_');
+    const timestamp = new Date().toISOString().slice(0, 19).replace('T', '_').replace(/:/g, '-');
+    const directionLabel = direction === 'source_to_target' ? 'source_to_target' : 'target_to_source';
+    patchFilename.value = `data_patch_${directionLabel}_${db1Name}_to_${db2Name}_${timestamp}.sql`;
 
     showPatchPreview.value = true;
+    patchApplied.value = false;
+    isCopied.value = false;
+    isDownloaded.value = false;
 
-    // Show info message for very large patches
-    if (fileSizeBytes > 50 * 1024 * 1024) { // > 50MB
-      await showMessage(
-        'Large Patch Generated',
-        `Patch size: ${fileSizeMB}MB\n\nThis is a large patch. The preview will show options instead of the full SQL.\n\nYou can apply it directly or download it for review.\n\nNote: Applying may take several minutes.`,
-        'info'
-      );
-    }
+  } catch (err) {
+    await showMessage('Patch Generation Failed', String(err), 'error');
+  } finally {
+    isGeneratingPatch.value = false;
+  }
+};
+
+const generateSingleTablePatch = async (tableName: string, direction: 'source_to_target' | 'target_to_source' = 'source_to_target', patchType: 'different' | 'missing' | 'extra' = 'different') => {
+  const tableResult = tableComparisons.value.find(t => t.tableName === tableName);
+  if (!tableResult) return;
+  
+  isGeneratingPatch.value = true;
+  currentPatchDirection.value = direction;
+  patchFilePath.value = null;
+  applyProgress.value = ''; // Clear any previous apply messages
+  
+  await nextTick();
+  await new Promise(resolve => setTimeout(resolve, 50));
+  
+  try {
+    const comparisonData = [{
+      tableName: tableResult.tableName,
+      keyColumn: tableResult.keyColumn,
+      comparison: {
+        missingInTarget: tableResult.comparison.missingInTarget,
+        differentRows: tableResult.comparison.differentRows.map(diff => ({
+          sourceRow: diff.sourceRow,
+          targetRow: diff.targetRow,
+          differentColumns: diff.differentColumns
+        })),
+        extraInTarget: tableResult.comparison.extraInTarget,
+        commonColumns: tableResult.comparison.commonColumns
+      }
+    }];
+
+    const responseJson = await invoke<string>('generate_data_patch', {
+      db1Path: database1.value,
+      db2Path: database2.value,
+      tableComparisons: comparisonData,
+      direction: direction,
+      patchType: patchType,
+    });
+    
+    const response = JSON.parse(responseJson);
+    
+    patchFilePath.value = response.filePath;
+    patchContent.value = response.preview;
+    patchTooLargeToShow.value = response.isLarge;
+    
+    const timestamp = new Date().toISOString().slice(0, 19).replace('T', '_').replace(/:/g, '-');
+    const directionLabel = direction === 'source_to_target' ? 'source_to_target' : 'target_to_source';
+    patchFilename.value = `data_patch_${directionLabel}_${tableName}_${timestamp}.sql`;
+    
+    showPatchPreview.value = true;
+    patchApplied.value = false;
+    isCopied.value = false;
+    isDownloaded.value = false;
 
   } catch (err) {
     await showMessage('Patch Generation Failed', String(err), 'error');
@@ -1665,59 +1771,9 @@ const downloadPatch = (sql: string, filename: string) => {
   URL.revokeObjectURL(url);
 };
 
-const generateSingleTablePatch = async (tableName: string) => {
-  const tableResult = tableComparisons.value.find(t => t.tableName === tableName);
-  if (!tableResult) return;
-  
-  isGeneratingPatch.value = true;
-  await nextTick(); // Wait for Vue to update
-  await new Promise(resolve => setTimeout(resolve, 50)); // Allow browser to paint
-  
-  try {
-    // Reuse the same backend command with single table
-    const comparisonData = [{
-      tableName: tableResult.tableName,
-      keyColumn: tableResult.keyColumn,
-      comparison: {
-        missingInTarget: tableResult.comparison.missingInTarget,
-        differentRows: tableResult.comparison.differentRows.map(diff => ({
-          sourceRow: diff.sourceRow,
-          targetRow: diff.targetRow,
-          differentColumns: diff.differentColumns
-        })),
-        extraInTarget: tableResult.comparison.extraInTarget,
-        commonColumns: tableResult.comparison.commonColumns
-      }
-    }];
-
-    const patchSql = await invoke<string>('generate_data_patch', {
-      db1Path: database1.value,
-      db2Path: database2.value,
-      tableComparisons: comparisonData  // camelCase - Tauri converts to snake_case
-    });
-    
-    const timestamp = new Date().toISOString()
-      .slice(0, 19)
-      .replace('T', '_')
-      .replace(/:/g, '-');
-    
-    const filename = `data_patch_${tableName}_${timestamp}.sql`;
-    downloadPatch(patchSql, filename);
-    
-    // Patch generated - file downloaded, no notification needed
-
-  } catch (err) {
-    await showMessage('Patch Generation Failed', String(err), 'error');
-  } finally {
-    isGeneratingPatch.value = false;
-  }
-};
-
-// Patch preview helper functions
 const copyPatchToClipboard = async () => {
   try {
     await navigator.clipboard.writeText(patchContent.value);
-    // Show "Copied!" feedback on button
     isCopied.value = true;
     setTimeout(() => {
       isCopied.value = false;
@@ -1727,52 +1783,73 @@ const copyPatchToClipboard = async () => {
   }
 };
 
-const downloadPatchFile = () => {
-  downloadPatch(patchContent.value, patchFilename.value);
-  // Show "Downloaded!" feedback on button
-  isDownloaded.value = true;
-  setTimeout(() => {
-    isDownloaded.value = false;
-  }, 2000);
+const downloadPatchFile = async () => {
+  if (!patchFilePath.value) {
+    // Fallback for safety
+    downloadPatch(patchContent.value, patchFilename.value);
+    return;
+  }
+
+  try {
+    const savePath = await save({
+      defaultPath: patchFilename.value,
+      filters: [{
+        name: 'SQL Patch',
+        extensions: ['sql']
+      }]
+    });
+
+    if (savePath) {
+      await invoke('save_temp_file', {
+        tempPath: patchFilePath.value,
+        destPath: savePath
+      });
+      isDownloaded.value = true;
+      setTimeout(() => { isDownloaded.value = false; }, 2000);
+    }
+  } catch (err) {
+    await showMessage('Download Failed', String(err), 'error');
+  }
 };
 
 const applyPatchToDatabase = async () => {
-  if (!database2.value || !patchContent.value) return;
+  if (!patchFilePath.value) {
+    await showMessage('Error', 'No patch file available to apply', 'error');
+    return;
+  }
 
   isApplying.value = true;
-  applyProgress.value = 'Applying data patch to target database...';
-
+  applyProgress.value = 'Applying patch to database...';
+  
   try {
-    const result = await invoke<string>('apply_data_patch', {
-      targetDbPath: database2.value,
-      patchSql: patchContent.value
+    // Determine target database based on direction
+    const targetDbPath = currentPatchDirection.value === 'source_to_target' 
+      ? database2.value // Apply to Target
+      : database1.value; // Apply to Source
+      
+    const targetName = currentPatchDirection.value === 'source_to_target' 
+      ? getDatabaseName(database2.value) 
+      : getDatabaseName(database1.value);
+
+    applyProgress.value = `Applying patch to ${targetName}...`;
+
+    // Use file-based apply command
+    const result = await invoke<string>('apply_patch_file', {
+      targetDbPath: targetDbPath,
+      patchFilePath: patchFilePath.value
     });
 
-    applyProgress.value = result;
+    applyProgress.value = 'Patch applied successfully!';
     patchApplied.value = true;
-
-    await showMessage(
-      'Data Patch Applied',
-      result,
-      'info'
-    );
-
-    // Close modal and refresh comparison
+    await showMessage('Success', result + '\n\nDatabases will be re-compared to show the updated state.', 'info');
+    
+    // Auto-refresh comparison after user dismisses the success message
     showPatchPreview.value = false;
-    patchApplied.value = false;
-    applyProgress.value = '';
-
-    // Re-run comparison to show synchronized state
     await compareTables();
-
+    
   } catch (err) {
-    console.error('Failed to apply data patch:', err);
     applyProgress.value = '';
-    await showMessage(
-      'Error Applying Patch',
-      `Failed to apply data patch:\n\n${err}`,
-      'error'
-    );
+    await showMessage('Apply Failed', String(err), 'error');
   } finally {
     isApplying.value = false;
   }
@@ -2101,7 +2178,58 @@ const formatBytes = (bytes: number): string => {
   border-radius: 6px;
   cursor: pointer;
   font-size: 0.95em;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
+}
+
+.patch-actions-group {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.patch-btn.forward-btn {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+}
+
+.patch-btn.forward-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4);
+}
+
+.patch-btn.reverse-btn {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  color: white;
+}
+
+.patch-btn.reverse-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.4);
+}
+
+.direction-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.9em;
+}
+
+.direction-badge.forward {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+}
+
+.direction-badge.reverse {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  color: white;
+}
+
+.db-name {
+  font-weight: 600;
+  color: #2563eb;
 }
 
 .bulk-btn:hover:not(:disabled) {
@@ -2242,6 +2370,43 @@ const formatBytes = (bytes: number): string => {
 
 .compare-btn:hover:not(:disabled) {
   background: #218838;
+}
+
+.mini-patch-btn {
+  padding: 6px 12px;
+  background: #6610f2;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.85em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.table-patch-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.mini-patch-btn.forward {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+}
+
+.mini-patch-btn.forward:hover {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+}
+
+.mini-patch-btn.reverse {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+}
+
+.mini-patch-btn.reverse:hover {
+  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3);
 }
 
 .compare-btn:disabled {

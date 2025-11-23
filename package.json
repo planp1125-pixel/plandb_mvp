@@ -1,6 +1,6 @@
 {
-  "name": "plandbsync",
-  "version": "0.5.0",
+  "name": "plandb",
+  "version": "0.5.2",
   "description": "SQLCipher Database Comparison Tool",
   "type": "module",
   "scripts": {

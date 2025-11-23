@@ -1,10 +1,10 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod models;
-mod database;
 mod commands;
+mod database;
 mod license;
+mod models;
 
 use database::DatabaseManager;
 use license::LicenseManager;
@@ -16,14 +16,14 @@ fn main() {
     let db_manager = Mutex::new(DatabaseManager::new());
 
     // Initialize license manager
-       let license_manager = match LicenseManager::new() {
+    let license_manager = match LicenseManager::new() {
         Ok(manager) => Mutex::new(manager),
         Err(e) => {
             eprintln!("Failed to initialize license manager: {}", e);
             std::process::exit(1);
         }
     };
-    
+
     tauri::Builder::default()
         // .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
@@ -40,9 +40,13 @@ fn main() {
             commands::compare_database_schemas,
             commands::compare_table_data_fast,
             commands::generate_schema_patch,
+            commands::generate_table_schema_patch, // Added this line
             commands::apply_schema_patch,
             commands::generate_data_patch,
+            commands::generate_data_patch_file,
             commands::apply_data_patch,
+            commands::apply_patch_file,
+            commands::save_temp_file,
             commands::get_license_status,
             commands::activate_license,
             commands::deactivate_license,
@@ -52,8 +56,5 @@ fn main() {
             commands::check_database_type,
         ])
         .run(tauri::generate_context!())
-                .expect("error while running tauri application");
-         
-        }
-
-        
+        .expect("error while running tauri application");
+}
