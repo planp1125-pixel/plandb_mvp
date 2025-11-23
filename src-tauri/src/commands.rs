@@ -206,17 +206,21 @@ pub async fn test_connection() -> Result<String, String> {
 pub async fn generate_schema_patch(
     db1_path: String,
     db2_path: String,
+    direction: Option<String>,  // "source_to_target" (default) or "target_to_source"
     db_manager: State<'_, Mutex<DatabaseManager>>,
 ) -> Result<String, String> {
     let manager = db_manager.lock().unwrap();
-    
+
     let comparison = manager.compare_schemas(&db1_path, &db2_path)
         .map_err(|e| e.to_string())?;
+
+    // Determine direction
+    let is_reverse = direction.as_deref() == Some("target_to_source");
 
     // Open BOTH databases to get schemas
     let source_conn = Connection::open(&db1_path)
         .map_err(|e| format!("Failed to open source database: {}", e))?;
-    
+
     let target_conn = Connection::open(&db2_path)
         .map_err(|e| format!("Failed to open target database: {}", e))?;
 
@@ -230,8 +234,15 @@ pub async fn generate_schema_patch(
     // Generate the SQL patch
     let mut sql = String::new();
     sql.push_str("-- Schema Migration Patch\n");
-    sql.push_str(&format!("-- Source: {}\n", comparison.database1));
-    sql.push_str(&format!("-- Target: {}\n", comparison.database2));
+    if is_reverse {
+        sql.push_str("-- Direction: Target → Source (Reverse)\n");
+        sql.push_str(&format!("-- Template: {} (Target)\n", comparison.database2));
+        sql.push_str(&format!("-- Apply to: {} (Source)\n", comparison.database1));
+    } else {
+        sql.push_str("-- Direction: Source → Target (Forward)\n");
+        sql.push_str(&format!("-- Template: {} (Source)\n", comparison.database1));
+        sql.push_str(&format!("-- Apply to: {} (Target)\n", comparison.database2));
+    }
     sql.push_str(&format!("-- Generated: {}\n\n", chrono::Utc::now()));
     sql.push_str("-- NOTE: PRAGMA statements require the transaction to be committed first.\n");
     sql.push_str("-- If running in DB Browser, close any open transactions before executing.\n\n");
@@ -245,96 +256,153 @@ pub async fn generate_schema_patch(
         sql.push_str("BEGIN TRANSACTION;\n\n");
     }
 
-    // Create tables that exist in SOURCE but not in TARGET
-    // Industry standard: Make target match source
-    for table in &comparison.removed_tables {
-        match get_create_table_sql(&source_conn, table) {
-            Ok(create_sql) => {
-                sql.push_str("-- Create table from source\n");
-                sql.push_str(&format!("{};\n\n", create_sql));
-            }
-            Err(e) => {
-                sql.push_str(&format!("-- ERROR: Could not get schema for {}: {}\n\n", table, e));
+    if is_reverse {
+        // REVERSE: Make SOURCE match TARGET
+        // Create tables that exist in TARGET but not in SOURCE
+        for table in &comparison.added_tables {
+            match get_create_table_sql(&target_conn, table) {
+                Ok(create_sql) => {
+                    sql.push_str("-- Create table from target\n");
+                    sql.push_str(&format!("{};\n\n", create_sql));
+                }
+                Err(e) => {
+                    sql.push_str(&format!("-- ERROR: Could not get schema for {}: {}\n\n", table, e));
+                }
             }
         }
-    }
 
-    // Drop tables that exist in TARGET but not in SOURCE
-    // Industry standard: Make target match source
-    for table in &comparison.added_tables {
-        sql.push_str("-- Drop table not in source\n");
-        sql.push_str(&format!("DROP TABLE IF EXISTS `{}`;\n\n", table));
+        // Drop tables that exist in SOURCE but not in TARGET
+        for table in &comparison.removed_tables {
+            sql.push_str("-- Drop table not in target\n");
+            sql.push_str(&format!("DROP TABLE IF EXISTS `{}`;\n\n", table));
+        }
+    } else {
+        // FORWARD: Make TARGET match SOURCE (original behavior)
+        // Create tables that exist in SOURCE but not in TARGET
+        for table in &comparison.removed_tables {
+            match get_create_table_sql(&source_conn, table) {
+                Ok(create_sql) => {
+                    sql.push_str("-- Create table from source\n");
+                    sql.push_str(&format!("{};\n\n", create_sql));
+                }
+                Err(e) => {
+                    sql.push_str(&format!("-- ERROR: Could not get schema for {}: {}\n\n", table, e));
+                }
+            }
+        }
+
+        // Drop tables that exist in TARGET but not in SOURCE
+        for table in &comparison.added_tables {
+            sql.push_str("-- Drop table not in source\n");
+            sql.push_str(&format!("DROP TABLE IF EXISTS `{}`;\n\n", table));
+        }
     }
     
     // Modify existing tables
     for modified in &comparison.modified_tables {
-        // added_columns = columns in TARGET but not in SOURCE → need to DROP (requires recreation)
-        // removed_columns = columns in SOURCE but not in TARGET → need to ADD
-        // modified_columns = columns with different types/constraints → requires recreation
+        // added_columns = columns in TARGET but not in SOURCE
+        // removed_columns = columns in SOURCE but not in TARGET
+        // modified_columns = columns with different types/constraints
 
-        let needs_recreation = !modified.added_columns.is_empty()
-            || !modified.modified_columns.is_empty();
+        if is_reverse {
+            // REVERSE: Make SOURCE match TARGET
+            let needs_recreation = !modified.removed_columns.is_empty()
+                || !modified.modified_columns.is_empty();
 
-        if needs_recreation {
-            // Generate table recreation SQL
-            sql.push_str(&format!("-- Recreate table: {} (columns removed/modified)\n", modified.table_name));
-
-            match generate_table_recreation_sql(
-                &source_conn,
-                &target_conn,
-                &modified.table_name,
-                &modified
-            ) {
-                Ok(recreation_sql) => {
-                    sql.push_str(&recreation_sql);
-                }
-                Err(e) => {
-                    sql.push_str(&format!("-- ERROR: Could not generate recreation SQL for {}: {}\n",
-                        modified.table_name, e));
-                    sql.push_str(&format!("-- Manual recreation required for:\n"));
-                    if !modified.added_columns.is_empty() {
-                        sql.push_str(&format!("--   Columns to drop: {}\n",
-                            modified.added_columns.iter().map(|c| c.name.as_str()).collect::<Vec<_>>().join(", ")));
-                    }
-                    for mod_col in &modified.modified_columns {
-                        sql.push_str(&format!(
-                            "--   Modified column: {} ({} -> {})\n",
-                            mod_col.column_name, mod_col.old_type, mod_col.new_type
-                        ));
-                    }
-                }
-            }
-            sql.push_str("\n");
-        } else if !modified.removed_columns.is_empty() {
-            // Only removed_columns (in source, not in target) - simple ALTER TABLE ADD
-            sql.push_str(&format!("-- Modify table: {} (add columns from source)\n", modified.table_name));
-
-            // Get column definitions from source
-            for col_name in &modified.removed_columns {
-                // Get the column info from source database
-                match get_column_info(&source_conn, &modified.table_name, col_name) {
-                    Ok(col) => {
-                        let nullable = if col.is_nullable { "" } else { " NOT NULL" };
-                        let default = match &col.default_value {
-                            Some(def) => format!(" DEFAULT {}", def),
-                            None => String::new(),
-                        };
-
-                        sql.push_str(&format!(
-                            "ALTER TABLE `{}` ADD COLUMN `{}` {}{}{};\n",
-                            modified.table_name,
-                            col.name,
-                            col.data_type,
-                            nullable,
-                            default
-                        ));
+            if needs_recreation {
+                sql.push_str(&format!("-- Recreate table: {} (reverse direction)\n", modified.table_name));
+                match generate_table_recreation_sql_reverse(
+                    &target_conn,
+                    &source_conn,
+                    &modified.table_name,
+                    &modified
+                ) {
+                    Ok(recreation_sql) => {
+                        sql.push_str(&recreation_sql);
                     }
                     Err(e) => {
-                        sql.push_str(&format!("-- ERROR: Could not get column info for {}: {}\n", col_name, e));
+                        sql.push_str(&format!("-- ERROR: Could not generate recreation SQL for {}: {}\n",
+                            modified.table_name, e));
                     }
                 }
+                sql.push_str("\n");
+            } else if !modified.added_columns.is_empty() {
+                sql.push_str(&format!("-- Modify table: {} (add columns from target)\n", modified.table_name));
+                for col_name in &modified.added_columns {
+                    match get_column_info(&target_conn, &modified.table_name, &col_name.name) {
+                        Ok(col) => {
+                            let nullable = if col.is_nullable { "" } else { " NOT NULL" };
+                            let default = match &col.default_value {
+                                Some(def) => format!(" DEFAULT {}", def),
+                                None => String::new(),
+                            };
+                            sql.push_str(&format!(
+                                "ALTER TABLE `{}` ADD COLUMN `{}` {}{}{};\n",
+                                modified.table_name, col.name, col.data_type, nullable, default
+                            ));
+                        }
+                        Err(e) => {
+                            sql.push_str(&format!("-- ERROR: Could not get column info for {}: {}\n", col_name.name, e));
+                        }
+                    }
+                }
+                sql.push_str("\n");
             }
-            sql.push_str("\n");
+        } else {
+            // FORWARD: Make TARGET match SOURCE (original behavior)
+            let needs_recreation = !modified.added_columns.is_empty()
+                || !modified.modified_columns.is_empty();
+
+            if needs_recreation {
+                sql.push_str(&format!("-- Recreate table: {} (columns removed/modified)\n", modified.table_name));
+                match generate_table_recreation_sql(
+                    &source_conn,
+                    &target_conn,
+                    &modified.table_name,
+                    &modified
+                ) {
+                    Ok(recreation_sql) => {
+                        sql.push_str(&recreation_sql);
+                    }
+                    Err(e) => {
+                        sql.push_str(&format!("-- ERROR: Could not generate recreation SQL for {}: {}\n",
+                            modified.table_name, e));
+                        sql.push_str(&format!("-- Manual recreation required for:\n"));
+                        if !modified.added_columns.is_empty() {
+                            sql.push_str(&format!("--   Columns to drop: {}\n",
+                                modified.added_columns.iter().map(|c| c.name.as_str()).collect::<Vec<_>>().join(", ")));
+                        }
+                        for mod_col in &modified.modified_columns {
+                            sql.push_str(&format!(
+                                "--   Modified column: {} ({} -> {})\n",
+                                mod_col.column_name, mod_col.old_type, mod_col.new_type
+                            ));
+                        }
+                    }
+                }
+                sql.push_str("\n");
+            } else if !modified.removed_columns.is_empty() {
+                sql.push_str(&format!("-- Modify table: {} (add columns from source)\n", modified.table_name));
+                for col_name in &modified.removed_columns {
+                    match get_column_info(&source_conn, &modified.table_name, col_name) {
+                        Ok(col) => {
+                            let nullable = if col.is_nullable { "" } else { " NOT NULL" };
+                            let default = match &col.default_value {
+                                Some(def) => format!(" DEFAULT {}", def),
+                                None => String::new(),
+                            };
+                            sql.push_str(&format!(
+                                "ALTER TABLE `{}` ADD COLUMN `{}` {}{}{};\n",
+                                modified.table_name, col.name, col.data_type, nullable, default
+                            ));
+                        }
+                        Err(e) => {
+                            sql.push_str(&format!("-- ERROR: Could not get column info for {}: {}\n", col_name, e));
+                        }
+                    }
+                }
+                sql.push_str("\n");
+            }
         }
     }
 
@@ -572,6 +640,98 @@ fn generate_table_recreation_sql(
         }
     }
     
+    Ok(sql)
+}
+
+// Generate table recreation SQL for REVERSE direction (make source match target)
+fn generate_table_recreation_sql_reverse(
+    target_conn: &Connection,
+    source_conn: &Connection,
+    table_name: &str,
+    diff: &crate::models::TableDiff,
+) -> Result<String, String> {
+    // Get the TARGET schema (what we want - make source match target)
+    let mut target_schema = get_create_table_sql(target_conn, table_name)
+        .map_err(|e| format!("Could not get target schema: {}", e))?;
+
+    // Fix unsupported collations
+    target_schema = target_schema
+        .replace("COLLATE UTF16", "COLLATE BINARY")
+        .replace("COLLATE utf16", "COLLATE BINARY")
+        .replace("COLLATE UTF8", "COLLATE BINARY")
+        .replace("COLLATE utf8", "COLLATE BINARY");
+
+    // Get columns from target (final state - what we want)
+    let target_columns = get_table_column_names(target_conn, table_name)?;
+
+    // Get columns from source (current state)
+    let source_columns = get_table_column_names(source_conn, table_name)?;
+
+    // Find common columns for data migration
+    let common_columns: Vec<String> = target_columns.iter()
+        .filter(|col| source_columns.contains(col))
+        .cloned()
+        .collect();
+
+    if common_columns.is_empty() {
+        return Err("No common columns found - table would lose all data".to_string());
+    }
+
+    let common_cols_str = common_columns.iter()
+        .map(|c| format!("`{}`", c))
+        .collect::<Vec<_>>()
+        .join(", ");
+
+    let mut sql = String::new();
+
+    // Step 1: Disable foreign keys
+    sql.push_str("PRAGMA foreign_keys=off;\n\n");
+
+    // Step 2: Start transaction
+    sql.push_str("BEGIN IMMEDIATE;\n\n");
+
+    // Step 3: Rename old table (current source)
+    sql.push_str(&format!("ALTER TABLE `{}` RENAME TO `{}_old`;\n\n", table_name, table_name));
+
+    // Step 4: Create new table with target schema (make source match target)
+    sql.push_str(&format!("{};\n\n", target_schema));
+
+    // Step 5: Copy data from old to new table
+    sql.push_str(&format!(
+        "INSERT INTO `{}` ({})\nSELECT {}\nFROM `{}_old`;\n\n",
+        table_name,
+        common_cols_str,
+        common_cols_str,
+        table_name
+    ));
+
+    // Step 6: Drop old table
+    sql.push_str(&format!("DROP TABLE `{}_old`;\n\n", table_name));
+
+    // Step 7: Commit transaction
+    sql.push_str("COMMIT;\n\n");
+
+    // Step 8: Re-enable foreign keys
+    sql.push_str("PRAGMA foreign_keys=on;\n\n");
+
+    // Add comment about what changed
+    sql.push_str("-- Changes applied (reverse direction):\n");
+    if !diff.added_columns.is_empty() {
+        let added: Vec<String> = diff.added_columns.iter().map(|c| c.name.clone()).collect();
+        sql.push_str(&format!("--   Added (from target): {}\n", added.join(", ")));
+    }
+    if !diff.removed_columns.is_empty() {
+        sql.push_str(&format!("--   Dropped (not in target): {}\n", diff.removed_columns.join(", ")));
+    }
+    if !diff.modified_columns.is_empty() {
+        for mod_col in &diff.modified_columns {
+            sql.push_str(&format!(
+                "--   Modified: {} ({} -> {})\n",
+                mod_col.column_name, mod_col.new_type, mod_col.old_type
+            ));
+        }
+    }
+
     Ok(sql)
 }
 

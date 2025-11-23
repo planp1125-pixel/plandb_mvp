@@ -90,8 +90,8 @@
                 <label for="kdfAlgorithm">KDF Algorithm</label>
                 <select id="kdfAlgorithm" v-model="settings.kdf_algorithm" class="form-select">
                   <option value="PBKDF2_HMAC_SHA1">PBKDF2 HMAC SHA1</option>
-                  <option value="PBKDF2_HMAC_SHA256">PBKDF2 HMAC SHA256 (Default)</option>
-                  <option value="PBKDF2_HMAC_SHA512">PBKDF2 HMAC SHA512</option>
+                  <option value="PBKDF2_HMAC_SHA256">PBKDF2 HMAC SHA256</option>
+                  <option value="PBKDF2_HMAC_SHA512">PBKDF2 HMAC SHA512 (Default)</option>
                 </select>
               </div>
             </div>
@@ -163,7 +163,7 @@ const settings = ref({
   page_size: '4096',
   kdf_iterations: '256000',
   hmac_algorithm: 'HMAC_SHA256',
-  kdf_algorithm: 'PBKDF2_HMAC_SHA256'
+  kdf_algorithm: 'PBKDF2_HMAC_SHA512'
 });
 
 const handleConnect = () => {
