@@ -904,6 +904,58 @@ fn get_column_info(
     Ok(column)
 }
 
+/// Detect if added columns require table recreation (middle insertion)
+/// Returns true if any added column needs to be inserted before the last column
+fn needs_column_order_recreation(
+    source_conn: &Connection,
+    target_conn: &Connection,
+    table_name: &str,
+    added_columns: &[ColumnInfo],
+) -> Result<bool, String> {
+    if added_columns.is_empty() {
+        return Ok(false);
+    }
+
+    // Get source column count
+    let source_col_count: i32 = source_conn
+        .prepare(&format!("PRAGMA table_info(`{}`)", table_name))
+        .map_err(|e| format!("Failed to get source table info: {}", e))?
+        .query_map([], |_| Ok(()))
+        .map_err(|e| format!("Failed to count source columns: {}", e))?
+        .count() as i32;
+
+    // Get all target columns with positions
+    let mut target_columns: Vec<(String, i32)> = target_conn
+        .prepare(&format!("PRAGMA table_info(`{}`)", table_name))
+        .map_err(|e| format!("Failed to get target table info: {}", e))?
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, String>(1)?, // column name
+                row.get::<_, i32>(0)?,    // cid (position)
+            ))
+        })
+        .map_err(|e| format!("Failed to query target columns: {}", e))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| format!("Failed to collect target columns: {}", e))?;
+
+    // Check if any added column has position < source_col_count
+    // If so, it needs middle insertion
+    for added_col in added_columns {
+        if let Some((_, position)) = target_columns
+            .iter()
+            .find(|(name, _)| name == &added_col.name)
+        {
+            if *position < source_col_count {
+                // This column needs to be inserted in the middle
+                return Ok(true);
+            }
+        }
+    }
+
+    // All added columns are at the end, can use ALTER TABLE
+    Ok(false)
+}
+
 #[tauri::command]
 pub async fn generate_table_schema_patch(
     db1_path: String,
@@ -1018,34 +1070,98 @@ pub async fn generate_table_schema_patch(
                         }
                     }
                 } else if !table_diff.added_columns.is_empty() {
-                    // Just add columns from target
-                    sql.push_str(&format!("-- Add columns from target\n"));
-                    for col_name in &table_diff.added_columns {
-                        match get_column_info(&target_conn, &table_name, &col_name.name) {
-                            Ok(col) => {
-                                let nullable = if col.is_nullable { "" } else { " NOT NULL" };
-                                let default = match &col.default_value {
-                                    Some(def) => format!(" DEFAULT {}", def),
-                                    None => String::new(),
-                                };
-                                sql.push_str(&format!(
-                                    "ALTER TABLE `{}` ADD COLUMN `{}` {}{}{};\n",
-                                    table_name, col.name, col.data_type, nullable, default
-                                ));
+                    // Check if columns need middle insertion (smart detection)
+                    let needs_recreation = needs_column_order_recreation(
+                        &source_conn,
+                        &target_conn,
+                        &table_name,
+                        &table_diff.added_columns,
+                    )?;
+
+                    if needs_recreation {
+                        // Use table recreation to preserve column order
+                        sql.push_str("-- Table recreation required (column order preservation)\n");
+                        match generate_table_recreation_sql_reverse(
+                            &target_conn,
+                            &source_conn,
+                            &table_name,
+                            table_diff,
+                        ) {
+                            Ok(recreation_sql) => {
+                                sql.push_str(&recreation_sql);
                             }
                             Err(e) => {
-                                return Err(format!("Could not get column info: {}", e));
+                                return Err(format!("Could not generate recreation SQL: {}", e));
+                            }
+                        }
+                    } else {
+                        // All columns at end, use simple ALTER TABLE
+                        sql.push_str(&format!("-- Add columns from target (at end)\n"));
+                        for col_name in &table_diff.added_columns {
+                            match get_column_info(&target_conn, &table_name, &col_name.name) {
+                                Ok(col) => {
+                                    let nullable = if col.is_nullable { "" } else { " NOT NULL" };
+                                    let default = match &col.default_value {
+                                        Some(def) => format!(" DEFAULT {}", def),
+                                        None => String::new(),
+                                    };
+                                    sql.push_str(&format!(
+                                        "ALTER TABLE `{}` ADD COLUMN `{}` {}{}{};\n",
+                                        table_name, col.name, col.data_type, nullable, default
+                                    ));
+                                }
+                                Err(e) => {
+                                    return Err(format!("Could not get column info: {}", e));
+                                }
                             }
                         }
                     }
                 }
             } else {
                 // Forward: Make TARGET match SOURCE
+                // In forward direction:
+                // - added_columns = columns in TARGET not in SOURCE (need to be DROPPED from target)
+                // - removed_columns = columns in SOURCE not in TARGET (need to be ADDED to target)
+
+                // Check if we need recreation for any reason:
+                // 1. Modifications exist
+                // 2. Need to drop columns (added_columns)
+                // 3. Need to add columns in middle (removed_columns with position check)
+
+                let has_modifications = !table_diff.modified_columns.is_empty();
+                let needs_drop_columns = !table_diff.added_columns.is_empty();
+
+                // Check if removed_columns (adding to target) need middle insertion
+                let columns_to_add: Vec<ColumnInfo> = table_diff
+                    .removed_columns
+                    .iter()
+                    .filter_map(|col_name| {
+                        get_column_info(&source_conn, &table_name, col_name).ok()
+                    })
+                    .collect();
+
+                let needs_order_preservation = if !columns_to_add.is_empty() {
+                    needs_column_order_recreation(
+                        &target_conn,
+                        &source_conn,
+                        &table_name,
+                        &columns_to_add,
+                    )?
+                } else {
+                    false
+                };
+
                 let needs_recreation =
-                    !table_diff.added_columns.is_empty() || !table_diff.modified_columns.is_empty();
+                    has_modifications || needs_drop_columns || needs_order_preservation;
 
                 if needs_recreation {
-                    sql.push_str("-- Recreate table to match source schema\n");
+                    if needs_drop_columns && !needs_order_preservation && !has_modifications {
+                        sql.push_str("-- Table recreation required (drop columns)\n");
+                    } else if needs_order_preservation {
+                        sql.push_str("-- Table recreation required (column order preservation)\n");
+                    } else {
+                        sql.push_str("-- Recreate table to match source schema\n");
+                    }
                     match generate_table_recreation_sql(
                         &source_conn,
                         &target_conn,
@@ -1060,8 +1176,8 @@ pub async fn generate_table_schema_patch(
                         }
                     }
                 } else if !table_diff.removed_columns.is_empty() {
-                    // Just add columns from source
-                    sql.push_str(&format!("-- Add columns from source\n"));
+                    // All columns at end, use simple ALTER TABLE
+                    sql.push_str(&format!("-- Add columns from source (at end)\n"));
                     for col_name in &table_diff.removed_columns {
                         match get_column_info(&source_conn, &table_name, col_name) {
                             Ok(col) => {
