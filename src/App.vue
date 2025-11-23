@@ -194,7 +194,7 @@ const reportBugEmail = async () => {
 const reportBugGithub = async () => {
   // Replace with your actual repo URL
     const openGitHubReport = async () => {
-      await open('https://github.com/planp1125-pixel/planDB/issues/new');
+      await open('https://github.com/planp1125-pixel/plandb_mvp/issues/new');
     }; 
   try {
     await openGitHubReport();
