@@ -652,7 +652,7 @@ pub fn get_trial_info() -> Result<TrialInfo, String> {
     Ok(TrialInfo {
         is_expired: active_days > 90,
         remaining_days: remaining_days as i64,
-        version: "0.5.2".to_string(),
+        version: env!("CARGO_PKG_VERSION").to_string(),
     })
 }
 

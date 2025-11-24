@@ -152,7 +152,7 @@ const databaseService = new DatabaseService();
 const trialInfo = ref<TrialInfo>({
   is_expired: false,
   remaining_days: 90,
-  version: '0.5.2'
+  version: '0.5.3'
 });
 
 // License management and initial setup

@@ -1,0 +1,1709 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>planDB - SQLite & SQLCipher Database Comparison Tool for Linux | Bidirectional Patching</title>
+
+    <!-- SEO Meta Tags -->
+    <meta name="description"
+        content="Professional SQLite and SQLCipher database comparison tool for Linux and Windows. Compare schemas, generate bidirectional patches, migrate databases safely. Built for developers, mobile teams, and embedded systems. Native Linux support, 90-day free trial.">
+    <meta name="keywords"
+        content="sqlite comparison tool linux, sqlcipher database tool, database diff linux, sqlite migration, database sync, bidirectional patching, encrypted database comparison, sqlite to sqlcipher migration, linux database tools, dev prod database sync, mobile database migration, embedded systems database">
+    <meta name="author" content="PlanLabs">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://planplabs.com">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="planDB - SQLite & SQLCipher Comparison Tool for Linux">
+    <meta property="og:description"
+        content="The only professional database comparison tool for SQLite and SQLCipher on Linux. Bidirectional patching, native encryption support.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://planplabs.com">
+    <meta property="og:image" content="https://planplabs.com/landing_assets/uploaded_image_1_1763916169898.png">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="planDB - SQLite & SQLCipher Comparison Tool">
+    <meta name="twitter:description"
+        content="Compare, sync, and migrate SQLite databases with bidirectional patching. Native Linux support.">
+    <meta name="twitter:image" content="https://planplabs.com/landing_assets/uploaded_image_1_1763916169898.png">
+
+    <!-- Schema.org Structured Data for AI Crawlers -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "planDB",
+      "applicationCategory": "DeveloperApplication",
+      "applicationSubCategory": "Database Tools",
+      "operatingSystem": ["Linux", "Windows", "Ubuntu", "Debian", "Fedora"],
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD",
+        "priceValidUntil": "2025-12-31",
+        "availability": "https://schema.org/InStock",
+        "description": "90-day free beta access with all features unlocked"
+      },
+      "description": "Professional SQLite and SQLCipher database comparison tool with bidirectional patch generation, native Linux support, and encrypted database handling. Built for developers who need to sync dev/prod databases, migrate schemas safely, and work with SQLCipher encryption.",
+      "softwareVersion": "0.5.3 Beta",
+      "programmingLanguage": ["Rust", "Vue.js"],
+      "featureList": [
+        "Schema comparison with visual diff",
+        "Data comparison between databases",
+        "Bidirectional patch generation (forward and reverse)",
+        "SQLCipher encrypted database support",
+        "Native Linux support (Ubuntu, Debian, Fedora)",
+        "Database migration with rollback capability",
+        "Multi-database tabbed interface",
+        "Direct patch application or SQL export"
+      ],
+      "screenshot": [
+        "https://planplabs.com/landing_assets/uploaded_image_1_1763916169898.png",
+        "https://planplabs.com/landing_assets/uploaded_image_2_1763916169898.png",
+        "https://planplabs.com/landing_assets/uploaded_image_3_1763916169898.png"
+      ],
+      "downloadUrl": "https://github.com/planp1125-pixel/plandb_mvp/releases",
+      "releaseNotes": "Beta version 0.5.3 with full SQLite and SQLCipher comparison capabilities",
+      "requirements": "Linux (Ubuntu 20.04+, Debian 10+, Fedora 35+) or Windows 10/11",
+      "maintainer": {
+        "@type": "Organization",
+        "name": "PlanLabs"
+      }
+    }
+    </script>
+
+    <!-- FAQ Schema for AI -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "What databases does planDB support?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "planDB specializes in SQLite and SQLCipher databases. It provides native support for encrypted SQLCipher databases with password handling, making it the only professional comparison tool specifically built for SQLCipher. Both plain SQLite and encrypted SQLCipher databases are fully supported."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does planDB work on Linux?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes! planDB is built natively for Linux using Rust and Tauri. It works on Ubuntu, Debian, Fedora and other distributions. Available as .deb packages and AppImage format. This is the only professional SQLite comparison tool with native Linux support - no Wine or virtual machines required."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What is bidirectional patching?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Bidirectional patching means planDB generates SQL patches in both directions when comparing databases: forward patch (Source to Target) for applying changes, and reverse patch (Target to Source) for automatic rollback. This provides a safety net - download the reverse patch before applying forward changes, and you always have a rollback option ready."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Who uses planDB?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "planDB is used by backend developers, mobile app developers (iOS/Android), DevOps engineers, database administrators, and embedded systems engineers who work with SQLite or SQLCipher databases. Common use cases include syncing dev/prod databases, generating mobile app migration scripts, managing IoT device databases, and working with encrypted healthcare/finance data."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How much does planDB cost?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "planDB is currently in free beta with 90-day access to all features. After launch, pricing is estimated at $99-149 per year or $199-299 lifetime license. Beta testers receive exclusive discounted pricing."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Can planDB handle SQLCipher encrypted databases?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes, planDB has full native SQLCipher support. You can compare encrypted databases, migrate between SQLite and SQLCipher, generate patches while maintaining encryption, and browse encrypted data. It's the only professional tool built specifically for SQLCipher databases used in healthcare (HIPAA), finance (PCI), and security-critical applications."
+          }
+        }
+      ]
+    }
+    </script>
+
+    <!-- Breadcrumb Schema -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://planplabs.com"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Features",
+          "item": "https://planplabs.com#features"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Download",
+          "item": "https://planplabs.com#download"
+        }
+      ]
+    }
+    </script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --secondary: #10b981;
+            --bg-body: #0f172a;
+            --bg-surface: #1e293b;
+            --bg-surface-hover: #334155;
+            --text-main: #f1f5f9;
+            --text-muted: #94a3b8;
+            --border: rgba(255, 255, 255, 0.1);
+            --gradient-hero: linear-gradient(135deg, #60a5fa 0%, #a78bfa 100%);
+            --success: #10b981;
+            --error: #ef4444;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        /* Navbar */
+        nav {
+            padding: 20px 0;
+            border-bottom: 1px solid var(--border);
+            backdrop-filter: blur(10px);
+            background: rgba(15, 23, 42, 0.9);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .nav-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 1.5rem;
+            font-weight: 700;
+            text-decoration: none;
+        }
+
+        .logo svg {
+            width: 40px;
+            height: 40px;
+        }
+
+        .logo-text {
+            display: flex;
+            align-items: baseline;
+        }
+
+        .logo-plan {
+            color: var(--primary);
+            font-weight: 300;
+        }
+
+        .logo-db {
+            color: var(--secondary);
+            font-weight: 600;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 32px;
+            align-items: center;
+        }
+
+        .nav-links a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.95rem;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover {
+            color: white;
+        }
+
+        /* Hero */
+        .hero {
+            padding: 100px 0 60px;
+            text-align: center;
+            background: radial-gradient(circle at top center, rgba(59, 130, 246, 0.15), transparent 50%);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 6px 16px;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 100px;
+            color: var(--secondary);
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-bottom: 24px;
+        }
+
+        h1 {
+            font-size: 3.5rem;
+            line-height: 1.1;
+            margin-bottom: 24px;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+        }
+
+        h1 .gradient-text {
+            background: var(--gradient-hero);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero-subtitle {
+            font-size: 1.25rem;
+            color: var(--text-muted);
+            max-width: 700px;
+            margin: 0 auto 40px;
+            line-height: 1.8;
+        }
+
+        .cta-group {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 14px 28px;
+            border-radius: 8px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.2s;
+            font-size: 1rem;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 4px 14px rgba(59, 130, 246, 0.4);
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.5);
+        }
+
+        .btn-secondary {
+            background: var(--bg-surface);
+            color: white;
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-surface-hover);
+            transform: translateY(-2px);
+        }
+
+        .hero-note {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        /* Trust Line */
+        .trust-line {
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            padding: 40px 0 20px;
+        }
+
+        /* Problem Section */
+        .problem-section {
+            padding: 80px 0;
+            background: linear-gradient(to bottom, var(--bg-body), #162032);
+        }
+
+        .problem-content {
+            text-align: center;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .problem-content h2 {
+            font-size: 2.5rem;
+            margin-bottom: 48px;
+        }
+
+        .pain-points {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 24px;
+            margin-top: 40px;
+        }
+
+        .pain-point {
+            background: var(--bg-surface);
+            padding: 24px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+
+        .pain-icon {
+            font-size: 2rem;
+            display: block;
+            margin-bottom: 12px;
+        }
+
+        .pain-point p {
+            color: var(--text-muted);
+            font-size: 1rem;
+        }
+
+        /* Highlight Feature Section */
+        .highlight-feature {
+            padding: 80px 0;
+            background: var(--bg-body);
+        }
+
+        .highlight-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            align-items: center;
+        }
+
+        .feature-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 100px;
+            color: var(--secondary);
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+
+        .highlight-content h2 {
+            font-size: 2.25rem;
+            margin-bottom: 20px;
+            line-height: 1.2;
+        }
+
+        .highlight-content>p {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+            margin-bottom: 24px;
+        }
+
+        .highlight-list {
+            list-style: none;
+            margin: 24px 0;
+        }
+
+        .highlight-list li {
+            padding: 12px 0;
+            font-size: 1.05rem;
+            color: var(--text-main);
+        }
+
+        .highlight-note {
+            background: rgba(16, 185, 129, 0.1);
+            border-left: 3px solid var(--secondary);
+            padding: 16px;
+            border-radius: 8px;
+            margin-top: 24px;
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        .highlight-visual {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .flow-diagram {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .flow-row {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+        }
+
+        .flow-box {
+            background: var(--bg-body);
+            border: 2px solid var(--primary);
+            padding: 20px 30px;
+            border-radius: 12px;
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .flow-arrow {
+            font-size: 2rem;
+            color: var(--secondary);
+        }
+
+        /* Features */
+        .features {
+            padding: 80px 0;
+            background: #162032;
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 64px;
+        }
+
+        .section-header h2 {
+            font-size: 2.5rem;
+            margin-bottom: 16px;
+        }
+
+        .section-header p {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 32px;
+        }
+
+        .feature-card {
+            background: var(--bg-surface);
+            padding: 32px;
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            transition: transform 0.2s, border-color 0.2s;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(59, 130, 246, 0.3);
+        }
+
+        .feature-icon {
+            width: 48px;
+            height: 48px;
+            background: rgba(59, 130, 246, 0.1);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+        }
+
+        .feature-card h3 {
+            font-size: 1.25rem;
+            margin-bottom: 12px;
+        }
+
+        .feature-card p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+
+        /* Comparison Section */
+        .comparison-section {
+            padding: 80px 0;
+            background: var(--bg-body);
+        }
+
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 32px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .comparison-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 32px;
+        }
+
+        .comparison-card.highlight {
+            border: 2px solid var(--secondary);
+            position: relative;
+        }
+
+        .comparison-card.highlight::before {
+            content: "Best Choice";
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--secondary);
+            color: var(--bg-body);
+            padding: 4px 16px;
+            border-radius: 100px;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+
+        .comparison-card h3 {
+            font-size: 1.5rem;
+            margin-bottom: 24px;
+            text-align: center;
+        }
+
+        .comparison-card ul {
+            list-style: none;
+        }
+
+        .comparison-card li {
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.95rem;
+        }
+
+        .comparison-card li:last-child {
+            border-bottom: none;
+        }
+
+        /* Use Cases */
+        .use-cases {
+            padding: 80px 0;
+            background: #162032;
+        }
+
+        .use-case-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 32px;
+        }
+
+        .use-case-card {
+            background: var(--bg-surface);
+            padding: 32px;
+            border-radius: 16px;
+            border: 1px solid var(--border);
+        }
+
+        .use-case-card h3 {
+            font-size: 1.25rem;
+            margin-bottom: 12px;
+        }
+
+        .use-case-card p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+
+        /* Pricing */
+        .pricing {
+            padding: 80px 0;
+            background: var(--bg-body);
+        }
+
+        .pricing-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 32px;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .pricing-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 40px;
+            text-align: center;
+            position: relative;
+            transition: transform 0.2s, border-color 0.2s;
+        }
+
+        .pricing-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--primary);
+        }
+
+        .pricing-card.featured {
+            border: 2px solid var(--primary);
+            transform: scale(1.05);
+        }
+
+        .pricing-card.featured:hover {
+            transform: scale(1.05) translateY(-4px);
+        }
+
+        .popular-badge {
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--primary);
+            color: white;
+            padding: 4px 16px;
+            border-radius: 100px;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+
+        .pricing-card h3 {
+            font-size: 1.5rem;
+            margin-bottom: 16px;
+        }
+
+        .price {
+            font-size: 3rem;
+            font-weight: 800;
+            margin-bottom: 8px;
+            color: var(--primary);
+        }
+
+        .price-period {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            margin-bottom: 32px;
+        }
+
+        .pricing-card ul {
+            list-style: none;
+            margin-bottom: 32px;
+            text-align: left;
+        }
+
+        .pricing-card li {
+            padding: 10px 0;
+            font-size: 0.95rem;
+            color: var(--text-muted);
+        }
+
+        .pricing-card .btn {
+            width: 100%;
+            justify-content: center;
+        }
+
+        /* Showcase */
+        .showcase {
+            padding: 80px 0;
+            background: #162032;
+        }
+
+        .showcase-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 32px;
+        }
+
+        .showcase-item {
+            position: relative;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .showcase-item.large {
+            grid-column: span 2;
+        }
+
+        .showcase-item img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        /* FAQ */
+        .faq {
+            padding: 80px 0;
+            background: var(--bg-body);
+        }
+
+        .faq-list {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .faq-item {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 32px;
+            margin-bottom: 20px;
+        }
+
+        .faq-item h3 {
+            font-size: 1.25rem;
+            margin-bottom: 12px;
+            color: var(--text-main);
+        }
+
+        .faq-item p {
+            color: var(--text-muted);
+            line-height: 1.8;
+        }
+
+        /* CTA Banner */
+        .cta-banner {
+            background: linear-gradient(135deg, var(--primary), #8b5cf6);
+            padding: 60px 40px;
+            border-radius: 16px;
+            text-align: center;
+            margin: 80px 0;
+        }
+
+        .cta-banner h3 {
+            font-size: 2rem;
+            margin-bottom: 24px;
+        }
+
+        .cta-banner .btn {
+            background: white;
+            color: var(--primary);
+            font-size: 1.1rem;
+            padding: 16px 32px;
+        }
+
+        .cta-banner .btn:hover {
+            background: var(--text-main);
+        }
+
+        .cta-subtext {
+            margin-top: 16px;
+            opacity: 0.9;
+            font-size: 0.95rem;
+        }
+
+        /* Downloads */
+        .downloads {
+            padding: 80px 0;
+            background: #162032;
+        }
+
+        .download-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 32px;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .download-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 32px;
+            text-align: center;
+            transition: transform 0.2s, border-color 0.2s;
+        }
+
+        .download-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--primary);
+        }
+
+        .os-icon {
+            font-size: 3rem;
+            display: block;
+            margin-bottom: 16px;
+        }
+
+        .download-card h3 {
+            font-size: 1.5rem;
+            margin-bottom: 8px;
+        }
+
+        .download-card p {
+            color: var(--text-muted);
+            margin-bottom: 24px;
+            font-size: 0.95rem;
+        }
+
+        .download-btn {
+            background: var(--primary);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            width: 100%;
+            transition: all 0.2s;
+        }
+
+        .download-btn:hover {
+            background: var(--primary-hover);
+            transform: translateY(-2px);
+        }
+
+        /* Contact */
+        .contact {
+            max-width: 600px;
+            margin: 80px auto;
+            background: var(--bg-surface);
+            padding: 48px;
+            border-radius: 16px;
+            border: 1px solid var(--border);
+        }
+
+        .form-group {
+            margin-bottom: 24px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px 16px;
+            background: var(--bg-body);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-main);
+            font-size: 1rem;
+            font-family: inherit;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        textarea.form-control {
+            min-height: 120px;
+            resize: vertical;
+        }
+
+        /* Footer */
+        footer {
+            padding: 40px 0;
+            border-top: 1px solid var(--border);
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(5px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: var(--bg-surface);
+            padding: 40px;
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            width: 90%;
+            max-width: 450px;
+            position: relative;
+            animation: modalSlide 0.3s ease-out;
+        }
+
+        @keyframes modalSlide {
+            from {
+                transform: translateY(20px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .close-modal {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1.5rem;
+            cursor: pointer;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .close-modal:hover {
+            color: white;
+            background: var(--bg-surface-hover);
+        }
+
+        .modal-header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .modal-header h3 {
+            font-size: 1.5rem;
+            margin-bottom: 8px;
+        }
+
+        .modal-header p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2.5rem;
+            }
+
+            .hero {
+                padding: 60px 0 40px;
+            }
+
+            .highlight-grid,
+            .comparison-grid,
+            .showcase-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .showcase-item.large {
+                grid-column: span 1;
+            }
+
+            .nav-links {
+                display: none;
+            }
+
+            .pricing-card.featured {
+                transform: scale(1);
+            }
+
+            .section-header h2 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Navbar -->
+    <nav>
+        <div class="container">
+            <div class="nav-content">
+                <a href="#" class="logo">
+                    <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M 6 8 L 6 32" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" />
+                        <path d="M 6 8 L 15 8 Q 24 8 24 16 Q 24 24 15 24 L 6 24" stroke="#3b82f6" stroke-width="3"
+                            fill="none" stroke-linecap="round" stroke-linejoin="round" />
+                        <g transform="translate(11, 11)">
+                            <ellipse cx="4" cy="1.5" rx="3" ry="1" fill="#10b981" />
+                            <rect x="1" y="1.5" width="6" height="6" fill="#10b981" opacity="0.9" />
+                            <ellipse cx="4" cy="7.5" rx="3" ry="1" fill="#10b981" />
+                        </g>
+                    </svg>
+                    <div class="logo-text">
+                        <span class="logo-plan">plan</span><span class="logo-db">DB</span>
+                    </div>
+                </a>
+                <div class="nav-links">
+                    <a href="#features">Features</a>
+                    <a href="#beta">Beta Program</a>
+                    <a href="#download">Download</a>
+                    <a href="#contact">Contact</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <section class="hero">
+        <div class="container">
+            <div class="badge">🚀 Beta Program Open · Free 90-Day Access</div>
+            <h1>
+                <span class="gradient-text">Compare, Sync & Migrate</span><br>
+                SQLite & SQLCipher Databases
+            </h1>
+            <p class="hero-subtitle">
+                Professional database comparison tool for developers working with SQLite and SQLCipher.
+                Generate bidirectional patches, sync dev/prod safely, native Linux support.
+            </p>
+            <div class="cta-group">
+                <a href="#download" class="btn btn-primary">
+                    Join Beta Program (Free) →
+                </a>
+                <a href="#features" class="btn btn-secondary">
+                    See How It Works
+                </a>
+            </div>
+            <p class="hero-note">
+                ✓ 90 days free · All features unlocked · Linux & Windows
+            </p>
+        </div>
+    </section>
+
+    <!-- Trust Line -->
+    <div class="container">
+        <p class="trust-line">
+            Built for backend developers, mobile teams, DevOps engineers, and embedded systems developers
+        </p>
+    </div>
+
+    <!-- Problem Section -->
+    <section class="problem-section">
+        <div class="container">
+            <div class="problem-content">
+                <h2>Database Comparison Shouldn't Be This Hard</h2>
+                <div class="pain-points">
+                    <div class="pain-point">
+                        <span class="pain-icon">⏰</span>
+                        <p>Manual schema comparison between dev and production takes hours and risks errors</p>
+                    </div>
+                    <div class="pain-point">
+                        <span class="pain-icon">💥</span>
+                        <p>One-way patches mean writing manual rollback scripts - risky and time-consuming</p>
+                    </div>
+                    <div class="pain-point">
+                        <span class="pain-icon">🔒</span>
+                        <p>No professional tools handle SQLCipher encrypted databases properly</p>
+                    </div>
+                    <div class="pain-point">
+                        <span class="pain-icon">🐧</span>
+                        <p>Linux developers forced to use Wine or virtual machines for Windows-only tools</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Highlight Feature: Bidirectional Patching -->
+    <section class="highlight-feature">
+        <div class="container">
+            <div class="highlight-grid">
+                <div class="highlight-content">
+                    <span class="feature-badge">✨ Unique Feature</span>
+                    <h2>Bidirectional Patching with Automatic Rollback</h2>
+                    <p>
+                        planDB generates patches in <strong>BOTH directions</strong> automatically - 
+                        unlike Red Gate SQL Compare or other single-direction tools.
+                    </p>
+                    <ul class="highlight-list">
+                        <li>✅ Forward patch (Dev → Prod) - Apply your changes</li>
+                        <li>✅ Reverse patch (Prod → Dev) - Your automatic safety net</li>
+                        <li>✅ Download both before applying - instant rollback ready</li>
+                        <li>✅ No manual rollback scripts needed ever again</li>
+                    </ul>
+                    <div class="highlight-note">
+                        💡 <strong>Best practice:</strong> Download the reverse patch before applying forward patch.
+                        If deployment fails, you have instant rollback SQL ready to execute.
+                    </div>
+                </div>
+                <div class="highlight-visual">
+                    <div class="flow-diagram">
+                        <div class="flow-row">
+                            <div class="flow-box">Dev DB</div>
+                            <div class="flow-box">Prod DB</div>
+                        </div>
+                        <div class="flow-arrow">↕️</div>
+                        <div style="text-align: center; color: var(--text-muted); margin: 16px 0;">
+                            Compare Once
+                        </div>
+                        <div class="flow-arrow">↓</div>
+                        <div style="text-align: center; margin: 16px 0;">
+                            <div
+                                style="background: rgba(59, 130, 246, 0.1); padding: 12px; border-radius: 8px; margin-bottom: 8px;">
+                                📄 Forward Patch<br>
+                                <span style="font-size: 0.85rem; color: var(--text-muted);">Dev → Prod</span>
+                            </div>
+                            <div style="background: rgba(16, 185, 129, 0.1); padding: 12px; border-radius: 8px;">
+                                🔄 Rollback Patch<br>
+                                <span style="font-size: 0.85rem; color: var(--text-muted);">Prod → Dev</span>
+                            </div>
+                        </div>
+                        <div style="text-align: center; color: var(--secondary); font-weight: 600; margin-top: 16px;">
+                            Both patches ready instantly!
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features -->
+    <section id="features" class="features">
+        <div class="container">
+            <div class="section-header">
+                <h2>Professional Database Comparison</h2>
+                <p>Everything you need to manage SQLite and SQLCipher databases</p>
+            </div>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🔍</div>
+                    <h3>Schema Comparison</h3>
+                    <p>Visual side-by-side comparison of tables, columns, indexes, triggers, and views. Color-coded differences make changes obvious.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📊</div>
+                    <h3>Data Comparison</h3>
+                    <p>Compare actual row data between databases with smart diff algorithms. Find data mismatches quickly and accurately.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">⚡</div>
+                    <h3>Bidirectional Patches</h3>
+                    <p>Automatic generation of forward and reverse patches. Apply changes confidently with instant rollback capability. Unique to planDB.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🔐</div>
+                    <h3>SQLCipher Native Support</h3>
+                    <p>Full support for encrypted SQLCipher databases with password handling. The only professional tool built specifically for SQLCipher.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🔄</div>
+                    <h3>Database Migration</h3>
+                    <p>Migrate between SQLite and SQLCipher with automatic encryption handling. Perfect for adding encryption to existing databases.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🗂️</div>
+                    <h3>Multi-Database Browser</h3>
+                    <p>Open unlimited databases with tabbed interface. Browse, compare, and work with multiple databases simultaneously.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🐧</div>
+                    <h3>Linux Native</h3>
+                    <p>Built with Rust and Tauri specifically for Linux. No Wine, no compromises. Also available on Windows.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🚀</div>
+                    <h3>High Performance</h3>
+                    <p>Rust-powered backend for blazing-fast comparisons. Handle large databases with millions of rows efficiently.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📋</div>
+                    <h3>Flexible Workflows</h3>
+                    <p>Copy patches to clipboard, download as SQL files for version control, or apply directly with safety confirmations. Your choice.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Comparison with Competitors -->
+    <section class="comparison-section">
+        <div class="container">
+            <div class="section-header">
+                <h2>Why Choose planDB?</h2>
+                <p>How we compare to the industry standard</p>
+            </div>
+            <div class="comparison-grid">
+                <div class="comparison-card">
+                    <h3>Red Gate SQL Compare</h3>
+                    <ul>
+                        <li>❌ Windows only (no Linux)</li>
+                        <li>❌ No SQLCipher support</li>
+                        <li>❌ $695 one-time license</li>
+                        <li>❌ One-direction patches only</li>
+                        <li>❌ No SQLite specialist features</li>
+                    </ul>
+                </div>
+                <div class="comparison-card highlight">
+                    <h3>planDB</h3>
+                    <ul>
+                        <li>✅ Linux + Windows native</li>
+                        <li>✅ Native SQLCipher support</li>
+                        <li>✅ $99-149/year (beta: free 90 days)</li>
+                        <li>✅ Bidirectional with auto-rollback</li>
+                        <li>✅ SQLite/SQLCipher specialist</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Use Cases -->
+    <section class="use-cases">
+        <div class="container">
+            <div class="section-header">
+                <h2>Who Uses planDB</h2>
+                <p>Real developers solving real problems</p>
+            </div>
+            <div class="use-case-grid">
+                <div class="use-case-card">
+                    <h3>👨‍💻 Backend Developers</h3>
+                    <p>Sync development and production databases safely. Generate migration scripts with confidence. Work with SQLCipher for sensitive data (healthcare, finance).</p>
+                </div>
+                <div class="use-case-card">
+                    <h3>📱 Mobile Developers</h3>
+                    <p>Create reliable database migrations for iOS and Android apps. Test schema changes before app releases. Generate SQLite migration code automatically.</p>
+                </div>
+                <div class="use-case-card">
+                    <h3>🔧 DevOps Engineers</h3>
+                    <p>Manage database deployments across environments. Automate schema synchronization. Ensure prod matches staging before releases.</p>
+                </div>
+                <div class="use-case-card">
+                    <h3>🐧 Linux Developers</h3>
+                    <p>The ONLY professional SQLite comparison tool built natively for Linux. No Wine, no virtual machines, no compromises.</p>
+                </div>
+                <div class="use-case-card">
+                    <h3>🏭 Embedded Systems</h3>
+                    <p>Manage SQLite databases on IoT devices, industrial equipment, and automotive systems. Remote database updates with rollback safety.</p>
+                </div>
+                <div class="use-case-card">
+                    <h3>🗄️ Database Admins</h3>
+                    <p>Professional tools for SQLite/SQLCipher database management. Visual comparison and safe migration workflows for production systems.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Screenshots -->
+    <section class="showcase">
+        <div class="container">
+            <div class="section-header">
+                <h2>See planDB in Action</h2>
+                <p>Professional interface designed for serious database work</p>
+            </div>
+            <div class="showcase-grid">
+                <div class="showcase-item">
+                    <img src="landing_assets/uploaded_image_1_1763916169898.png" alt="planDB schema comparison interface showing side-by-side database differences">
+                </div>
+                <div class="showcase-item">
+                    <img src="landing_assets/uploaded_image_2_1763916169898.png" alt="planDB data comparison view with highlighted row differences">
+                </div>
+                <div class="showcase-item large">
+                    <img src="landing_assets/uploaded_image_3_1763916169898.png" alt="planDB bidirectional patch generation with SQL preview">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Beta Program -->
+    <section id="beta" class="pricing">
+        <div class="container">
+            <div class="section-header">
+                <h2>Join the Beta Program</h2>
+                <p>Be among the first developers to use planDB. Shape the future with your feedback.</p>
+            </div>
+            <div class="beta-info" style="max-width: 900px; margin: 0 auto;">
+                <div
+                    style="background: var(--bg-surface); border: 2px solid var(--primary); border-radius: 16px; padding: 48px; text-align: center;">
+                    <div style="font-size: 3rem; margin-bottom: 24px;">🚀</div>
+                    <h3 style="font-size: 2rem; margin-bottom: 16px;">Free Beta Access - 90 Days</h3>
+                    <p style="color: var(--text-muted); font-size: 1.1rem; margin-bottom: 32px; line-height: 1.8;">
+                        We're looking for developers, DBAs, and teams who work with SQLite/SQLCipher databases
+                        to help us test and improve planDB before official launch.
+                    </p>
+
+                    <div
+                        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 24px; text-align: left; margin-bottom: 32px;">
+                        <div style="background: var(--bg-body); padding: 24px; border-radius: 12px;">
+                            <div style="font-size: 1.5rem; margin-bottom: 12px;">✅</div>
+                            <h4 style="margin-bottom: 8px;">All Features Unlocked</h4>
+                            <p style="color: var(--text-muted); font-size: 0.9rem;">
+                                Full access to schema comparison, data diff, bidirectional patching, SQLCipher support, and database browsing
+                            </p>
+                        </div>
+
+                        <div style="background: var(--bg-body); padding: 24px; border-radius: 12px;">
+                            <div style="font-size: 1.5rem; margin-bottom: 12px;">🎯</div>
+                            <h4 style="margin-bottom: 8px;">Shape the Product</h4>
+                            <p style="color: var(--text-muted); font-size: 0.9rem;">
+                                Your feedback directly influences features, UI improvements, and roadmap priorities. We listen to beta testers.
+                            </p>
+                        </div>
+
+                        <div style="background: var(--bg-body); padding: 24px; border-radius: 12px;">
+                            <div style="font-size: 1.5rem; margin-bottom: 12px;">💰</div>
+                            <h4 style="margin-bottom: 8px;">Early Bird Pricing</h4>
+                            <p style="color: var(--text-muted); font-size: 0.9rem;">
+                                Beta testers get exclusive discounted pricing when we launch. Estimated $49-69/year vs regular $99-149/year.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div
+                        style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 12px; padding: 24px; margin-bottom: 32px;">
+                        <p style="color: var(--text-main); font-size: 1rem; margin: 0;">
+                            <strong>What we need:</strong> Honest feedback on bugs, feature requests, usability issues, and use cases we haven't considered. Active beta testers who report issues get priority for future features and extra pricing discounts.
+                        </p>
+                    </div>
+
+                    <a href="#download" class="btn btn-primary" style="font-size: 1.1rem; padding: 16px 32px;">
+                        Download Beta (Free 90 Days) →
+                    </a>
+
+                    <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 16px;">
+                        No credit card required · No strings attached · Linux & Windows
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Banner -->
+    <div class="container">
+        <div class="cta-banner">
+            <h3>Help us build the best SQLite/SQLCipher tool for developers</h3>
+            <p style="font-size: 1.1rem; margin-bottom: 24px; opacity: 0.95;">
+                Join our beta program and get 90 days of free access to all professional features
+            </p>
+            <a href="#download" class="btn">
+                Join Beta Program Now →
+            </a>
+            <p class="cta-subtext">Your feedback shapes the product. Native Linux and Windows support.</p>
+        </div>
+    </div>
+
+    <!-- FAQ -->
+    <section class="faq">
+        <div class="container">
+            <div class="section-header">
+                <h2>Frequently Asked Questions</h2>
+            </div>
+            <div class="faq-list">
+                <div class="faq-item">
+                    <h3>What databases does planDB support?</h3>
+                    <p>planDB specializes in SQLite and SQLCipher databases. We focus on doing SQLite comparison extremely well rather than being mediocre at many databases. Support for MySQL and PostgreSQL may come in v2.0 based on user demand.</p>
+                </div>
+
+                <div class="faq-item">
+                    <h3>Does planDB work on Linux?</h3>
+                    <p>Yes! planDB is built natively for Linux using Rust and Tauri. It works on Ubuntu, Debian, Fedora, and other distributions. Available as .deb packages and AppImage format. This is the ONLY professional SQLite comparison tool with native Linux support - no Wine or virtual machines needed.</p>
+                </div>
+
+                <div class="faq-item">
+                    <h3>Can I use planDB on macOS?</h3>
+                    <p>macOS support is coming soon! We're currently focusing on Linux and Windows where developer demand is highest. Join the beta waitlist to be notified when the macOS version is ready.</p>
+                </div>
+
+                <div class="faq-item">
+                    <h3>Is the 90-day beta fully functional?</h3>
+                    <p>Yes! All features are included in the beta with no limitations. No credit card required. After the 90-day beta period, we'll launch with paid plans (estimated $99-149/year or $199-299 lifetime). Beta testers will receive special early-bird discounted pricing as a thank you.</p>
+                </div>
+
+                <div class="faq-item">
+                    <h3>What is bidirectional patching and why does it matter?</h3>
+                    <p>When you compare two databases, planDB automatically generates patches in BOTH directions: forward patch (Source→Target) to apply your changes, and reverse patch (Target→Source) for instant rollback. This means you always have a safety net ready before applying any changes - no manual rollback script writing needed.</p>
+                </div>
+
+                <div class="faq-item">
+                    <h3>Can planDB handle encrypted SQLCipher databases?</h3>
+                    <p>Yes! planDB has full native SQLCipher support with password handling. You can compare encrypted databases, migrate between SQLite and SQLCipher, generate patches while maintaining encryption, and browse encrypted data. It's the only professional tool built specifically for SQLCipher databases.</p>
+                </div>
+
+                <div class="faq-item">
+                    <h3>What happens if a patch fails during application?</h3>
+                    <p>planDB stops execution immediately and shows you exactly what was applied and what failed. You'll see the error message and the SQL line where it stopped. Since you have the reverse patch already downloaded, you can review the situation and apply the rollback SQL if needed to restore the database state.</p>
+                </div>
+
+                <div class="faq-item">
+                    <h3>Can I apply patches directly or must I do it manually?</h3>
+                    <p>You have three options: (1) Copy patch SQL to clipboard and paste into your preferred DB tool, (2) Download as .sql file for review, version control, or automated deployment, or (3) Apply directly within planDB with safety confirmations. Choose the workflow that fits your process.</p>
+                </div>
+
+                <div class="faq-item">
+                    <h3>What happens after the 90-day beta ends?</h3>
+                    <p>We'll launch paid plans estimated at $99-149/year or $199-299 lifetime license. Beta testers will get priority access to discounted pricing (estimated $49-69/year early bird rate) as a thank you for helping us improve the product. You'll be notified well in advance with plenty of time to decide.</p>
+                </div>
+
+                <div class="faq-item">
+                    <h3>How can I provide beta feedback?</h3>
+                    <p>We love feedback! Report bugs, request features, or share your experience through the contact form below, or email us directly. Active beta testers who provide valuable feedback will get extra perks and deeper discounts when we launch.</p>
+                </div>
+
+                <div class="faq-item">
+                    <h3>Is there a team or enterprise license available?</h3>
+                    <p>We're planning team licenses for the official launch. If your organization wants to test planDB with multiple developers during beta, contact us and we'll set up a custom beta arrangement for your team.</p>
+                </div>
+
+                <div class="faq-item">
+                    <h3>Who are the typical users of planDB?</h3>
+                    <p>planDB is used by backend developers syncing dev/prod databases, mobile app developers generating migration scripts, DevOps engineers managing deployments, embedded systems engineers updating IoT devices, and database administrators working with SQLite/SQLCipher in healthcare, finance, and security-critical applications.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Downloads -->
+    <section id="download" class="downloads">
+        <div class="container">
+            <div class="section-header">
+                <h2>Download Beta Version</h2>
+                <p>Get instant access to planDB beta. 90 days free, all features unlocked. No credit card required.</p>
+            </div>
+            <div class="download-cards">
+                <!-- Windows -->
+                <div class="download-card">
+                    <span class="os-icon">🪟</span>
+                    <h3>Windows</h3>
+                    <p>Windows 10/11 (64-bit)</p>
+                    <!-- IMPORTANT: Replace these URLs with your ACTUAL GitHub release URLs -->
+                    <!-- Go to: https://github.com/planp1125-pixel/plandb_mvp/releases -->
+                    <!-- Right-click on each file and copy the download link -->
+                    <!-- The URL should look like: -->
+                    <!-- https://github.com/planp1125-pixel/plandb_mvp/releases/download/v0.5.3/FILE.msi -->
+                    <button
+                        onclick="openDownloadModal('https://github.com/planp1125-pixel/plandb_mvp/releases/download/v0.5.3/planDB_0.5.3_x64_en-US.msi')"
+                        class="download-btn" style="border: none; cursor: pointer;">Download .msi</button>
+                    <div style="margin-top: 12px; font-size: 0.875rem; color: var(--text-muted);">
+                        <a href="#"
+                            onclick="openDownloadModal('https://github.com/planp1125-pixel/plandb_mvp/releases/download/v0.5.3/planDB_0.5.3_x64-setup.exe'); return false;"
+                            style="color: var(--primary); text-decoration: none;">Also available as .exe installer</a>
+                    </div>
+                </div>
+
+                <!-- Linux -->
+                <div class="download-card">
+                    <span class="os-icon">🐧</span>
+                    <h3>Linux</h3>
+                    <p>Ubuntu, Debian, Fedora</p>
+                    <button
+                        onclick="openDownloadModal('https://github.com/planp1125-pixel/plandb_mvp/releases/download/v0.5.3/planDB_0.5.3_amd64.deb')"
+                        class="download-btn" style="border: none; cursor: pointer;">Download .deb</button>
+                    <div style="margin-top: 12px; font-size: 0.875rem; color: var(--text-muted);">
+                        <a href="#"
+                            onclick="openDownloadModal('https://github.com/planp1125-pixel/plandb_mvp/releases/download/v0.5.3/planDB_0.5.3_amd64.AppImage'); return false;"
+                            style="color: var(--primary); text-decoration: none;">Also available as AppImage</a>
+                    </div>
+                </div>
+
+                <!-- macOS -->
+                <div class="download-card" style="opacity: 0.6; border-style: dashed;">
+                    <span class="os-icon">🍎</span>
+                    <h3>macOS</h3>
+                    <p>Apple Silicon & Intel</p>
+                    <button class="download-btn" disabled
+                        style="background: var(--bg-surface-hover); cursor: not-allowed; opacity: 0.6;">Coming
+                        Soon</button>
+                    <div style="margin-top: 12px; font-size: 0.875rem; color: var(--text-muted);">
+                        Join beta waitlist below
+                    </div>
+                </div>
+            </div>
+            
+            <div style="text-align: center; margin-top: 48px; padding: 24px; background: rgba(16, 185, 129, 0.1); border-radius: 12px; max-width: 800px; margin-left: auto; margin-right: auto;">
+                <p style="color: var(--text-muted); font-size: 0.95rem; line-height: 1.6; margin: 0;">
+                    <strong>Note:</strong> Download links connect to our GitHub releases page. 
+                    If you encounter any download issues, please visit 
+                    <a href="https://github.com/planp1125-pixel/plandb_mvp/releases" 
+                       style="color: var(--primary); text-decoration: none;" 
+                       target="_blank" rel="noopener">
+                        github.com/planp1125-pixel/plandb_mvp/releases
+                    </a> 
+                    directly or contact us below.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Contact -->
+    <section id="contact" class="container">
+        <div class="contact">
+            <div class="section-header" style="margin-bottom: 32px;">
+                <h2>Get in Touch</h2>
+                <p>Questions? Feature requests? Bug reports? Beta feedback? We'd love to hear from you.</p>
+            </div>
+            <form action="https://formspree.io/f/mrbdveqw" method="POST">
+                <div class="form-group">
+                    <label>Email Address</label>
+                    <input type="email" name="email" class="form-control" required placeholder="you@company.com">
+                </div>
+                <div class="form-group">
+                    <label>Message</label>
+                    <textarea name="message" class="form-control" required
+                        placeholder="How can we help? Bug reports, feature requests, and general feedback all welcome."></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center;">
+                    Send Message
+                </button>
+            </form>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 planDB by PlanLabs. All rights reserved.</p>
+            <p style="margin-top: 8px; font-size: 0.85rem;">
+                Built with ❤️ for developers who value their time and database safety
+            </p>
+        </div>
+    </footer>
+
+    <!-- Download Modal -->
+    <div id="downloadModal" class="modal-overlay">
+        <div class="modal-content">
+            <button class="close-modal" onclick="closeModal()">×</button>
+            <div class="modal-header">
+                <h3>Join the Beta Program</h3>
+                <p>Enter your email to get beta updates and early-bird pricing (optional).</p>
+            </div>
+            <form id="downloadForm" onsubmit="handleDownloadSubmit(event)">
+                <div class="form-group">
+                    <label>Email Address (Optional)</label>
+                    <input type="email" id="downloadEmail" class="form-control" placeholder="you@company.com">
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center;">
+                    Start Download
+                </button>
+                <div style="text-align: center; margin-top: 16px;">
+                    <a href="#" onclick="skipAndDownload(event)"
+                        style="color: var(--text-muted); font-size: 0.875rem; text-decoration: none;">
+                        Skip and download without email
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let currentDownloadUrl = '';
+
+        function openDownloadModal(url) {
+            currentDownloadUrl = url;
+            document.getElementById('downloadModal').style.display = 'flex';
+            document.getElementById('downloadEmail').focus();
+        }
+
+        function closeModal() {
+            document.getElementById('downloadModal').style.display = 'none';
+        }
+
+        // Close modal when clicking outside
+        document.getElementById('downloadModal').addEventListener('click', function (e) {
+            if (e.target === this) closeModal();
+        });
+
+        // Close modal on Escape key
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') closeModal();
+        });
+
+        async function handleDownloadSubmit(e) {
+            e.preventDefault();
+            const email = document.getElementById('downloadEmail').value;
+            const btn = e.target.querySelector('button[type="submit"]');
+            const originalText = btn.innerText;
+
+            btn.innerText = 'Processing...';
+            btn.disabled = true;
+
+            try {
+                // If email provided, submit to Formspree
+                if (email) {
+                    await fetch('https://formspree.io/f/mrbdveqw', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            email: email,
+                            message: `Beta signup - Downloaded: ${currentDownloadUrl.split('/').pop()}`
+                        })
+                    });
+                }
+
+                // Trigger download
+                window.location.href = currentDownloadUrl;
+
+                // Close modal
+                closeModal();
+
+                // Reset form
+                e.target.reset();
+
+            } catch (error) {
+                console.error('Error:', error);
+                // If form fails, still let them download
+                window.location.href = currentDownloadUrl;
+                closeModal();
+            } finally {
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        function skipAndDownload(e) {
+            e.preventDefault();
+            window.location.href = currentDownloadUrl;
+            closeModal();
+        }
+
+        // Smooth scroll for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+
+</html>
