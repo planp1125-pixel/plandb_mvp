@@ -48,7 +48,7 @@
         "description": "90-day free beta access with all features unlocked"
       },
       "description": "Professional SQLite and SQLCipher database comparison tool with bidirectional patch generation, native Linux support, and encrypted database handling. Built for developers who need to sync dev/prod databases, migrate schemas safely, and work with SQLCipher encryption.",
-      "softwareVersion": "0.5.3 Beta",
+      "softwareVersion": "0.5.4 Beta",
       "programmingLanguage": ["Rust", "Vue.js"],
       "featureList": [
         "Schema comparison with visual diff",
@@ -66,7 +66,7 @@
         "https://planplabs.com/landing_assets/uploaded_image_3_1763916169898.png"
       ],
       "downloadUrl": "https://github.com/planp1125-pixel/plandb_mvp/releases",
-      "releaseNotes": "Beta version 0.5.3 with full SQLite and SQLCipher comparison capabilities",
+      "releaseNotes": "Beta version 0.5.4 with full SQLite and SQLCipher comparison capabilities",
       "requirements": "Linux (Ubuntu 20.04+, Debian 10+, Fedora 35+) or Windows 10/11",
       "maintainer": {
         "@type": "Organization",
@@ -1192,6 +1192,51 @@
         </div>
     </section>
 
+    <!-- SQLite ↔ SQLCipher Migration Feature -->
+    <section class="highlight-feature" style="background: #162032;">
+        <div class="container">
+            <div class="highlight-grid">
+                <div class="highlight-visual">
+                    <div style="text-align: center;">
+                        <div style="font-size: 4rem; margin-bottom: 24px;">🔐</div>
+                        <div
+                            style="background: var(--bg-body); padding: 24px; border-radius: 12px; margin-bottom: 16px;">
+                            <div style="font-size: 1.5rem; color: var(--text-muted); margin-bottom: 8px;">SQLite</div>
+                            <div style="font-size: 0.9rem; color: var(--text-muted);">Unencrypted Database</div>
+                        </div>
+                        <div style="font-size: 2rem; color: var(--secondary); margin: 16px 0;">⬇️ Migrate ⬇️</div>
+                        <div
+                            style="background: var(--bg-body); padding: 24px; border-radius: 12px; border: 2px solid var(--secondary);">
+                            <div style="font-size: 1.5rem; color: var(--secondary); margin-bottom: 8px;">SQLCipher</div>
+                            <div style="font-size: 0.9rem; color: var(--text-muted);">AES-256 Encrypted</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="highlight-content">
+                    <span class="feature-badge">🔒 Security Feature</span>
+                    <h2>SQLite ↔ SQLCipher Migration Made Easy</h2>
+                    <p>
+                        Add encryption to your existing SQLite databases or decrypt SQLCipher databases for development.
+                        planDB handles the entire migration process while preserving complete data integrity.
+                    </p>
+                    <ul class="highlight-list">
+                        <li>✅ <strong>SQLite → SQLCipher:</strong> Encrypt existing databases with AES-256</li>
+                        <li>✅ <strong>SQLCipher → SQLite:</strong> Decrypt for testing or legacy compatibility</li>
+                        <li>✅ <strong>Preserve Everything:</strong> All tables, indexes, triggers, views intact</li>
+                        <li>✅ <strong>Migration Scripts:</strong> Generate SQL for automated deployments</li>
+                        <li>✅ <strong>Safe Process:</strong> Verify migration with comparison before committing</li>
+                    </ul>
+                    <div class="highlight-note">
+                        💡 <strong>Common use case:</strong> Mobile apps adding encryption for HIPAA/PCI compliance,
+                        healthcare/finance apps securing existing user data, or embedded systems adding security
+                        to production databases without database rewrites.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- Features -->
     <section id="features" class="features">
         <div class="container">
@@ -1451,90 +1496,108 @@
                         extremely well rather than being mediocre at many databases. Support for MySQL and PostgreSQL
                         may come in v2.0 based on user demand.</p>
                 </div>
-
-                <div class="faq-item">
-                    <h3>Does planDB work on Linux?</h3>
-                    <p>Yes! planDB is built natively for Linux using Rust and Tauri. It works on Ubuntu, Debian, Fedora,
-                        and other distributions. Available as .deb packages and AppImage format. This is the ONLY
-                        professional SQLite comparison tool with native Linux support - no Wine or virtual machines
-                        needed.</p>
-                </div>
-
-                <div class="faq-item">
-                    <h3>Can I use planDB on macOS?</h3>
-                    <p>macOS support is coming soon! We're currently focusing on Linux and Windows where developer
-                        demand is highest. Join the beta waitlist to be notified when the macOS version is ready.</p>
-                </div>
-
-                <div class="faq-item">
-                    <h3>Is the 90-day beta fully functional?</h3>
-                    <p>Yes! All features are included in the beta with no limitations. No credit card required. After
-                        the 90-day beta period, we'll launch with paid plans (estimated $99-149/year or $199-299
-                        lifetime). Beta testers will receive special early-bird discounted pricing as a thank you.</p>
-                </div>
-
-                <div class="faq-item">
-                    <h3>What is bidirectional patching and why does it matter?</h3>
-                    <p>When you compare two databases, planDB automatically generates patches in BOTH directions:
-                        forward patch (Source→Target) to apply your changes, and reverse patch (Target→Source) for
-                        instant rollback. This means you always have a safety net ready before applying any changes - no
-                        manual rollback script writing needed.</p>
-                </div>
-
-                <div class="faq-item">
-                    <h3>Can planDB handle encrypted SQLCipher databases?</h3>
-                    <p>Yes! planDB has full native SQLCipher support with password handling. You can compare encrypted
-                        databases, migrate between SQLite and SQLCipher, generate patches while maintaining encryption,
-                        and browse encrypted data. It's the only professional tool built specifically for SQLCipher
-                        databases.</p>
-                </div>
-
-                <div class="faq-item">
-                    <h3>What happens if a patch fails during application?</h3>
-                    <p>planDB stops execution immediately and shows you exactly what was applied and what failed. You'll
-                        see the error message and the SQL line where it stopped. Since you have the reverse patch
-                        already downloaded, you can review the situation and apply the rollback SQL if needed to restore
-                        the database state.</p>
-                </div>
-
-                <div class="faq-item">
-                    <h3>Can I apply patches directly or must I do it manually?</h3>
-                    <p>You have three options: (1) Copy patch SQL to clipboard and paste into your preferred DB tool,
-                        (2) Download as .sql file for review, version control, or automated deployment, or (3) Apply
-                        directly within planDB with safety confirmations. Choose the workflow that fits your process.
-                    </p>
-                </div>
-
-                <div class="faq-item">
-                    <h3>What happens after the 90-day beta ends?</h3>
-                    <p>We'll launch paid plans estimated at $99-149/year or $199-299 lifetime license. Beta testers will
-                        get priority access to discounted pricing (estimated $49-69/year early bird rate) as a thank you
-                        for helping us improve the product. You'll be notified well in advance with plenty of time to
-                        decide.</p>
-                </div>
-
-                <div class="faq-item">
-                    <h3>How can I provide beta feedback?</h3>
-                    <p>We love feedback! Report bugs, request features, or share your experience through the contact
-                        form below, or email us directly. Active beta testers who provide valuable feedback will get
-                        extra perks and deeper discounts when we launch.</p>
-                </div>
-
-                <div class="faq-item">
-                    <h3>Is there a team or enterprise license available?</h3>
-                    <p>We're planning team licenses for the official launch. If your organization wants to test planDB
-                        with multiple developers during beta, contact us and we'll set up a custom beta arrangement for
-                        your team.</p>
-                </div>
-
-                <div class="faq-item">
-                    <h3>Who are the typical users of planDB?</h3>
-                    <p>planDB is used by backend developers syncing dev/prod databases, mobile app developers generating
-                        migration scripts, DevOps engineers managing deployments, embedded systems engineers updating
-                        IoT devices, and database administrators working with SQLite/SQLCipher in healthcare, finance,
-                        and security-critical applications.</p>
-                </div>
+                <div class="faq-item"></div>
+                <h3>How does SQLite to SQLCipher migration work in planDB?</h3>
+                <p>
+                    planDB provides three ways to migrate between SQLite and SQLCipher formats:
+                    <br><br>
+                    <strong>1. Direct Migration:</strong> Open your source SQLite database and target SQLCipher database
+                    (or vice versa),
+                    then use the migration feature to convert all data while maintaining schema structure, indexes,
+                    triggers, and views.
+                    <br><br>
+                    <strong>2. Verification First:</strong> Compare both databases before and after migration to ensure
+                    complete
+                    data integrity. planDB shows you exactly what changed during the migration process.
+                    <br><br>
+                    This is essential when adding encryption to healthcare apps (HIPAA), financial apps (PCI-DSS),
+                    or any application handling sensitive user data that wasn't originally encrypted.
+                </p>
             </div>
+
+            <div class="faq-item">
+                <h3>Does planDB work on Linux?</h3>
+                <p>Yes! planDB is built natively for Linux using Rust and Tauri. It works on Ubuntu, Debian, Fedora,
+                    and other distributions. Available as .deb packages and AppImage format. This is the ONLY
+                    professional SQLite comparison tool with native Linux support - no Wine or virtual machines
+                    needed.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>Can I use planDB on macOS?</h3>
+                <p>macOS support is coming soon! We're currently focusing on Linux and Windows where developer
+                    demand is highest. Join the beta waitlist to be notified when the macOS version is ready.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>Is the 90-day beta fully functional?</h3>
+                <p>Yes! All features are included in the beta with no limitations. No credit card required. After
+                    the 90-day beta period, we'll launch with paid plans (estimated $99-149/year or $199-299
+                    lifetime). Beta testers will receive special early-bird discounted pricing as a thank you.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>What is bidirectional patching and why does it matter?</h3>
+                <p>When you compare two databases, planDB automatically generates patches in BOTH directions:
+                    forward patch (Source→Target) to apply your changes, and reverse patch (Target→Source) for
+                    instant rollback. This means you always have a safety net ready before applying any changes - no
+                    manual rollback script writing needed.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>Can planDB handle encrypted SQLCipher databases?</h3>
+                <p>Yes! planDB has full native SQLCipher support with password handling. You can compare encrypted
+                    databases, migrate between SQLite and SQLCipher, generate patches while maintaining encryption,
+                    and browse encrypted data. It's the only professional tool built specifically for SQLCipher
+                    databases.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>What happens if a patch fails during application?</h3>
+                <p>planDB stops execution immediately and shows you exactly what was applied and what failed. You'll
+                    see the error message and the SQL line where it stopped. Since you have the reverse patch
+                    already downloaded, you can review the situation and apply the rollback SQL if needed to restore
+                    the database state.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>Can I apply patches directly or must I do it manually?</h3>
+                <p>You have three options: (1) Copy patch SQL to clipboard and paste into your preferred DB tool,
+                    (2) Download as .sql file for review, version control, or automated deployment, or (3) Apply
+                    directly within planDB with safety confirmations. Choose the workflow that fits your process.
+                </p>
+            </div>
+
+            <div class="faq-item">
+                <h3>What happens after the 90-day beta ends?</h3>
+                <p>We'll launch paid plans estimated at $99-149/year or $199-299 lifetime license. Beta testers will
+                    get priority access to discounted pricing (estimated $49-69/year early bird rate) as a thank you
+                    for helping us improve the product. You'll be notified well in advance with plenty of time to
+                    decide.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>How can I provide beta feedback?</h3>
+                <p>We love feedback! Report bugs, request features, or share your experience through the contact
+                    form below, or email us directly. Active beta testers who provide valuable feedback will get
+                    extra perks and deeper discounts when we launch.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>Is there a team or enterprise license available?</h3>
+                <p>We're planning team licenses for the official launch. If your organization wants to test planDB
+                    with multiple developers during beta, contact us and we'll set up a custom beta arrangement for
+                    your team.</p>
+            </div>
+
+            <div class="faq-item">
+                <h3>Who are the typical users of planDB?</h3>
+                <p>planDB is used by backend developers syncing dev/prod databases, mobile app developers generating
+                    migration scripts, DevOps engineers managing deployments, embedded systems engineers updating
+                    IoT devices, and database administrators working with SQLite/SQLCipher in healthcare, finance,
+                    and security-critical applications.</p>
+            </div>
+        </div>
         </div>
     </section>
 
@@ -1555,13 +1618,13 @@
                     <!-- Go to: https://github.com/planp1125-pixel/plandb_mvp/releases -->
                     <!-- Right-click on each file and copy the download link -->
                     <!-- The URL should look like: -->
-                    <!-- https://github.com/planp1125-pixel/plandb_mvp/releases/download/v0.5.3/FILE.msi -->
+                    <!-- https://github.com/planp1125-pixel/plandb_mvp/releases/download/v0.5.4/FILE.msi -->
                     <button
-                        onclick="openDownloadModal('https://github.com/planp1125-pixel/plandb_mvp/releases/tag/v0.5.3/planDB_0.5.3_x64_en-US.msi')"
+                        onclick="openDownloadModal('https://github.com/planp1125-pixel/plandb_mvp/releases/download/plandb-v0.5.4/planDB_0.5.4_x64_en-US.msi')"
                         class="download-btn" style="border: none; cursor: pointer;">Download .msi</button>
                     <div style="margin-top: 12px; font-size: 0.875rem; color: var(--text-muted);">
                         <a href="#"
-                            onclick="openDownloadModal('https://github.com/planp1125-pixel/plandb_mvp/releases/tag/v0.5.3/planDB_0.5.3_x64-setup.exe'); return false;"
+                            onclick="openDownloadModal('https://github.com/planp1125-pixel/plandb_mvp/releases/download/plandb-v0.5.4/planDB_0.5.4_x64-setup.exe'); return false;"
                             style="color: var(--primary); text-decoration: none;">Also available as .exe installer</a>
                     </div>
                 </div>
@@ -1572,11 +1635,11 @@
                     <h3>Linux</h3>
                     <p>Ubuntu, Debian, Fedora</p>
                     <button
-                        onclick="openDownloadModal('https://github.com/planp1125-pixel/plandb_mvp/releases/tag/v0.5.3/planDB_0.5.3_amd64.deb')"
+                        onclick="openDownloadModal('https://github.com/planp1125-pixel/plandb_mvp/releases/download/plandb-v0.5.4/planDB_0.5.4_amd64.deb')"
                         class="download-btn" style="border: none; cursor: pointer;">Download .deb</button>
                     <div style="margin-top: 12px; font-size: 0.875rem; color: var(--text-muted);">
                         <a href="#"
-                            onclick="openDownloadModal('https://github.com/planp1125-pixel/plandb_mvp/releases/tag/v0.5.3/planDB_0.5.3_amd64.AppImage'); return false;"
+                            onclick="openDownloadModal('https://github.com/planp1125-pixel/plandb_mvp/releases/download/plandb-v0.5.4/planDB_0.5.4_amd64.AppImage'); return false;"
                             style="color: var(--primary); text-decoration: none;">Also available as AppImage</a>
                     </div>
                 </div>
@@ -1693,6 +1756,26 @@
             if (e.key === 'Escape') closeModal();
         });
 
+        // Detect operating system
+        function detectOS() {
+            const userAgent = window.navigator.userAgent.toLowerCase();
+            const platform = window.navigator.platform.toLowerCase();
+
+            if (userAgent.indexOf('win') !== -1 || platform.indexOf('win') !== -1) {
+                return 'Windows';
+            } else if (userAgent.indexOf('mac') !== -1 || platform.indexOf('mac') !== -1) {
+                return 'macOS';
+            } else if (userAgent.indexOf('linux') !== -1 || platform.indexOf('linux') !== -1) {
+                if (userAgent.indexOf('android') !== -1) {
+                    return 'Android';
+                }
+                return 'Linux';
+            } else if (userAgent.indexOf('iphone') !== -1 || userAgent.indexOf('ipad') !== -1) {
+                return 'iOS';
+            }
+            return 'Unknown';
+        }
+
         async function handleDownloadSubmit(e) {
             e.preventDefault();
             const email = document.getElementById('downloadEmail').value;
@@ -1703,8 +1786,12 @@
             btn.disabled = true;
 
             try {
-                // If email provided, submit to Formspree
+                // If email provided, submit to Formspree with enhanced tracking
                 if (email) {
+                    const fileName = currentDownloadUrl.split('/').pop();
+                    const os = detectOS();
+                    const timestamp = new Date().toISOString();
+
                     await fetch('https://formspree.io/f/mrbdveqw', {
                         method: 'POST',
                         headers: {
@@ -1712,7 +1799,21 @@
                         },
                         body: JSON.stringify({
                             email: email,
-                            message: `Beta signup - Downloaded: ${currentDownloadUrl.split('/').pop()}`
+                            downloadFile: fileName,
+                            operatingSystem: os,
+                            downloadUrl: currentDownloadUrl,
+                            timestamp: timestamp,
+                            userAgent: navigator.userAgent,
+                            referrer: document.referrer || 'Direct',
+                            message: `Beta Download Request
+
+📧 Email: ${email}
+📦 File: ${fileName}
+💻 OS: ${os}
+🕒 Time: ${new Date().toLocaleString()}
+🔗 URL: ${currentDownloadUrl}
+🌐 Referrer: ${document.referrer || 'Direct'}
+📱 Device: ${navigator.userAgent}`
                         })
                     });
                 }
