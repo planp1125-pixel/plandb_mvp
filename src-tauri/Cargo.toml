@@ -1,6 +1,6 @@
 [package]
 name = "plandb"
-version = "0.5.4"
+version = "0.5.5"
 description = "SQLCipher Database Schema Comparison Tool"
 authors = ["you"]
 edition = "2021"
