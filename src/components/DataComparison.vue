@@ -2438,7 +2438,7 @@ onBeforeUnmount(() => {
 .key-note {
   margin-top: 15px;
   padding: 12px;
-  background: #fff3cd;
+  background: #131312;
   border-left: 4px solid #ffc107;
   border-radius: 4px;
 }
@@ -3122,6 +3122,7 @@ onBeforeUnmount(() => {
     flex-direction: column;
   }
 
+  
   .compare-btn,
   .export-btn,
   .patch-btn {
