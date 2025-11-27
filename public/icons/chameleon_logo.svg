@@ -1,0 +1,43 @@
+<svg width="200" height="160" viewBox="0 0 200 160" xmlns="http://www.w3.org/2000/svg">
+  <!-- Chameleon Logo - Transparent Background -->
+  
+  <!-- Tail (spiral) - alternating colors -->
+  <path d="M 152 140 Q 168 132, 172 116 Q 174 100, 164 88 Q 152 76, 140 80 Q 128 84, 124 96 Q 122 108, 132 116 Q 142 124, 150 122" 
+        fill="none" stroke="#10b981" stroke-width="10" stroke-linecap="round"/>
+  <path d="M 132 116 Q 138 114, 140 108 Q 142 100, 136 96 Q 130 92, 126 98 Q 124 104, 128 108" 
+        fill="none" stroke="#f59e0b" stroke-width="8" stroke-linecap="round"/>
+  <path d="M 128 108 Q 131 107, 132 103 Q 133 99, 130 98" 
+        fill="none" stroke="#ef4444" stroke-width="6" stroke-linecap="round"/>
+  
+  <!-- Body segments -->
+  <!-- Back leg -->
+  <rect x="112" y="128" width="16" height="24" fill="#3b82f6" rx="2"/>
+  <rect x="114" y="152" width="12" height="16" fill="#3b82f6" rx="2"/>
+  
+  <!-- Back body - green (added) -->
+  <ellipse cx="112" cy="112" rx="28" ry="24" fill="#10b981"/>
+  
+  <!-- Middle body - yellow (modified) -->
+  <ellipse cx="88" cy="108" rx="24" ry="22" fill="#f59e0b"/>
+  
+  <!-- Front body - red (removed) -->
+  <ellipse cx="64" cy="106" rx="20" ry="20" fill="#ef4444"/>
+  
+  <!-- Front leg -->
+  <rect x="56" y="124" width="14" height="22" fill="#3b82f6" rx="2"/>
+  <rect x="57" y="146" width="12" height="14" fill="#3b82f6" rx="2"/>
+  
+  <!-- Head - blue (primary) -->
+  <ellipse cx="44" cy="100" rx="18" ry="20" fill="#3b82f6"/>
+  
+  <!-- Eye -->
+  <circle cx="38" cy="96" r="7" fill="#1e293b"/>
+  <circle cx="38" cy="96" r="4" fill="#5b7fc7"/>
+  
+  <!-- Mouth detail -->
+  <path d="M 28 104 Q 30 106, 34 105" fill="none" stroke="#1e293b" stroke-width="1" stroke-linecap="round"/>
+  
+  <!-- Body pattern lines (optional detail) -->
+  <path d="M 72 96 L 72 116" stroke="#1e293b" stroke-width="1" opacity="0.3"/>
+  <path d="M 96 98 L 96 118" stroke="#1e293b" stroke-width="1" opacity="0.3"/>
+</svg>

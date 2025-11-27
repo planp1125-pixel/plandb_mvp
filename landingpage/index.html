@@ -4,11 +4,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>planDB - SQLite & SQLCipher Database Comparison Tool for Linux | Bidirectional Patching</title>
+    <title>planDB - SQLite & SQLCipher Database Comparison Tool for Linux, Windows & macOS | Bidirectional Patching
+    </title>
 
     <!-- SEO Meta Tags -->
     <meta name="description"
-        content="Professional SQLite and SQLCipher database comparison tool for Linux and Windows. Compare schemas, generate bidirectional patches, migrate databases safely. Built for developers, mobile teams, and embedded systems. Native Linux support, 90-day free trial.">
+        content="Professional SQLite and SQLCipher database comparison tool for Linux, Windows, and macOS. Compare schemas, generate bidirectional patches, migrate databases safely. Built for developers, mobile teams, and embedded systems. Native support across all platforms, 90-day free trial.">
     <meta name="keywords"
         content="sqlite comparison tool linux, sqlcipher database tool, database diff linux, sqlite migration, database sync, bidirectional patching, encrypted database comparison, sqlite to sqlcipher migration, linux database tools, dev prod database sync, mobile database migration, embedded systems database">
     <meta name="author" content="PlanLabs">
@@ -38,7 +39,7 @@
       "name": "planDB",
       "applicationCategory": "DeveloperApplication",
       "applicationSubCategory": "Database Tools",
-      "operatingSystem": ["Linux", "Windows", "Ubuntu", "Debian", "Fedora"],
+      "operatingSystem": ["Linux", "Windows", "macOS", "Ubuntu", "Debian", "Fedora"],
       "offers": {
         "@type": "Offer",
         "price": "0",
@@ -67,7 +68,7 @@
       ],
       "downloadUrl": "https://github.com/planp1125-pixel/plandb_mvp/releases",
       "releaseNotes": "Beta version 0.5.4 with full SQLite and SQLCipher comparison capabilities",
-      "requirements": "Linux (Ubuntu 20.04+, Debian 10+, Fedora 35+) or Windows 10/11",
+      "requirements": "Linux (Ubuntu 20.04+, Debian 10+, Fedora 35+), Windows 10/11, or macOS (Apple Silicon M1/M2/M3)",
       "maintainer": {
         "@type": "Organization",
         "name": "PlanLabs"
@@ -204,10 +205,10 @@
 
         /* Navbar */
         nav {
-            padding: 20px 0;
-            border-bottom: 1px solid var(--border);
+            padding: 16px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
             backdrop-filter: blur(10px);
-            background: rgba(15, 23, 42, 0.9);
+            background: rgba(10, 15, 26, 0.95);
             position: sticky;
             top: 0;
             z-index: 100;
@@ -558,6 +559,71 @@
             color: var(--text-muted);
             font-size: 0.95rem;
             line-height: 1.6;
+        }
+
+        .step {
+            background: var(--bg-surface);
+            padding: 32px;
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            transition: transform 0.2s;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .step:hover {
+            transform: translateY(-4px);
+            border-color: rgba(59, 130, 246, 0.3);
+        }
+
+        .step-number {
+            width: 48px;
+            height: 48px;
+            background: var(--primary);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 24px;
+        }
+
+        .step-screenshot {
+            margin-bottom: 24px;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            background: var(--bg-body);
+            padding: 8px;
+            min-height: 300px;
+            align-items: center;
+        }
+
+        .step-screenshot img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            border: 1px solid var(--border);
+        }
+
+        .step-screenshot img:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+            z-index: 1;
+        }
+
+        /* Single image in step - span full width */
+        .step-screenshot img:only-child {
+            grid-column: span 2;
         }
 
         /* Comparison Section */
@@ -1014,6 +1080,59 @@
             font-size: 0.95rem;
         }
 
+        /* Image Popup Modal */
+        .image-popup-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 10000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .image-popup-overlay.active {
+            display: flex;
+        }
+
+        .image-popup-content {
+            max-width: 95vw;
+            max-height: 95vh;
+            position: relative;
+        }
+
+        .image-popup-content img {
+            max-width: 100%;
+            max-height: 95vh;
+            border-radius: 8px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+
+        .image-popup-close {
+            position: absolute;
+            top: -40px;
+            right: 0;
+            background: transparent;
+            border: none;
+            color: white;
+            font-size: 2.5rem;
+            cursor: pointer;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s;
+        }
+
+        .image-popup-close:hover {
+            transform: scale(1.1);
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
             h1 {
@@ -1030,12 +1149,23 @@
                 grid-template-columns: 1fr;
             }
 
+            .steps-container {
+                grid-template-columns: 1fr;
+            }
+
+            .use-case-grid {
+                grid-template-columns: 1fr;
+            }
+
             .showcase-item.large {
                 grid-column: span 1;
             }
 
             .nav-links {
                 display: none;
+                /* Keep this for mobile menu toggle */
+                /* For a visible mobile nav, you'd typically use a hamburger menu and toggle a class */
+                /* If you intended for nav-links to be visible on mobile, this needs a different approach */
             }
 
             .pricing-card.featured {
@@ -1055,25 +1185,17 @@
         <div class="container">
             <div class="nav-content">
                 <a href="#" class="logo">
-                    <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M 6 8 L 6 32" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" />
-                        <path d="M 6 8 L 15 8 Q 24 8 24 16 Q 24 24 15 24 L 6 24" stroke="#3b82f6" stroke-width="3"
-                            fill="none" stroke-linecap="round" stroke-linejoin="round" />
-                        <g transform="translate(11, 11)">
-                            <ellipse cx="4" cy="1.5" rx="3" ry="1" fill="#10b981" />
-                            <rect x="1" y="1.5" width="6" height="6" fill="#10b981" opacity="0.9" />
-                            <ellipse cx="4" cy="7.5" rx="3" ry="1" fill="#10b981" />
-                        </g>
-                    </svg>
+                    <img src="chameleon_logo_transparent.png" alt="planDB Logo" style="height: 40px; width: auto;">
                     <div class="logo-text">
                         <span class="logo-plan">plan</span><span class="logo-db">DB</span>
                     </div>
                 </a>
                 <div class="nav-links">
                     <a href="#features">Features</a>
-                    <a href="#beta">Beta Program</a>
+                    <a href="#how-it-works">How It Works</a>
+                    <a href="#use-cases">Use Cases</a>
+                    <a href="#faq">FAQ</a>
                     <a href="#download">Download</a>
-                    <a href="#contact">Contact</a>
                 </div>
             </div>
         </div>
@@ -1100,7 +1222,7 @@
                 </a>
             </div>
             <p class="hero-note">
-                ✓ 90 days free · All features unlocked · Linux & Windows
+                ✓ 90 days free · All features unlocked · Linux, Windows, and macOS
             </p>
         </div>
     </section>
@@ -1124,7 +1246,7 @@
                     </div>
                     <div class="pain-point">
                         <span class="pain-icon">💥</span>
-                        <p>One-way patches mean writing manual rollback scripts - risky and time-consuming</p>
+                        <p>One-way patches means writing manual rollback scripts - risky and time-consuming</p>
                     </div>
                     <div class="pain-point">
                         <span class="pain-icon">🔒</span>
@@ -1192,6 +1314,56 @@
         </div>
     </section>
 
+    <!-- HOW IT WORKS SECTION (NEW!) -->
+    <section id="how-it-works" class="how-it-works">
+        <div class="container">
+            <div class="section-header">
+                <h2>How It Works</h2>
+                <p>Get started with planDB in under 2 minutes</p>
+            </div>
+            <div class="steps-container">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <div class="step-screenshot">
+                        <img src="landing_assets/db_connection.png" alt="Select databases">
+                        <img src="landing_assets/Sqlcipher_details.png" alt="Select databases">
+                    </div>
+                    <h3>Select Your Databases</h3>
+                    <p>Choose two SQLite or SQLCipher databases to compare. If encrypted, enter the password once and
+                        planDB handles the rest.</p>
+                </div>
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <div class="step-screenshot">
+                        <img src="landing_assets/schema_compare.png" alt="Compare databases">
+                        <img src="landing_assets/data_compare.png" alt="Compare databases">
+                    </div>
+                    <h3>Compare Schema & Data</h3>
+                    <p>View side-by-side differences in tables, columns, indexes, and data. Color-coded highlighting
+                        shows what's added, changed, or removed.</p>
+                </div>
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <div class="step-screenshot">
+                        <img src="landing_assets/patch_gen.png" alt="Generate patches">
+                    </div>
+                    <h3>Generate Patches</h3>
+                    <p>Create SQL scripts to sync databases. Get both forward patches (to apply changes) and rollback
+                        patches (to undo them if needed).</p>
+                </div>
+                <div class="step">
+                    <div class="step-number">4</div>
+                    <div class="step-screenshot">
+                        <img src="landing_assets/patch_apply.png" alt="Review and apply">
+                    </div>
+                    <h3>Review & Apply</h3>
+                    <p>Review the generated SQL patches, then either apply them directly or export for later use.
+                        Rollback available if anything goes wrong.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- SQLite ↔ SQLCipher Migration Feature -->
     <section class="highlight-feature" style="background: #162032;">
         <div class="container">
@@ -1222,9 +1394,9 @@
                     </p>
                     <ul class="highlight-list">
                         <li>✅ <strong>SQLite → SQLCipher:</strong> Encrypt existing databases with AES-256</li>
-                        <li>✅ <strong>SQLCipher → SQLite:</strong> Decrypt for testing or legacy compatibility</li>
-                        <li>✅ <strong>Preserve Everything:</strong> All tables, indexes, triggers, views intact</li>
-                        <li>✅ <strong>Migration Scripts:</strong> Generate SQL for automated deployments</li>
+
+                        <li>✅ <strong>Preserve Everything:</strong> All tables, indexes, Datas, views intact</li>
+
                         <li>✅ <strong>Safe Process:</strong> Verify migration with comparison before committing</li>
                     </ul>
                     <div class="highlight-note">
@@ -1324,7 +1496,7 @@
                 <div class="comparison-card highlight">
                     <h3>planDB</h3>
                     <ul>
-                        <li>✅ Linux + Windows native</li>
+                        <li>✅ Linux + Windows + macOS native</li>
                         <li>✅ Native SQLCipher support</li>
                         <li>✅ $99-149/year (beta: free 90 days)</li>
                         <li>✅ Bidirectional with auto-rollback</li>
@@ -1335,43 +1507,92 @@
         </div>
     </section>
 
-    <!-- Use Cases -->
-    <section class="use-cases">
+    <!-- USE CASES SECTION (NEW!) -->
+    <section id="use-cases" class="use-cases">
         <div class="container">
             <div class="section-header">
-                <h2>Who Uses planDB</h2>
-                <p>Real developers solving real problems</p>
+                <h2>Common Use Cases</h2>
+                <p>See how developers use planDB to solve real database challenges</p>
             </div>
             <div class="use-case-grid">
-                <div class="use-case-card">
-                    <h3>👨‍💻 Backend Developers</h3>
-                    <p>Sync development and production databases safely. Generate migration scripts with confidence.
-                        Work with SQLCipher for sensitive data (healthcare, finance).</p>
+                <div class="use-case">
+                    <h3>
+                        <span class="use-case-icon">🚀</span>
+                        Syncing Dev → Production
+                    </h3>
+                    <ol>
+                        <li>Select dev.db as Database 1</li>
+                        <li>Select prod.db as Database 2</li>
+                        <li>Compare to see all differences</li>
+                        <li>Generate forward patch (dev → prod)</li>
+                        <li>Download rollback patch as safety net</li>
+                        <li>Review and apply to production</li>
+                    </ol>
                 </div>
-                <div class="use-case-card">
-                    <h3>📱 Mobile Developers</h3>
-                    <p>Create reliable database migrations for iOS and Android apps. Test schema changes before app
-                        releases. Generate SQLite migration code automatically.</p>
+                <div class="use-case">
+                    <h3>
+                        <span class="use-case-icon">🐛</span>
+                        Debugging Schema Drift
+                    </h3>
+                    <ol>
+                        <li>Select current.db and backup.db</li>
+                        <li>Compare schemas to see changes</li>
+                        <li>Identify unauthorized modifications</li>
+                        <li>Use rollback patch to restore schema</li>
+                        <li>Audit who made changes and when</li>
+                    </ol>
                 </div>
-                <div class="use-case-card">
-                    <h3>🔧 DevOps Engineers</h3>
-                    <p>Manage database deployments across environments. Automate schema synchronization. Ensure prod
-                        matches staging before releases.</p>
+                <div class="use-case">
+                    <h3>
+                        <span class="use-case-icon">🔐</span>
+                        Comparing Encrypted Databases
+                    </h3>
+                    <ol>
+                        <li>Select both SQLCipher .db files</li>
+                        <li>Enter password (no decryption needed)</li>
+                        <li>Compare directly without temp files</li>
+                        <li>Generate patches while maintaining encryption</li>
+                        <li>Keep sensitive data secure throughout</li>
+                    </ol>
                 </div>
-                <div class="use-case-card">
-                    <h3>🐧 Linux Developers</h3>
-                    <p>The ONLY professional SQLite comparison tool built natively for Linux. No Wine, no virtual
-                        machines, no compromises.</p>
+                <div class="use-case">
+                    <h3>
+                        <span class="use-case-icon">📱</span>
+                        Mobile App Migrations
+                    </h3>
+                    <ol>
+                        <li>Compare old version vs new version schemas</li>
+                        <li>Generate migration SQL for app updates</li>
+                        <li>Test migrations on sample databases</li>
+                        <li>Include rollback scripts in app</li>
+                        <li>Deploy with confidence</li>
+                    </ol>
                 </div>
-                <div class="use-case-card">
-                    <h3>🏭 Embedded Systems</h3>
-                    <p>Manage SQLite databases on IoT devices, industrial equipment, and automotive systems. Remote
-                        database updates with rollback safety.</p>
+                <div class="use-case">
+                    <h3>
+                        <span class="use-case-icon">🔄</span>
+                        SQLite → SQLCipher Migration
+                    </h3>
+                    <ol>
+                        <li>Select unencrypted SQLite database</li>
+                        <li>Create new SQLCipher database with password</li>
+                        <li>Compare to ensure complete migration</li>
+                        <li>Verify all data transferred correctly</li>
+                        <li>Generate patch for any missing elements</li>
+                    </ol>
                 </div>
-                <div class="use-case-card">
-                    <h3>🗄️ Database Admins</h3>
-                    <p>Professional tools for SQLite/SQLCipher database management. Visual comparison and safe migration
-                        workflows for production systems.</p>
+                <div class="use-case">
+                    <h3>
+                        <span class="use-case-icon">�</span>
+                        Team Database Synchronization
+                    </h3>
+                    <ol>
+                        <li>Compare team member's local database with main</li>
+                        <li>Identify their local changes</li>
+                        <li>Generate patch to merge changes</li>
+                        <li>Review for conflicts before applying</li>
+                        <li>Keep team databases in sync</li>
+                    </ol>
                 </div>
             </div>
         </div>
@@ -1385,16 +1606,20 @@
                 <p>Professional interface designed for serious database work</p>
             </div>
             <div class="showcase-grid">
-                <div class="showcase-item">
+                <div class="showcase-item medium large">
                     <img src="landing_assets/uploaded_image_1_1763916169898.png"
                         alt="planDB schema comparison interface showing side-by-side database differences">
                 </div>
-                <div class="showcase-item">
+                <div class="showcase-item medium large">
                     <img src="landing_assets/uploaded_image_2_1763916169898.png"
                         alt="planDB data comparison view with highlighted row differences">
                 </div>
-                <div class="showcase-item large">
+                <div class="showcase-item medium">
                     <img src="landing_assets/uploaded_image_3_1763916169898.png"
+                        alt="planDB bidirectional patch generation with SQL preview">
+                </div>
+                <div class="showcase-item medium">
+                    <img src="landing_assets/uploaded_image_4_1763916169898.png"
                         alt="planDB bidirectional patch generation with SQL preview">
                 </div>
             </div>
@@ -1462,7 +1687,7 @@
                     </a>
 
                     <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 16px;">
-                        No credit card required · No strings attached · Linux & Windows
+                        No credit card required · No strings attached · Linux, Windows, and macOS
                     </p>
                 </div>
             </div>
@@ -1479,125 +1704,75 @@
             <a href="#download" class="btn">
                 Join Beta Program Now →
             </a>
-            <p class="cta-subtext">Your feedback shapes the product. Native Linux and Windows support.</p>
+            <p class="cta-subtext">Your feedback shapes the product. Native Linux, Windows, and macOS support.</p>
         </div>
     </div>
 
-    <!-- FAQ -->
-    <section class="faq">
+    <!-- ENHANCED FAQ SECTION (Replaces your old FAQ) -->
+    <section id="faq" class="faq">
         <div class="container">
             <div class="section-header">
                 <h2>Frequently Asked Questions</h2>
+                <p>Everything you need to know about planDB</p>
             </div>
-            <div class="faq-list">
+            <div class="faq-grid">
                 <div class="faq-item">
-                    <h3>What databases does planDB support?</h3>
-                    <p>planDB specializes in SQLite and SQLCipher databases. We focus on doing SQLite comparison
-                        extremely well rather than being mediocre at many databases. Support for MySQL and PostgreSQL
-                        may come in v2.0 based on user demand.</p>
+                    <h3>What database formats does planDB support?</h3>
+                    <p>planDB supports standard SQLite databases (.db, .sqlite, .sqlite3) and SQLCipher encrypted
+                        databases. Both file formats work seamlessly with full schema and data comparison.</p>
                 </div>
-                <div class="faq-item"></div>
-                <h3>How does SQLite to SQLCipher migration work in planDB?</h3>
-                <p>
-                    planDB provides three ways to migrate between SQLite and SQLCipher formats:
-                    <br><br>
-                    <strong>1. Direct Migration:</strong> Open your source SQLite database and target SQLCipher database
-                    (or vice versa),
-                    then use the migration feature to convert all data while maintaining schema structure, indexes,
-                    triggers, and views.
-                    <br><br>
-                    <strong>2. Verification First:</strong> Compare both databases before and after migration to ensure
-                    complete
-                    data integrity. planDB shows you exactly what changed during the migration process.
-                    <br><br>
-                    This is essential when adding encryption to healthcare apps (HIPAA), financial apps (PCI-DSS),
-                    or any application handling sensitive user data that wasn't originally encrypted.
-                </p>
+                <div class="faq-item">
+                    <h3>Do I need to decrypt SQLCipher databases first?</h3>
+                    <p>No! planDB handles encrypted databases natively. Just enter the password once and planDB compares
+                        the databases directly without creating temporary decrypted files. Your encrypted data stays
+                        secure throughout the entire process.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>What's the difference between forward and rollback patches?</h3>
+                    <p>Forward patches sync Database 1 → Database 2 by applying all changes. Rollback patches do the
+                        opposite (Database 2 → Database 1), allowing you to undo changes if something goes wrong. Always
+                        download the rollback patch before applying forward changes for a safety net.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>Does planDB work offline?</h3>
+                    <p>Yes! planDB works completely offline with no internet connection required. Your databases never
+                        leave your machine - no cloud uploads, no external servers, no telemetry. Perfect for secure
+                        environments and air-gapped systems.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>Which platforms are supported?</h3>
+                    <p>planDB runs natively on Linux (Ubuntu, Debian, Fedora, etc.), Windows 10/11, and macOS (Apple
+                        Silicon & Intel). Download formats include .deb packages, AppImage, .msi installer, portable
+                        .exe, and .dmg for macOS.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>Can I compare databases of different sizes?</h3>
+                    <p>Yes! planDB is optimized to handle databases from small (kilobytes) to large (gigabytes). The
+                        Rust backend uses efficient memory management and streaming for large datasets.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>How do I apply the generated patches?</h3>
+                    <p>You have two options: (1) Apply patches directly within planDB with one click, or (2) Export SQL
+                        scripts and run them manually using your preferred database tool. Both forward and rollback
+                        patches can be saved for audit trails.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>Is planDB free?</h3>
+                    <p>planDB is currently in free beta with 90-day access to all features. After the beta, pricing will
+                        be $99/year. Beta testers get special early-bird pricing: $49/year or $99 lifetime license for
+                        the first 100 customers.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>What if I find a bug or need help?</h3>
+                    <p>Contact us via the form below or email support@planplabs.com. As an early-stage product, we
+                        respond quickly to bug reports and feature requests. Beta testers help shape the product!</p>
+                </div>
+                <div class="faq-item">
+                    <h3>Can planDB handle complex schemas with triggers and views?</h3>
+                    <p>Yes! planDB compares all schema elements including tables, columns, indexes, triggers, and views.
+                        The comparison engine understands SQLite's full schema syntax.</p>
+                </div>
             </div>
-
-            <div class="faq-item">
-                <h3>Does planDB work on Linux?</h3>
-                <p>Yes! planDB is built natively for Linux using Rust and Tauri. It works on Ubuntu, Debian, Fedora,
-                    and other distributions. Available as .deb packages and AppImage format. This is the ONLY
-                    professional SQLite comparison tool with native Linux support - no Wine or virtual machines
-                    needed.</p>
-            </div>
-
-            <div class="faq-item">
-                <h3>Can I use planDB on macOS?</h3>
-                <p>macOS support is coming soon! We're currently focusing on Linux and Windows where developer
-                    demand is highest. Join the beta waitlist to be notified when the macOS version is ready.</p>
-            </div>
-
-            <div class="faq-item">
-                <h3>Is the 90-day beta fully functional?</h3>
-                <p>Yes! All features are included in the beta with no limitations. No credit card required. After
-                    the 90-day beta period, we'll launch with paid plans (estimated $99-149/year or $199-299
-                    lifetime). Beta testers will receive special early-bird discounted pricing as a thank you.</p>
-            </div>
-
-            <div class="faq-item">
-                <h3>What is bidirectional patching and why does it matter?</h3>
-                <p>When you compare two databases, planDB automatically generates patches in BOTH directions:
-                    forward patch (Source→Target) to apply your changes, and reverse patch (Target→Source) for
-                    instant rollback. This means you always have a safety net ready before applying any changes - no
-                    manual rollback script writing needed.</p>
-            </div>
-
-            <div class="faq-item">
-                <h3>Can planDB handle encrypted SQLCipher databases?</h3>
-                <p>Yes! planDB has full native SQLCipher support with password handling. You can compare encrypted
-                    databases, migrate between SQLite and SQLCipher, generate patches while maintaining encryption,
-                    and browse encrypted data. It's the only professional tool built specifically for SQLCipher
-                    databases.</p>
-            </div>
-
-            <div class="faq-item">
-                <h3>What happens if a patch fails during application?</h3>
-                <p>planDB stops execution immediately and shows you exactly what was applied and what failed. You'll
-                    see the error message and the SQL line where it stopped. Since you have the reverse patch
-                    already downloaded, you can review the situation and apply the rollback SQL if needed to restore
-                    the database state.</p>
-            </div>
-
-            <div class="faq-item">
-                <h3>Can I apply patches directly or must I do it manually?</h3>
-                <p>You have three options: (1) Copy patch SQL to clipboard and paste into your preferred DB tool,
-                    (2) Download as .sql file for review, version control, or automated deployment, or (3) Apply
-                    directly within planDB with safety confirmations. Choose the workflow that fits your process.
-                </p>
-            </div>
-
-            <div class="faq-item">
-                <h3>What happens after the 90-day beta ends?</h3>
-                <p>We'll launch paid plans estimated at $99-149/year or $199-299 lifetime license. Beta testers will
-                    get priority access to discounted pricing (estimated $49-69/year early bird rate) as a thank you
-                    for helping us improve the product. You'll be notified well in advance with plenty of time to
-                    decide.</p>
-            </div>
-
-            <div class="faq-item">
-                <h3>How can I provide beta feedback?</h3>
-                <p>We love feedback! Report bugs, request features, or share your experience through the contact
-                    form below, or email us directly. Active beta testers who provide valuable feedback will get
-                    extra perks and deeper discounts when we launch.</p>
-            </div>
-
-            <div class="faq-item">
-                <h3>Is there a team or enterprise license available?</h3>
-                <p>We're planning team licenses for the official launch. If your organization wants to test planDB
-                    with multiple developers during beta, contact us and we'll set up a custom beta arrangement for
-                    your team.</p>
-            </div>
-
-            <div class="faq-item">
-                <h3>Who are the typical users of planDB?</h3>
-                <p>planDB is used by backend developers syncing dev/prod databases, mobile app developers generating
-                    migration scripts, DevOps engineers managing deployments, embedded systems engineers updating
-                    IoT devices, and database administrators working with SQLite/SQLCipher in healthcare, finance,
-                    and security-critical applications.</p>
-            </div>
-        </div>
         </div>
     </section>
 
@@ -1606,7 +1781,8 @@
         <div class="container">
             <div class="section-header">
                 <h2>Download Beta Version</h2>
-                <p>Get instant access to planDB beta. 90 days free, all features unlocked. No credit card required.</p>
+                <p>Get instant access to planDB beta. 90 days free, all features unlocked. No credit card
+                    required.</p>
             </div>
             <div class="download-cards">
                 <!-- Windows -->
@@ -1625,7 +1801,8 @@
                     <div style="margin-top: 12px; font-size: 0.875rem; color: var(--text-muted);">
                         <a href="#"
                             onclick="openDownloadModal('https://github.com/planp1125-pixel/plandb_mvp/releases/download/plandb-v0.5.4/planDB_0.5.4_x64-setup.exe'); return false;"
-                            style="color: var(--primary); text-decoration: none;">Also available as .exe installer</a>
+                            style="color: var(--primary); text-decoration: none;">Also available as .exe
+                            installer</a>
                     </div>
                 </div>
 
@@ -1640,20 +1817,21 @@
                     <div style="margin-top: 12px; font-size: 0.875rem; color: var(--text-muted);">
                         <a href="#"
                             onclick="openDownloadModal('https://github.com/planp1125-pixel/plandb_mvp/releases/download/plandb-v0.5.4/planDB_0.5.4_amd64.AppImage'); return false;"
-                            style="color: var(--primary); text-decoration: none;">Also available as AppImage</a>
+                            style="color: var(--primary); text-decoration: none;">Also available as
+                            AppImage</a>
                     </div>
                 </div>
 
                 <!-- macOS -->
-                <div class="download-card" style="opacity: 0.6; border-style: dashed;">
+                <div class="download-card">
                     <span class="os-icon">🍎</span>
                     <h3>macOS</h3>
-                    <p>Apple Silicon & Intel</p>
-                    <button class="download-btn" disabled
-                        style="background: var(--bg-surface-hover); cursor: not-allowed; opacity: 0.6;">Coming
-                        Soon</button>
+                    <p>Apple Silicon (M1/M2/M3)</p>
+                    <button
+                        onclick="openDownloadModal('https://github.com/planp1125-pixel/plandb_mvp/releases/download/plandb-v0.5.4/planDB_0.5.4_aarch64.dmg')"
+                        class="download-btn" style="border: none; cursor: pointer;">Download .dmg</button>
                     <div style="margin-top: 12px; font-size: 0.875rem; color: var(--text-muted);">
-                        Join beta waitlist below
+                        For Apple Silicon Macs (M1/M2/M3)
                     </div>
                 </div>
             </div>
@@ -1730,6 +1908,14 @@
                     </a>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Image Popup Modal -->
+    <div id="imagePopup" class="image-popup-overlay">
+        <div class="image-popup-content">
+            <button class="image-popup-close" onclick="closeImagePopup()">×</button>
+            <img id="popupImage" src="" alt="Full size image">
         </div>
     </div>
 
@@ -1855,6 +2041,41 @@
                         block: 'start'
                     });
                 }
+            });
+        });
+
+        // Image Popup Functions
+        function openImagePopup(imageSrc) {
+            const popup = document.getElementById('imagePopup');
+            const popupImage = document.getElementById('popupImage');
+            popupImage.src = imageSrc;
+            popup.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeImagePopup() {
+            const popup = document.getElementById('imagePopup');
+            popup.classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        // Close popup on background click
+        document.getElementById('imagePopup').addEventListener('click', function (e) {
+            if (e.target === this) closeImagePopup();
+        });
+
+        // Close popup on Escape key
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') closeImagePopup();
+        });
+
+        // Attach click handlers to all step screenshot images
+        document.addEventListener('DOMContentLoaded', function () {
+            const stepImages = document.querySelectorAll('.step-screenshot img');
+            stepImages.forEach(img => {
+                img.addEventListener('click', function () {
+                    openImagePopup(this.src);
+                });
             });
         });
     </script>
