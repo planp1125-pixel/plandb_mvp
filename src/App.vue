@@ -4,7 +4,7 @@
     <header class="app-header">
       <div class="header-content">
         <div class="flex items-center gap-3">
-          <img src="./assets/chameleon_logo_transparent.png" alt="planDB Logo" class="h-16 w-auto" />
+          <img src="./assets/chameleon_logo_hq.png" alt="planDB Logo" class="h-16 w-auto" />
           <div>
             <h1 class="text-xl font-bold">planDB</h1>
             <div class="subtitle">Desktop application for SQLCipher database management</div>
