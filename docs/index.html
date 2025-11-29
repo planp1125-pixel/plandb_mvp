@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>planDB Documentation - SQLite & SQLCipher Database Comparison Tool</title>
+    <meta name="description" content="Complete documentation for planDB - SQLite and SQLCipher database comparison tool. Installation guides, tutorials, and troubleshooting.">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            line-height: 1.6;
+            color: #1e293b;
+            background: #f8fafc;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        
+        .nav {
+            background: white;
+            border-bottom: 1px solid #e2e8f0;
+            padding: 15px 20px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .nav-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+        }
+        
+        .nav a {
+            color: #3b82f6;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+        
+        .nav a:hover {
+            color: #1e40af;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            display: grid;
+            grid-template-columns: 250px 1fr;
+            gap: 40px;
+        }
+        
+        .sidebar {
+            background: white;
+            padding: 25px;
+            border-radius: 8px;
+            height: fit-content;
+            position: sticky;
+            top: 80px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .sidebar h3 {
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            color: #64748b;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+        
+        .sidebar ul {
+            list-style: none;
+        }
+        
+        .sidebar li {
+            margin-bottom: 10px;
+        }
+        
+        .sidebar a {
+            color: #475569;
+            text-decoration: none;
+            display: block;
+            padding: 5px 0;
+            transition: color 0.2s;
+        }
+        
+        .sidebar a:hover {
+            color: #3b82f6;
+        }
+        
+        .content {
+            background: white;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .content h2 {
+            color: #1e40af;
+            margin-top: 40px;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        
+        .content h2:first-child {
+            margin-top: 0;
+        }
+        
+        .content h3 {
+            color: #334155;
+            margin-top: 30px;
+            margin-bottom: 15px;
+        }
+        
+        .content h4 {
+            color: #475569;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+        
+        .content p {
+            margin-bottom: 15px;
+            color: #334155;
+        }
+        
+        .content ul, .content ol {
+            margin-bottom: 15px;
+            margin-left: 25px;
+        }
+        
+        .content li {
+            margin-bottom: 8px;
+        }
+        
+        code {
+            background: #f1f5f9;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            color: #e11d48;
+        }
+        
+        pre {
+            background: #1e293b;
+            color: #f1f5f9;
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 20px 0;
+            line-height: 1.5;
+        }
+        
+        pre code {
+            background: none;
+            color: inherit;
+            padding: 0;
+        }
+        
+        .alert {
+            padding: 15px 20px;
+            border-radius: 6px;
+            margin: 20px 0;
+            border-left: 4px solid;
+        }
+        
+        .alert-info {
+            background: #dbeafe;
+            border-color: #3b82f6;
+            color: #1e40af;
+        }
+        
+        .alert-warning {
+            background: #fef3c7;
+            border-color: #f59e0b;
+            color: #92400e;
+        }
+        
+        .alert-success {
+            background: #d1fae5;
+            border-color: #10b981;
+            color: #065f46;
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 12px 24px;
+            background: #3b82f6;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 500;
+            transition: background 0.2s;
+            margin-top: 10px;
+        }
+        
+        .btn:hover {
+            background: #2563eb;
+        }
+        
+        .footer {
+            background: #1e293b;
+            color: #94a3b8;
+            text-align: center;
+            padding: 30px 20px;
+            margin-top: 60px;
+        }
+        
+        .footer a {
+            color: #60a5fa;
+            text-decoration: none;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+            
+            .sidebar {
+                position: static;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📚 planDB Documentation</h1>
+        <p>Complete guide to SQLite & SQLCipher database comparison</p>
+    </div>
+
+    <nav class="nav">
+        <div class="nav-container">
+            <a href="https://planplabs.com">← Back to planDB</a>
+            <a href="#installation">Installation</a>
+            <a href="#getting-started">Getting Started</a>
+            <a href="#features">Features</a>
+            <a href="#troubleshooting">Troubleshooting</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <aside class="sidebar">
+            <h3>Quick Links</h3>
+            <ul>
+                <li><a href="#installation">Installation</a></li>
+                <li><a href="#linux">Linux</a></li>
+                <li><a href="#macos">macOS</a></li>
+                <li><a href="#windows">Windows</a></li>
+                <li><a href="#getting-started">Getting Started</a></li>
+                <li><a href="#features">Features</a></li>
+                <li><a href="#schema-comparison">Schema Comparison</a></li>
+                <li><a href="#data-comparison">Data Comparison</a></li>
+                <li><a href="#patch-generation">Patch Generation</a></li>
+                <li><a href="#sqlcipher">SQLCipher Support</a></li>
+                <li><a href="#troubleshooting">Troubleshooting</a></li>
+                <li><a href="#faq">FAQ</a></li>
+            </ul>
+        </aside>
+
+        <main class="content">
+            <h2 id="installation">Installation</h2>
+            <p>planDB is available for Linux, macOS, and Windows. Choose your platform below:</p>
+
+            <h3 id="linux">Linux</h3>
+            
+            <h4>Ubuntu / Debian (.deb)</h4>
+            <pre><code>wget https://github.com/planp1125-pixel/plandb_mvp/releases/download/plandb-v0.5.4/plandb_0.5.4_amd64.deb
+sudo dpkg -i plandb_0.5.4_amd64.deb</code></pre>
+
+            <h4>Any Linux Distribution (AppImage)</h4>
+            <pre><code>wget https://github.com/planp1125-pixel/plandb_mvp/releases/download/plandb-v0.5.4/plandb_0.5.4_amd64.AppImage
+chmod +x plandb_0.5.4_amd64.AppImage
+./plandb_0.5.4_amd64.AppImage</code></pre>
+
+            <div class="alert alert-info">
+                <strong>Note:</strong> If you encounter dependency issues, install required packages:
+                <pre><code>sudo apt install libwebkit2gtk-4.0-37 libgtk-3-0</code></pre>
+            </div>
+
+            <h3 id="macos">macOS</h3>
+            
+            <h4>Installation Steps</h4>
+            <ol>
+                <li>Download <code>planDB_aarch64.dmg</code> from the <a href="https://github.com/planp1125-pixel/plandb_mvp/releases">releases page</a></li>
+                <li>Open the .dmg file</li>
+                <li>Drag planDB to your Applications folder</li>
+                <li>Launch from Applications</li>
+            </ol>
+
+            <div class="alert alert-warning">
+                <strong>Mac Security Warning:</strong> If you see "planDB cannot be opened because the developer cannot be verified", run:
+                <pre><code>xattr -cr /Applications/planDB.app</code></pre>
+                Then try opening again.
+            </div>
+
+            <h3 id="windows">Windows</h3>
+            
+            <h4>MSI Installer (Recommended)</h4>
+            <ol>
+                <li>Download <code>planDB_0.5.4_x64_en-US.msi</code></li>
+                <li>Double-click to run installer</li>
+                <li>Follow installation wizard</li>
+                <li>Launch from Start Menu</li>
+            </ol>
+
+            <h4>Portable .exe</h4>
+            <p>Download <code>planDB_0.5.4_x64-setup.exe</code> and run directly. No installation required.</p>
+
+            <h2 id="getting-started">Getting Started</h2>
+            
+            <h3>First Launch</h3>
+            <p>When you first open planDB, you'll see the main comparison interface with two database selection panels.</p>
+
+            <h3>Basic Workflow</h3>
+            <ol>
+                <li><strong>Select Database 1:</strong> Click "Select Database" and choose your first SQLite/SQLCipher file</li>
+                <li><strong>Select Database 2:</strong> Click "Select Database" for the second database</li>
+                <li><strong>Enter Password (if encrypted):</strong> For SQLCipher databases, enter the encryption password</li>
+                <li><strong>Compare:</strong> Click "Compare Databases" to see differences</li>
+                <li><strong>Generate Patches:</strong> Review differences and generate SQL patches</li>
+            </ol>
+
+            <div class="alert alert-success">
+                <strong>Tip:</strong> planDB remembers your last used databases for quick access!
+            </div>
+
+            <h2 id="features">Features</h2>
+
+            <h3 id="schema-comparison">Schema Comparison</h3>
+            <p>planDB compares all schema elements between databases:</p>
+            <ul>
+                <li>✅ Tables and columns</li>
+                <li>✅ Indexes (unique, composite, partial)</li>
+                
+            </ul>
+
+            <p>The comparison result shows:</p>
+            <ul>
+                <li><strong style="color: #10b981;">Green:</strong> Items added in Database 2</li>
+                <li><strong style="color: #ef4444;">Red:</strong> Items removed from Database 1</li>
+                <li><strong style="color: #f59e0b;">Yellow:</strong> Items modified</li>
+                <li><strong style="color: #64748b;">Gray:</strong> Unchanged items</li>
+            </ul>
+
+            <h3 id="data-comparison">Data Comparison</h3>
+            <p>Compare actual data row-by-row:</p>
+            <ul>
+                <li>Identify inserted records</li>
+                <li>Identify deleted records</li>
+                <li>Identify modified records with field-level diff</li>
+                <li>Handle large datasets efficiently</li>
+            </ul>
+
+            <h3 id="patch-generation">Patch Generation</h3>
+            <p>planDB generates <strong>bidirectional SQL patches</strong>:</p>
+
+            <h4>Forward Patch (Database 1 → Database 2)</h4>
+            <p>Applies all changes from Database 1 to make Database 2 match it.</p>
+            <pre><code>-- Example forward patch
+ALTER TABLE users ADD COLUMN email TEXT;
+INSERT INTO users (id, name, email) VALUES (3, 'Alice', 'alice@example.com');
+UPDATE users SET status = 'active' WHERE id = 1;</code></pre>
+
+            <h4>Reverse Patch (Database 2 → Database 1)</h4>
+            <p>Rollback patch to undo changes if needed.</p>
+            <pre><code>-- Example reverse patch  
+UPDATE users SET status = 'inactive' WHERE id = 1;
+DELETE FROM users WHERE id = 3;
+ALTER TABLE users DROP COLUMN email;</code></pre>
+
+            <div class="alert alert-info">
+                <strong>Best Practice:</strong> Always download the reverse patch before applying forward changes. This gives you a safety net for rollback!
+            </div>
+
+            <h3 id="sqlcipher">SQLCipher Support</h3>
+            <p>planDB has native SQLCipher encryption support:</p>
+            <ul>
+                <li>✅ Compare encrypted databases directly</li>
+                <li>✅ No manual decrypt/re-encrypt workflow</li>
+                <li>✅ Supports all SQLCipher versions</li>
+                <li>✅ Password-protected comparison</li>
+                <li>✅ Generate patches while maintaining encryption</li>
+            </ul>
+
+            <h4>Working with Encrypted Databases</h4>
+            <ol>
+                <li>Select your SQLCipher database file</li>
+                <li>Enter the encryption password when prompted</li>
+                <li>planDB handles encryption/decryption automatically</li>
+                <li>Your password is never stored or transmitted</li>
+            </ol>
+
+            <h2 id="troubleshooting">Troubleshooting</h2>
+
+            <h3>macOS: "App cannot be opened"</h3>
+            <p><strong>Error:</strong> "planDB cannot be opened because the developer cannot be verified"</p>
+            <p><strong>Solution:</strong></p>
+            <pre><code>xattr -cr /Applications/planDB.app</code></pre>
+            <p>This removes the quarantine attribute. Then try opening again.</p>
+
+            <h3>Linux: Missing Dependencies</h3>
+            <p><strong>Error:</strong> Library errors on launch</p>
+            <p><strong>Solution:</strong></p>
+            <pre><code>sudo apt install libwebkit2gtk-4.0-37 libgtk-3-0 libayatana-appindicator3-1</code></pre>
+
+            <h3>Windows: SmartScreen Warning</h3>
+            <p><strong>Error:</strong> "Windows protected your PC"</p>
+            <p><strong>Solution:</strong> Click "More info" → "Run anyway"</p>
+
+            <h3>SQLCipher: Wrong Password</h3>
+            <p><strong>Error:</strong> "Database is encrypted or is not a database"</p>
+            <p><strong>Solution:</strong> Verify your password is correct. SQLCipher databases cannot be opened without the correct password.</p>
+
+            <h3>Large Databases: Slow Comparison</h3>
+            <p><strong>Issue:</strong> Comparison takes a long time</p>
+            <p><strong>Tips:</strong></p>
+            <ul>
+                <li>Use schema-only comparison first</li>
+                <li>Limit data comparison to specific tables</li>
+                <li>Ensure databases are indexed properly</li>
+                <li>Close other applications to free up memory</li>
+            </ul>
+
+            <h2 id="faq">Frequently Asked Questions</h2>
+
+            <h3>Can I compare databases of different sizes?</h3>
+            <p>Yes! planDB handles databases from kilobytes to gigabytes. The comparison is done efficiently using streaming to manage memory usage.</p>
+
+            <h3>Does planDB work offline?</h3>
+            <p>Yes, completely offline. Your databases never leave your machine. No internet connection required.</p>
+
+            <h3>Can I compare SQLite with SQLCipher?</h3>
+            <p>Yes! You can compare an unencrypted SQLite database with an encrypted SQLCipher database, or any combination.</p>
+
+            <h3>How do I apply the generated patches?</h3>
+            <p>You have two options:</p>
+            <ol>
+                <li><strong>Direct Apply:</strong> Use planDB's built-in apply feature</li>
+                <li><strong>Manual Apply:</strong> Export the SQL patch and run it with <code>sqlite3</code> or your preferred tool</li>
+            </ol>
+
+            <h3>Where can I get help?</h3>
+            <ul>
+                <li>📧 Email: <a href="mailto:planptechsup@gmail.com">planptechsup@gmail.com</a></li>
+                <li>💬 GitHub Issues: <a href="https://github.com/planp1125-pixel/plandb_mvp/issues">Report bugs or request features</a></li>
+                <li>💡 GitHub Discussions: <a href="https://github.com/planp1125-pixel/plandb_mvp/discussions">Ask questions</a></li>
+            </ul>
+
+            <h2>Additional Resources</h2>
+            <ul>
+                <li><a href="https://planplabs.com">planDB Website</a></li>
+                <li><a href="https://github.com/planp1125-pixel/plandb_mvp">GitHub Repository</a></li>
+                <li><a href="https://github.com/planp1125-pixel/plandb_mvp/releases">Latest Releases</a></li>
+                <li><a href="https://www.zetetic.net/sqlcipher/">SQLCipher Documentation</a></li>
+                <li><a href="https://www.sqlite.org/docs.html">SQLite Documentation</a></li>
+            </ul>
+
+            <div class="alert alert-success" style="margin-top: 40px;">
+                <strong>Need more help?</strong> Feel free to reach out via email or open a discussion on GitHub. We're here to help!
+            </div>
+
+            <a href="https://planplabs.com" class="btn">Download planDB</a>
+        </main>
+    </div>
+
+    <footer class="footer">
+        <p>&copy; 2025 planDB by PlanLabs. All rights reserved.</p>
+        <p style="margin-top: 10px;">
+            <a href="https://planplabs.com">Website</a> • 
+            <a href="https://github.com/planp1125-pixel/plandb_mvp">GitHub</a> • 
+            <a href="mailto:planptechsup@gmail.com">Contact</a>
+        </p>
+    </footer>
+</body>
+</html>
