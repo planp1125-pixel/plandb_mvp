@@ -1,6 +1,6 @@
 [package]
 name = "plandb"
-version = "0.5.8"
+version = "0.5.9"
 description = "SQLCipher Database Schema Comparison Tool"
 authors = ["you"]
 edition = "2021"
@@ -18,7 +18,6 @@ tauri-plugin-opener = "2.5.0"
 tauri-plugin-dialog = "2.4.0"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-#chrono = "0.4"
 chrono = { version = "0.4", features = ["serde"] }
 sha2 = "0.10"
 reqwest = { version = "0.11", features = ["json"] }
@@ -34,7 +33,7 @@ thiserror = "1.0"
 base64 = "0.22.1"
 
 [target.'cfg(windows)'.dependencies]
-openssl = "0.10"
+openssl = { version = "0.10", features = ["vendored"] }
 
 [target.'cfg(not(windows))'.dependencies]
 openssl = { version = "0.10", features = ["vendored"] }
