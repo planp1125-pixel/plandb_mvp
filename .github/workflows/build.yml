@@ -60,23 +60,23 @@ jobs:
         with:
           arch: x64
 
-      # Install Windows dependencies (OpenSSL Static via vcpkg)
+      # Install Windows dependencies (Perl + NASM for OpenSSL Vendored)
       - name: Install Windows dependencies
         if: matrix.platform == 'windows-latest'
         shell: pwsh
         run: |
-          # Install OpenSSL Static via vcpkg
-          vcpkg install openssl:x64-windows-static
+          # Install Perl and NASM (required for building OpenSSL vendored)
+          choco install strawberryperl -y
+          choco install nasm -y
           
-          # Set environment variables for OpenSSL
-          $vcpkgRoot = $env:VCPKG_INSTALLATION_ROOT
-          echo "OPENSSL_DIR=$vcpkgRoot\installed\x64-windows-static" >> $env:GITHUB_ENV
-          echo "OPENSSL_STATIC=1" >> $env:GITHUB_ENV
+          # Refresh environment variables to pick up new paths
+          refreshenv
           
           # SQLCipher flags
           echo "LIBSQLITE3_SYS_USE_PKG_CONFIG=0" >> $env:GITHUB_ENV
           echo "SQLCIPHER_BUNDLED=1" >> $env:GITHUB_ENV
           echo "LIBSQLITE3_SYS_BUNDLED_SQLCIPHER=1" >> $env:GITHUB_ENV
+          # OPENSSL_STATIC is handled by 'vendored' feature automatically
 
       # Create Cargo config for Windows with proper library paths
       - name: Create Cargo config for Windows
