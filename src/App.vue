@@ -135,7 +135,7 @@ import { open } from '@tauri-apps/plugin-shell';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import DatabaseConnection from "./components/DatabaseConnection.vue";
 import Database from './components/Database.vue';
-import ChameleonLoader from './components/ChameleonLoader.vue';
+
 import { DatabaseService, type DatabaseInfo, type SchemaComparison as SchemaComparisonType, type TrialInfo } from './services/databaseService';
 
 // Theme management
