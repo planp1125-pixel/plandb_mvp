@@ -1,26 +1,44 @@
 <template>
   <div id="app" class="app-container">
-    <!-- Header -->
-    <header class="app-header">
-      <div class="header-content">
-        <div class="flex items-center gap-3">
-          <img src="./assets/chameleon_logo_hq.png" alt="planDB Logo" class="h-16 w-auto" />
-          <div>
-            <h1 class="text-xl font-bold">planDB</h1>
-            <div class="subtitle">Desktop application for SQLCipher database management</div>
-          </div>
-        </div>
+    <!-- Unified Titlebar (VS Code style) -->
+    <div class="unified-titlebar" data-tauri-drag-region>
+      <!-- Left: Logo + App Name -->
+      <div class="titlebar-left">
+        <img src="./assets/chameleon_logo_hq.png" alt="planDB" class="titlebar-logo" />
+        <span class="titlebar-app-name">planDB</span>
+        <span class="titlebar-subtitle">SQLCipher Database Tool</span>
+      </div>
 
-        <!-- Theme toggle -->
-        <button
-          class="theme-toggle-btn"
-          @click="toggleTheme"
-          :title="isDark ? 'Switch to Light' : 'Switch to Dark'"
-        >
+      <!-- Center: Trial Info -->
+      <div class="titlebar-center">
+        <div class="titlebar-badge">Beta v{{ trialInfo.version }}</div>
+        <div class="titlebar-trial" :class="{ 'expired': trialInfo.is_expired }">
+          {{ trialInfo.is_expired ? 'Trial Expired' : `${trialInfo.remaining_days} days left` }}
+        </div>
+      </div>
+
+      <!-- Right: Theme Toggle + Window Controls -->
+      <div class="titlebar-right">
+        <button class="titlebar-theme-btn" @click="toggleTheme" :title="isDark ? 'Light Mode' : 'Dark Mode'">
           {{ isDark ? '🌙' : '☀️' }}
         </button>
+        <button class="titlebar-btn" @click="minimizeWindow" title="Minimize">
+          <svg width="12" height="12" viewBox="0 0 12 12">
+            <path d="M0 6h12" stroke="currentColor" stroke-width="1"/>
+          </svg>
+        </button>
+        <button class="titlebar-btn" @click="maximizeWindow" title="Maximize">
+          <svg width="12" height="12" viewBox="0 0 12 12">
+            <rect x="1" y="1" width="10" height="10" stroke="currentColor" stroke-width="1" fill="none"/>
+          </svg>
+        </button>
+        <button class="titlebar-btn titlebar-btn-close" @click="closeWindow" title="Close">
+          <svg width="12" height="12" viewBox="0 0 12 12">
+            <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="1"/>
+          </svg>
+        </button>
       </div>
-    </header>
+    </div>
 
     <!-- Main Content -->
     <main class="main-wrapper">
@@ -70,14 +88,6 @@
               <span class="text-xl">🐙</span>
             </button>
           </div>
-
-          <!-- Trial Info -->
-          <div class="trial-info">
-            <div class="version-tag">Beta v{{ trialInfo.version }}</div>
-            <div class="trial-days" :class="{ 'expired': trialInfo.is_expired }">
-              {{ trialInfo.is_expired ? 'Trial Expired' : `Trial: ${trialInfo.remaining_days} days left` }}
-            </div>
-          </div>
         </nav>
 
         <!-- Sidebar for database connections -->
@@ -122,8 +132,10 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
 import { open } from '@tauri-apps/plugin-shell';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import DatabaseConnection from "./components/DatabaseConnection.vue";
 import Database from './components/Database.vue';
+import ChameleonLoader from './components/ChameleonLoader.vue';
 import { DatabaseService, type DatabaseInfo, type SchemaComparison as SchemaComparisonType, type TrialInfo } from './services/databaseService';
 
 // Theme management
@@ -200,6 +212,34 @@ const reportBugGithub = async () => {
     await openGitHubReport();
   } catch (e) {
     console.error('Failed to open GitHub:', e);
+  }
+};
+
+// Window controls
+const minimizeWindow = async () => {
+  try {
+    console.log('Minimizing window...');
+    await getCurrentWindow().minimize();
+  } catch (e) {
+    console.error('Failed to minimize:', e);
+  }
+};
+
+const maximizeWindow = async () => {
+  try {
+    console.log('Toggling maximize...');
+    await getCurrentWindow().toggleMaximize();
+  } catch (e) {
+    console.error('Failed to maximize:', e);
+  }
+};
+
+const closeWindow = async () => {
+  try {
+    console.log('Closing window...');
+    await getCurrentWindow().close();
+  } catch (e) {
+    console.error('Failed to close:', e);
   }
 };
 
@@ -558,3 +598,5 @@ const handleTableSelected = (tableName: string) => {
   flex-direction: column;
 }
 </style>
+
+<style src="./assets/titlebar.css"></style>

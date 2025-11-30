@@ -60,29 +60,20 @@ jobs:
         with:
           arch: x64
 
-      # Install Windows dependencies with OpenSSL
+      # Install Windows dependencies (NASM for OpenSSL)
       - name: Install Windows dependencies
         if: matrix.platform == 'windows-latest'
         shell: pwsh
         run: |
-          # Install OpenSSL via chocolatey
-          choco install openssl -y
-          
-          # Find OpenSSL installation path
-          $opensslPath = Get-ChildItem "C:\Program Files\OpenSSL*" | Select-Object -First 1 -ExpandProperty FullName
-          Write-Host "Found OpenSSL at: $opensslPath"
-          
-          # Set environment variables
-          echo "OPENSSL_DIR=$opensslPath" >> $env:GITHUB_ENV
-          echo "OPENSSL_LIB_DIR=$opensslPath\lib\VC\x64\MT" >> $env:GITHUB_ENV
-          echo "OPENSSL_INCLUDE_DIR=$opensslPath\include" >> $env:GITHUB_ENV
-          echo "OPENSSL_STATIC=1" >> $env:GITHUB_ENV
-          echo "OPENSSL_NO_VENDOR=1" >> $env:GITHUB_ENV
+          # Install NASM (required for building OpenSSL vendored)
+          choco install nasm -y
           
           # SQLCipher flags
           echo "LIBSQLITE3_SYS_USE_PKG_CONFIG=0" >> $env:GITHUB_ENV
           echo "SQLCIPHER_BUNDLED=1" >> $env:GITHUB_ENV
           echo "LIBSQLITE3_SYS_BUNDLED_SQLCIPHER=1" >> $env:GITHUB_ENV
+          echo "OPENSSL_STATIC=1" >> $env:GITHUB_ENV
+          echo "OPENSSL_LIBS=libssl:libcrypto" >> $env:GITHUB_ENV
 
       # Create Cargo config for Windows with proper library paths
       - name: Create Cargo config for Windows
