@@ -1,0 +1,123 @@
+/* Unified Titlebar (VS Code/Figma style) */
+.unified-titlebar {
+    height: 40px;
+    background: var(--bg-primary);
+    border-bottom: 1px solid var(--border-primary);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 12px;
+    user-select: none;
+    flex-shrink: 0;
+}
+
+/* Left Section: Logo + Name */
+.titlebar-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-left: 4px;
+}
+
+.titlebar-logo {
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
+}
+
+.titlebar-app-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: -0.2px;
+}
+
+.titlebar-subtitle {
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--text-muted);
+    margin-left: 8px;
+    padding-left: 8px;
+    border-left: 1px solid var(--border-primary);
+}
+
+/* Center Section: Trial Info */
+.titlebar-center {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.titlebar-badge {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--primary-500);
+    background: rgba(99, 102, 241, 0.1);
+    padding: 3px 8px;
+    border-radius: 4px;
+}
+
+.titlebar-trial {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-muted);
+}
+
+.titlebar-trial.expired {
+    color: #ef4444;
+}
+
+/* Right Section: Theme + Window Controls */
+.titlebar-right {
+    display: flex;
+    gap: 0;
+    align-items: center;
+}
+
+.titlebar-theme-btn {
+    width: 40px;
+    height: 32px;
+    border: none;
+    background: transparent;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    margin-right: 4px;
+}
+
+.titlebar-theme-btn:hover {
+    background: var(--bg-hover);
+}
+
+.titlebar-btn {
+    width: 46px;
+    height: 40px;
+    border: none;
+    background: transparent;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.titlebar-btn:hover {
+    background: var(--bg-hover);
+}
+
+.titlebar-btn-close:hover {
+    background: #e81123;
+    color: white;
+}
+
+.titlebar-btn svg {
+    opacity: 0.7;
+}
+
+.titlebar-btn:hover svg {
+    opacity: 1;
+}
